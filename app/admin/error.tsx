@@ -1,0 +1,53 @@
+'use client';
+
+import { useEffect } from 'react';
+import { Button } from '@heroui/react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import Link from 'next/link';
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    console.error('Application error:', error);
+  }, [error]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 dir-rtl">
+      <div className="text-center space-y-4 max-w-md">
+        <div className="w-16 h-16 mx-auto rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-extrabold text-zinc-900 dark:text-white">
+          حدث خطأ في لوحة الإدارة
+        </h2>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          نعتذر عن هذا الخطأ. يرجى تحديث الصفحة أو العودة إلى خدمات الكيان.
+        </p>
+        <div className="flex justify-center gap-4">
+          <Button
+            color="warning"
+            variant="solid"
+            onClick={reset}
+            startContent={<RefreshCw className="w-4 h-4" />}
+            className="font-bold text-zinc-950 bg-amber-400 hover:bg-amber-500"
+          >
+            إعادة المحاولة
+          </Button>
+          <Button
+            as={Link}
+            href="/"
+            variant="bordered"
+            startContent={<Home className="w-4 h-4" />}
+          >
+            العودة لخدمات الكيان
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

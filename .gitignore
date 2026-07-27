@@ -1,0 +1,16 @@
+.vercel
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.icloud-placeholder
+.next/
+node_modules/
+*.log
+tsconfig.tsbuildinfo
+supabase/.temp/
+
+.vscode/
+.agents/
+skills-lock.json

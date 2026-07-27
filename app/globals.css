@@ -1,0 +1,179 @@
+/* Do not let Tailwind scan the whole repository. A previous dependency backup and
+   generated files made automatic discovery block the development compiler. */
+@import "@heroui/react/styles";
+@import "tailwindcss" source(none);
+
+@custom-variant dark (&:where(.dark, .dark *));
+@source "./admin/error.tsx";
+@source "./admin/layout.tsx";
+@source "./admin/page.tsx";
+@source "./driver/page.tsx";
+@source "./error.tsx";
+@source "./layout.tsx";
+@source "./loading.tsx";
+@source "./login/page.tsx";
+@source "./merchant/page.tsx";
+@source "./page.tsx";
+@source "./providers.tsx";
+@source "../components/admin/DriverManager.tsx";
+@source "../components/admin/EditPlaceModal.tsx";
+@source "../components/admin/EditRequestModal.tsx";
+@source "../components/admin/FeedbackDetailsModal.tsx";
+@source "../components/auth/LoginForm.tsx";
+@source "../components/delivery/DeliveryBar.tsx";
+@source "../components/delivery/DriverCard.tsx";
+@source "../components/delivery/DriverModal.tsx";
+@source "../components/delivery/DriverPinSuccessModal.tsx";
+@source "../components/directory/CategoryBar.tsx";
+@source "../components/directory/CategoryTabs.tsx";
+@source "../components/directory/DirectoryView.tsx";
+@source "../components/directory/PlaceCard.tsx";
+@source "../components/directory/ShareButton.tsx";
+@source "../components/directory/UpvoteButton.tsx";
+@source "../components/layout/Header.tsx";
+@source "../components/layout/PwaInstaller.tsx";
+@source "../components/modals/AddListingModal.tsx";
+@source "../components/modals/EditMerchantModal.tsx";
+@source "../components/modals/FeedbackModal.tsx";
+@source "../components/operations/AdminWorkspace.tsx";
+@source "../components/operations/DriverWorkspace.tsx";
+@source "../components/operations/MerchantOrderWorkspace.tsx";
+@source "../components/operations/PushSubscriptionButton.tsx";
+@source "../components/ui/heroui-compat.tsx";
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --font-ibm-plex-arabic: "IBM Plex Sans Arabic", Tahoma, Arial, system-ui, sans-serif;
+    --kayan-black: #09090b;
+    --kayan-white: #ffffff;
+    --kayan-surface: #fafafa;
+    --kayan-muted: #71717a;
+    --kayan-border: #e4e4e7;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    font-family: var(--font-ibm-plex-arabic);
+    direction: rtl;
+    background-color: var(--kayan-surface);
+    color: var(--kayan-black);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+  button,
+  a {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 2px solid #18181b;
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Custom Soft Elevation Cards */
+.soft-card {
+  background-color: #ffffff;
+  border: 1px solid rgba(228, 228, 231, 0.7);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
+  border-radius: 1.25rem; /* 20px */
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.soft-card:hover {
+  border-color: rgba(212, 212, 216, 1);
+  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+
+.dark .soft-card {
+  background-color: #18181b;
+  border-color: rgba(39, 39, 42, 0.8);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+}
+
+.dark .soft-card:hover {
+  border-color: rgba(63, 63, 70, 1);
+  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.6);
+}
+
+/* Global Mobile Viewport Clamping */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip !important;
+  position: relative;
+}
+
+main,
+header,
+footer,
+.container {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.font-sans {
+  font-family: var(--font-ibm-plex-arabic);
+}
+
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Hide scrollbars visually while maintaining touch scroll functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Touch friendly mobile scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e4e4e7;
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #27272a;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #e4e4e7 transparent;
+}
+
+.dark * {
+  scrollbar-color: #27272a transparent;
+}
