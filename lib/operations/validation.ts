@@ -73,8 +73,68 @@ export const merchantPlaceSchema = z.object({
 });
 
 export const driverPublicProfileSchema = z.object({
+  displayName: z.string().trim().min(2).max(100),
   whatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
   vehicleType: z.string().trim().max(60).optional().nullable(),
 });
+
+export const accountRequestSchema = z
+  .object({
+    kind: z.enum(['driver', 'merchant']),
+    displayName: z.string().trim().min(2, 'اكتب الاسم كاملاً.').max(100),
+    phone: egyptianPhone,
+    password: z
+      .string()
+      .min(12, 'كلمة المرور يجب أن تتكون من 12 حرفاً على الأقل.')
+      .max(128),
+    whatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
+    vehicleType: z.string().trim().max(60).optional().nullable(),
+    placeMode: z.enum(['existing', 'new']).optional().nullable(),
+    existingPlaceId: z.uuid().optional().nullable(),
+    placeTitle: z.string().trim().max(150).optional().nullable(),
+    placeCategory: z
+      .enum([
+        'restaurants',
+        'home_made',
+        'market',
+        'veggies',
+        'pharmacy',
+        'crafts',
+        'services',
+      ])
+      .optional()
+      .nullable(),
+    placeWhatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
+    placePayment: z.string().trim().max(30).optional().nullable(),
+    placeDescription: z.string().trim().max(2000).optional().nullable(),
+  })
+  .superRefine((value, context) => {
+    if (value.kind === 'driver') return;
+    if (!value.placeMode) {
+      context.addIssue({
+        code: 'custom',
+        path: ['placeMode'],
+        message: 'اختر ربط مكان موجود أو إنشاء خدمة جديدة.',
+      });
+      return;
+    }
+    if (value.placeMode === 'existing' && !value.existingPlaceId) {
+      context.addIssue({
+        code: 'custom',
+        path: ['existingPlaceId'],
+        message: 'اختر المكان المطلوب ربطه.',
+      });
+    }
+    if (
+      value.placeMode === 'new'
+      && (!value.placeTitle || !value.placeCategory)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['placeTitle'],
+        message: 'اكتب اسم الخدمة واختر التصنيف.',
+      });
+    }
+  });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;

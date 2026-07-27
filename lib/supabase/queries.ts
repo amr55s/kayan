@@ -111,7 +111,7 @@ export function mergePublicDrivers(
 
 async function fetchPlaces(): Promise<Place[]> {
   const supabase = createPublicClient();
-  const result = await withTimeout(
+  const result: any = await withTimeout(
     supabase
       .from('places')
       .select(
@@ -127,13 +127,8 @@ async function fetchPlaces(): Promise<Place[]> {
 
 async function fetchLegacyDrivers(): Promise<LegacyDriverRow[]> {
   const supabase = createPublicClient();
-  const result = await withTimeout(
-    supabase
-      .from('drivers')
-      .select(
-        'id, name, phone, whatsapp, vehicle_type, is_active, active_until, created_at',
-      )
-      .order('created_at', { ascending: false }),
+  const result: any = await withTimeout(
+    (supabase as any).rpc('list_public_legacy_drivers'),
   );
 
   if (result.error) throw new Error(result.error.message);

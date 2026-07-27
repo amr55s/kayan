@@ -139,14 +139,14 @@ export const Header: React.FC<HeaderProps> = ({
                   startContent={<Bike className="size-5" />}
                   className="w-full justify-start border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-950 hover:bg-zinc-50"
                 >
-                  تسجيل كابتن توصيل
+                  طلب حساب كابتن توصيل
                 </Button>
                 <Button
                   onClick={() => choose(onOpenAddModal)}
                   startContent={<Building2 className="size-5" />}
                   className="w-full justify-start bg-zinc-950 px-4 text-sm font-bold text-white hover:bg-zinc-800"
                 >
-                  تسجيل محل أو خدمة
+                  طلب حساب محل أو خدمة
                 </Button>
               </ModalBody>
             </>

@@ -1,152 +1,143 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
   Button,
   Input,
-  Textarea,
+  Modal,
+  ModalBody,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
   Select,
   SelectItem,
-  Progress,
-  Image as HeroImage,
+  Tab,
+  Tabs,
+  Textarea,
 } from '@heroui/react';
 import {
-  PlusCircle,
-  Send,
+  Building2,
   CheckCircle2,
+  KeyRound,
+  Link2,
+  Send,
   Upload,
   X,
-  Phone,
-  CreditCard,
-  Building,
-  FileText,
 } from 'lucide-react';
-import { submitPendingListing } from '@/lib/supabase/actions';
+import { submitAccountRequest } from '@/lib/operations/actions';
 import { CATEGORY_OPTIONS } from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
+import type { Place } from '@/types';
 
 interface AddListingModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  placesList: Place[];
 }
 
-export const AddListingModal: React.FC<AddListingModalProps> = ({ isOpen, onOpenChange }) => {
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('restaurants');
+export function AddListingModal({
+  isOpen,
+  onOpenChange,
+  placesList,
+}: AddListingModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<'existing' | 'new'>('existing');
+  const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
-  const [instapayVfcash, setInstapayVfcash] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [existingPlaceId, setExistingPlaceId] = useState('');
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('restaurants');
+  const [payment, setPayment] = useState('');
   const [description, setDescription] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [filePreviews, setFilePreviews] = useState<string[]>([]);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const resetForm = () => {
-    filePreviews.forEach((url) => URL.revokeObjectURL(url));
-
-    setTitle('');
-    setCategory('restaurants');
+  function resetForm() {
+    setMode('existing');
+    setDisplayName('');
     setPhone('');
     setWhatsapp('');
-    setInstapayVfcash('');
+    setPassword('');
+    setConfirmPassword('');
+    setExistingPlaceId('');
+    setTitle('');
+    setCategory('restaurants');
+    setPayment('');
     setDescription('');
     setSelectedFiles([]);
-    setFilePreviews([]);
+    setIsSubmitting(false);
     setIsSuccess(false);
     setErrorMsg('');
-    setUploadProgress(0);
-  };
+  }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-
-    const filesArray = Array.from(e.target.files);
-    const validImages = filesArray.filter((file) => file.type.startsWith('image/'));
-
-    const oversized = validImages.find((file) => file.size > 5 * 1024 * 1024);
+  function handleFiles(files: FileList | null) {
+    if (!files) return;
+    const next = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    const oversized = next.find((file) => file.size > 5 * 1024 * 1024);
     if (oversized) {
-      setErrorMsg(`الصورة "${oversized.name}" تتجاوز الحد الأقصى (5 ميجابايت).`);
+      setErrorMsg(`الصورة "${oversized.name}" أكبر من 5 ميجابايت.`);
       return;
     }
-
-    if (selectedFiles.length + validImages.length > 3) {
-      setErrorMsg('يمكنك رفع حتى 3 صور فقط للمكان أو المنيو.');
+    if (selectedFiles.length + next.length > 3) {
+      setErrorMsg('يمكن رفع 3 صور كحد أقصى.');
       return;
     }
-
     setErrorMsg('');
-    const newFiles = [...selectedFiles, ...validImages].slice(0, 3);
-    setSelectedFiles(newFiles);
+    setSelectedFiles((current) => [...current, ...next]);
+  }
 
-    const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
-    setFilePreviews(newPreviews);
-  };
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setErrorMsg('');
 
-  const handleRemoveImage = (indexToRemove: number) => {
-    if (filePreviews[indexToRemove]) {
-      URL.revokeObjectURL(filePreviews[indexToRemove]);
-    }
-    const updatedFiles = selectedFiles.filter((_, idx) => idx !== indexToRemove);
-    const updatedPreviews = filePreviews.filter((_, idx) => idx !== indexToRemove);
-    setSelectedFiles(updatedFiles);
-    setFilePreviews(updatedPreviews);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !phone.trim() || !category) {
-      setErrorMsg('يرجى ملء جميع الحقول المطلوبة (اسم المكان، التصنيف، ورقم الهاتف)');
+    if (!isValidEgyptianPhone(phone)) {
+      setErrorMsg('أدخل رقم هاتف مصري صحيحاً، مثال: 01012345678.');
       return;
     }
-
-    if (!isValidEgyptianPhone(phone.trim())) {
-      setErrorMsg('يرجى إدخال رقم هاتف مصري صحيح (مثال: 01012345678).');
+    if (whatsapp && !isValidEgyptianPhone(whatsapp)) {
+      setErrorMsg('رقم واتساب غير صحيح.');
+      return;
+    }
+    if (password.length < 12) {
+      setErrorMsg('كلمة المرور يجب أن تتكون من 12 حرفاً على الأقل.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setErrorMsg('كلمتا المرور غير متطابقتين.');
       return;
     }
 
     setIsSubmitting(true);
-    setErrorMsg('');
-    setUploadProgress(30);
+    const result = await submitAccountRequest(
+      {
+        kind: 'merchant',
+        displayName,
+        phone,
+        whatsapp: whatsapp || phone,
+        password,
+        placeMode: mode,
+        existingPlaceId: mode === 'existing' ? existingPlaceId : null,
+        placeTitle: mode === 'new' ? title : null,
+        placeCategory: mode === 'new' ? category : null,
+        placeWhatsapp: mode === 'new' ? whatsapp || phone : null,
+        placePayment: mode === 'new' ? payment : null,
+        placeDescription: mode === 'new' ? description : null,
+      },
+      mode === 'new' ? selectedFiles : [],
+    );
+    setIsSubmitting(false);
 
-    try {
-      setUploadProgress(60);
-      const res = await submitPendingListing(
-        {
-          title: title.trim(),
-          category,
-          phone: phone.trim(),
-          whatsapp: whatsapp.trim() || phone.trim(),
-          instapay_vfcash: instapayVfcash.trim() || undefined,
-          description: description.trim() || undefined,
-        },
-        selectedFiles
-      );
-
-      setUploadProgress(100);
-
-      if (!res.success) {
-        throw new Error(res.message);
-      }
-
-      setIsSuccess(true);
-    } catch (err: any) {
-      console.error('Submission error:', err);
-      setErrorMsg(err.message || 'حدث خطأ أثناء إرسال الطلب، يرجى المحاولة لاحقاً.');
-    } finally {
-      setIsSubmitting(false);
+    if (!result.success) {
+      setErrorMsg(result.message);
+      return;
     }
-  };
+    setIsSuccess(true);
+  }
 
   return (
     <Modal
@@ -160,235 +151,208 @@ export const AddListingModal: React.FC<AddListingModalProps> = ({ isOpen, onOpen
       scrollBehavior="inside"
       backdrop="blur"
       classNames={{
-        base: "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 dir-rtl font-sans max-w-[95vw] sm:max-w-2xl my-auto max-h-[90vh]",
-        header: "border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0",
-        body: "py-4 space-y-5 overflow-y-auto",
-        footer: "border-t border-zinc-100 dark:border-zinc-800 pt-3 shrink-0 sticky bottom-0 bg-white dark:bg-zinc-900 z-10",
+        base: 'dir-rtl max-h-[90vh] max-w-[95vw] border border-zinc-200 bg-white font-sans sm:max-w-2xl',
+        header: 'shrink-0 border-b border-zinc-100 pb-3',
+        body: 'overscroll-contain py-4',
+        footer: 'sticky bottom-0 z-10 shrink-0 border-t border-zinc-100 bg-white pt-3',
       }}
     >
       <ModalContent>
         {(onClose) => (
           <>
-            <ModalHeader className="flex items-center gap-2 text-zinc-900 dark:text-white font-bold text-lg">
-              <div className="p-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-sm">
-                <PlusCircle className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <span>تسجيل محل أو خدمة</span>
-                <span className="text-xs text-zinc-500 font-normal">نشر مجاني للمحلات والأنشطة والخدمات المحلية</span>
+            <ModalHeader className="flex items-center gap-3">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-zinc-950 text-white">
+                <Building2 className="size-5" />
+              </span>
+              <div>
+                <h2 className="text-lg font-black text-zinc-950">طلب حساب محل أو خدمة</h2>
+                <p className="mt-0.5 text-xs font-normal text-zinc-500">
+                  اربط حسابك ببطاقة موجودة أو أضف خدمتك لأول مرة.
+                </p>
               </div>
             </ModalHeader>
 
-            <ModalBody className="py-4 space-y-5">
+            <ModalBody>
               {isSuccess ? (
-                <div className="py-8 text-center flex flex-col items-center justify-center gap-3">
-                  <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
-                    <CheckCircle2 className="w-10 h-10" />
-                  </div>
-                  <h4 className="font-extrabold text-xl text-zinc-900 dark:text-white">
-                    تم إرسال طلبك
-                  </h4>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-sm leading-relaxed font-bold">
-                    سيتم مراجعة ونشر مكانك في خدمات الكيان خلال يوم عمل واحد إن شاء الله.
+                <div className="flex flex-col items-center gap-3 py-8 text-center">
+                  <CheckCircle2 className="size-14 text-emerald-600" />
+                  <h3 className="text-xl font-black">تم إرسال الطلب</h3>
+                  <p className="max-w-md text-sm leading-7 text-zinc-600">
+                    ستراجع الإدارة ملكية المكان والبيانات. بعد الموافقة يمكنك الدخول
+                    برقم الهاتف وكلمة المرور وتعديل بطاقة خدمتك من لوحة النشاط.
                   </p>
-                  <Button
-                    onClick={() => {
-                      resetForm();
-                      onClose();
-                    }}
-                    className="font-bold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 mt-2 px-8 h-11 shadow-sm rounded-xl"
-                  >
-                    تم، إغلاق النافذة
+                  <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
+                    تم
                   </Button>
                 </div>
               ) : (
-                <form id="add-listing-form" onSubmit={handleSubmit} className="space-y-5">
+                <form id="merchant-account-form" onSubmit={handleSubmit} className="space-y-5">
                   {errorMsg && (
-                    <div className="p-3 text-xs bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 font-semibold">
+                    <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
                       {errorMsg}
-                    </div>
+                    </p>
                   )}
 
-                  {isSubmitting && (
-                    <Progress
-                      size="sm"
-                      value={uploadProgress}
-                      color="primary"
-                      className="w-full"
-                      aria-label="جاري إرسال البيانات..."
+                  <Tabs
+                    fullWidth
+                    selectedKey={mode}
+                    onSelectionChange={(key) => setMode(key as 'existing' | 'new')}
+                    classNames={{
+                      tabList: 'rounded-xl bg-zinc-100 p-1',
+                      cursor: 'bg-zinc-950',
+                      tab: 'h-11 font-bold',
+                      tabContent: 'text-zinc-600 group-data-[selected=true]:text-white',
+                    }}
+                    aria-label="طريقة تسجيل النشاط"
+                  >
+                    <Tab
+                      key="existing"
+                      title={
+                        <span className="flex items-center gap-2">
+                          <Link2 className="size-4" />
+                          ربط مكان موجود
+                        </span>
+                      }
                     />
-                  )}
+                    <Tab
+                      key="new"
+                      title={
+                        <span className="flex items-center gap-2">
+                          <Building2 className="size-4" />
+                          إضافة خدمة جديدة
+                        </span>
+                      }
+                    />
+                  </Tabs>
 
-                  {/* Section 1: البيانات الأساسية */}
-                  <div className="p-4 rounded-2xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 space-y-3">
-                    <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-900 dark:text-white pb-1 border-b border-zinc-200/60 dark:border-zinc-800">
-                      <Building className="w-4 h-4" />
-                      <span>القسم الأول: البيانات الأساسية والتواصل</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {mode === 'existing' ? (
+                    <Select
+                      isRequired
+                      label="اختر بطاقة المكان أو الخدمة"
+                      selectedKeys={existingPlaceId ? [existingPlaceId] : []}
+                      onSelectionChange={(keys) => setExistingPlaceId(String(Array.from(keys)[0] ?? ''))}
+                    >
+                      {placesList.map((place) => (
+                        <SelectItem key={place.id}>
+                          {place.title} — {place.phone}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  ) : (
+                    <div className="grid gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-2">
                       <Input
                         isRequired
-                        labelPlacement="outside"
-                        label="اسم المكان / التجارة"
+                        name="placeTitle"
+                        label="اسم المكان أو الخدمة"
                         value={title}
                         onValueChange={setTitle}
-                        variant="bordered"
-                        size="md"
-                        classNames={{
-                          label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                          inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                        }}
                       />
-
                       <Select
                         isRequired
-                        labelPlacement="outside"
-                        label="تصنيف الخدمة"
+                        label="التصنيف"
                         selectedKeys={[category]}
-                        onChange={(e) => setCategory(e.target.value)}
-                        variant="bordered"
-                        size="md"
-                        classNames={{
-                          label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                          trigger: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                        }}
+                        onSelectionChange={(keys) => setCategory(String(Array.from(keys)[0] ?? 'restaurants'))}
                       >
-                        {CATEGORY_OPTIONS.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.label}
-                          </SelectItem>
+                        {CATEGORY_OPTIONS.filter((item) => item.id !== 'all').map((item) => (
+                          <SelectItem key={item.id}>{item.label}</SelectItem>
                         ))}
                       </Select>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input
-                        isRequired
-                        labelPlacement="outside"
-                        label="رقم الهاتف المباشر"
-                        value={phone}
-                        onValueChange={setPhone}
-                        variant="bordered"
-                        type="tel"
-                        startContent={<Phone className="w-4 h-4 text-zinc-400 shrink-0" />}
-                        size="md"
-                        classNames={{
-                          label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                          inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                        }}
+                        name="payment"
+                        label="Vodafone Cash / InstaPay"
+                        value={payment}
+                        onValueChange={setPayment}
                       />
-
-                      <Input
-                        labelPlacement="outside"
-                        label="رقم الواتساب (اختياري)"
-                        value={whatsapp}
-                        onValueChange={setWhatsapp}
-                        variant="bordered"
-                        type="tel"
-                        size="md"
-                        classNames={{
-                          label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                          inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                        }}
+                      <Textarea
+                        name="description"
+                        label="وصف مختصر أو مواعيد العمل"
+                        value={description}
+                        onValueChange={setDescription}
                       />
-                    </div>
-
-                    <div className="pt-2 mt-1">
-                      <Input
-                        labelPlacement="outside"
-                        label="رقم فودافون كاش / InstaPay (اختياري للتحويلات)"
-                        value={instapayVfcash}
-                        onValueChange={setInstapayVfcash}
-                        variant="bordered"
-                        type="tel"
-                        startContent={<CreditCard className="w-4 h-4 text-emerald-600 shrink-0" />}
-                        size="md"
-                        classNames={{
-                          label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1.5",
-                          inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Section 2: الصور والوصف */}
-                  <div className="p-4 rounded-2xl bg-zinc-50/80 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 space-y-3">
-                    <div className="flex items-center gap-2 text-xs font-extrabold text-zinc-900 dark:text-white pb-1 border-b border-zinc-200/60 dark:border-zinc-800">
-                      <FileText className="w-4 h-4" />
-                      <span>القسم الثاني: الوصف وصور المنيو / المكان</span>
-                    </div>
-
-                    <Textarea
-                      labelPlacement="outside"
-                      label="وصف مختصر أو مواعيد العمل"
-                      value={description}
-                      onValueChange={setDescription}
-                      variant="bordered"
-                      minRows={2}
-                      classNames={{
-                        label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                        inputWrapper: "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                      }}
-                    />
-
-                    {/* Drag-and-Drop Minimalist Dropzone */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                        <span>إرفاق صور المنيو أو المكان (1 إلى 3 صور)</span>
-                        <span className="text-zinc-400 text-[11px]">{selectedFiles.length} / 3 صور</span>
-                      </div>
-
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        accept="image/*"
-                        multiple
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-
-                      {selectedFiles.length < 3 && (
-                        <div
-                          onClick={() => fileInputRef.current?.click()}
-                          className="w-full border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-zinc-800 dark:hover:border-zinc-200 rounded-2xl p-4 text-center cursor-pointer bg-white dark:bg-zinc-900 transition-colors flex flex-col items-center justify-center gap-1.5"
+                      <div className="space-y-2 sm:col-span-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          multiple
+                          className="sr-only"
+                          onChange={(event) => handleFiles(event.target.files)}
+                        />
+                        <Button
+                          type="button"
+                          variant="flat"
+                          startContent={<Upload className="size-4" />}
+                          onPress={() => fileInputRef.current?.click()}
+                          isDisabled={selectedFiles.length >= 3}
                         >
-                          <Upload className="w-6 h-6 text-zinc-800 dark:text-zinc-200" />
-                          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                            اضغط هنا لرفع صور المنيو أو المكان
-                          </span>
-                          <span className="text-[11px] text-zinc-400">
-                            يدعم صور JPG, PNG, WEBP (حتى 5MB لكل صورة)
-                          </span>
-                        </div>
-                      )}
-
-                      {filePreviews.length > 0 && (
-                        <div className="grid grid-cols-3 gap-3 pt-1">
-                          {filePreviews.map((previewUrl, idx) => (
-                            <div key={idx} className="relative w-full h-20 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 group bg-zinc-100 dark:bg-zinc-800">
-                              <HeroImage
-                                src={previewUrl}
-                                alt={`صورة ${idx + 1}`}
-                                classNames={{
-                                  wrapper: "w-full h-full",
-                                  img: "w-full h-full object-cover",
-                                }}
-                                radius="none"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveImage(idx)}
-                                aria-label="إزالة الصورة"
-                                className="absolute top-1 right-1 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-zinc-900/80 text-white transition-colors hover:bg-rose-600"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                          رفع صور المكان أو المنيو ({selectedFiles.length}/3)
+                        </Button>
+                        {selectedFiles.map((file, index) => (
+                          <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs">
+                            <span className="truncate">{file.name}</span>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="light"
+                              aria-label={`حذف صورة ${file.name}`}
+                              onPress={() => setSelectedFiles((files) => files.filter((_, itemIndex) => itemIndex !== index))}
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Input
+                      isRequired
+                      name="displayName"
+                      autoComplete="name"
+                      label="اسم صاحب أو مسؤول النشاط"
+                      value={displayName}
+                      onValueChange={setDisplayName}
+                    />
+                    <Input
+                      isRequired
+                      name="phone"
+                      autoComplete="tel"
+                      type="tel"
+                      inputMode="tel"
+                      label="رقم دخول الحساب"
+                      value={phone}
+                      onValueChange={setPhone}
+                    />
+                    <Input
+                      name="whatsapp"
+                      autoComplete="tel"
+                      type="tel"
+                      inputMode="tel"
+                      label="رقم واتساب"
+                      value={whatsapp}
+                      onValueChange={setWhatsapp}
+                    />
+                    <Input
+                      isRequired
+                      name="new-password"
+                      autoComplete="new-password"
+                      type="password"
+                      label="كلمة المرور"
+                      value={password}
+                      onValueChange={setPassword}
+                      startContent={<KeyRound className="size-4 text-zinc-400" />}
+                    />
+                    <Input
+                      isRequired
+                      name="confirm-password"
+                      autoComplete="new-password"
+                      type="password"
+                      label="تأكيد كلمة المرور"
+                      value={confirmPassword}
+                      onValueChange={setConfirmPassword}
+                      className="sm:col-span-2"
+                    />
                   </div>
                 </form>
               )}
@@ -396,17 +360,17 @@ export const AddListingModal: React.FC<AddListingModalProps> = ({ isOpen, onOpen
 
             {!isSuccess && (
               <ModalFooter>
-                <Button variant="flat" color="default" onClick={onClose} disabled={isSubmitting} className="h-11 font-semibold">
+                <Button variant="flat" onPress={onClose} isDisabled={isSubmitting}>
                   إلغاء
                 </Button>
                 <Button
                   type="submit"
-                  form="add-listing-form"
+                  form="merchant-account-form"
                   isLoading={isSubmitting}
-                  startContent={!isSubmitting && <Send className="w-4 h-4" />}
-                  className="font-bold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 px-6 h-11 shadow-sm rounded-xl"
+                  startContent={!isSubmitting && <Send className="size-4" />}
+                  className="bg-zinc-950 font-bold text-white"
                 >
-                  إرسال الطلب للمراجعة
+                  إرسال طلب الحساب
                 </Button>
               </ModalFooter>
             )}
@@ -415,4 +379,4 @@ export const AddListingModal: React.FC<AddListingModalProps> = ({ isOpen, onOpen
       </ModalContent>
     </Modal>
   );
-};
+}

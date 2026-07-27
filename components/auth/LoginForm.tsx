@@ -22,8 +22,21 @@ async function resolvePostLoginPath(
     .maybeSingle();
 
   if (profileError || !profile) {
+    const { data: request } = await (supabase as any)
+      .from('account_requests')
+      .select('status, rejection_reason')
+      .eq('auth_user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     await supabase.auth.signOut();
-    throw new Error('الحساب غير مرتبط بملف مستخدم. تواصل مع الإدارة.');
+    if (request?.status === 'pending') {
+      throw new Error('طلب الحساب ما زال قيد مراجعة الإدارة.');
+    }
+    if (request?.status === 'rejected') {
+      throw new Error(request.rejection_reason || 'تم رفض طلب الحساب. تواصل مع الإدارة.');
+    }
+    throw new Error('الحساب غير مكتمل أو غير مرتبط بملف مستخدم. تواصل مع الإدارة.');
   }
   if (!profile.is_active) {
     await supabase.auth.signOut();
@@ -73,9 +86,7 @@ export function LoginForm() {
         password,
       });
       if (signInError || !signInData.user) {
-        throw new Error(
-          'رقم الهاتف أو كلمة المرور غير صحيحة. حسابات رمز PIN القديمة تحتاج تهيئة مرة واحدة.',
-        );
+        throw new Error('رقم الهاتف أو كلمة المرور غير صحيحة.');
       }
       const destination = await resolvePostLoginPath(supabase, signInData.user.id);
       router.replace(destination);
@@ -112,6 +123,8 @@ export function LoginForm() {
             {!changePassword && (
               <Input
                 isRequired
+                name="phone"
+                autoComplete="tel"
                 type="tel"
                 label="رقم الهاتف"
                 placeholder="01012345678"
@@ -122,6 +135,8 @@ export function LoginForm() {
             )}
             <Input
               isRequired
+              name={changePassword ? 'new-password' : 'password'}
+              autoComplete={changePassword ? 'new-password' : 'current-password'}
               type="password"
               label={changePassword ? 'كلمة المرور الجديدة' : 'كلمة المرور'}
               value={password}
@@ -129,7 +144,7 @@ export function LoginForm() {
               startContent={<KeyRound className="size-4 text-zinc-400" />}
             />
             {changePassword && (
-              <Input isRequired type="password" label="تأكيد كلمة المرور" value={confirmPassword} onValueChange={setConfirmPassword} />
+              <Input isRequired name="confirm-password" autoComplete="new-password" type="password" label="تأكيد كلمة المرور" value={confirmPassword} onValueChange={setConfirmPassword} />
             )}
             <Button type="submit" isLoading={loading} className="w-full bg-white font-extrabold text-zinc-950">
               {changePassword ? 'حفظ كلمة المرور' : 'تسجيل الدخول'}

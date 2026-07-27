@@ -116,3 +116,21 @@ export interface MerchantBranch {
   is_default: boolean;
   is_active: boolean;
 }
+
+export interface AccountRequest {
+  id: string;
+  kind: 'driver' | 'merchant';
+  status: 'pending' | 'approved' | 'rejected';
+  auth_user_id: string;
+  display_name: string;
+  phone: string;
+  whatsapp?: string | null;
+  vehicle_type?: string | null;
+  legacy_driver_id?: string | null;
+  place_mode?: 'existing' | 'new' | null;
+  existing_place_id?: string | null;
+  place_title?: string | null;
+  place_category?: string | null;
+  rejection_reason?: string | null;
+  created_at: string;
+}

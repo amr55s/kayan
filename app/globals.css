@@ -23,7 +23,6 @@
 @source "../components/delivery/DeliveryBar.tsx";
 @source "../components/delivery/DriverCard.tsx";
 @source "../components/delivery/DriverModal.tsx";
-@source "../components/delivery/DriverPinSuccessModal.tsx";
 @source "../components/directory/CategoryBar.tsx";
 @source "../components/directory/CategoryTabs.tsx";
 @source "../components/directory/DirectoryView.tsx";
@@ -33,7 +32,6 @@
 @source "../components/layout/Header.tsx";
 @source "../components/layout/PwaInstaller.tsx";
 @source "../components/modals/AddListingModal.tsx";
-@source "../components/modals/EditMerchantModal.tsx";
 @source "../components/modals/FeedbackModal.tsx";
 @source "../components/operations/AdminWorkspace.tsx";
 @source "../components/operations/DriverWorkspace.tsx";

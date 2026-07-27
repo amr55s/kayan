@@ -27,7 +27,7 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
             <button
               key={cat.id}
               onClick={() => onCategoryChange(cat.id as CategoryType)}
-              className={`shrink-0 flex-shrink-0 min-w-[125px] sm:min-w-[150px] max-w-[160px] p-3 rounded-2xl border transition-all duration-200 text-right flex flex-col justify-between gap-2.5 cursor-pointer select-none ${
+              className={`shrink-0 flex-shrink-0 min-w-[125px] sm:min-w-[150px] max-w-[160px] p-3 rounded-2xl border transition-[background-color,border-color,color,box-shadow,transform] duration-200 text-right flex flex-col justify-between gap-2.5 cursor-pointer select-none ${
                 isSelected
                   ? 'bg-zinc-900 border-zinc-900 dark:bg-white dark:border-white text-white dark:text-zinc-900 shadow-sm scale-[1.02]'
                   : 'bg-white/80 dark:bg-zinc-900/80 border-zinc-200/60 dark:border-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/90'
@@ -65,7 +65,7 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
                 </span>
                 <span
                   className={`text-[10px] line-clamp-1 font-normal ${
-                    isSelected ? 'text-zinc-300 dark:text-zinc-600' : 'text-zinc-400 dark:text-zinc-500'
+                    isSelected ? 'text-white dark:text-zinc-950' : 'text-zinc-400 dark:text-zinc-500'
                   }`}
                 >
                   {cat.subtitle}

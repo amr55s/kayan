@@ -47,9 +47,10 @@ import { FeedbackDetailsModal } from '@/components/admin/FeedbackDetailsModal';
 import { EditPlaceModal } from '@/components/admin/EditPlaceModal';
 import { EditRequestModal } from '@/components/admin/EditRequestModal';
 import { DriverManager } from '@/components/admin/DriverManager';
+import { AccountRequestManager } from '@/components/admin/AccountRequestManager';
 import { UserEditorModal } from '@/components/admin/UserEditorModal';
 import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
-import type { FeedbackRequest, PendingRequest, Place } from '@/types';
+import type { AccountRequest, FeedbackRequest, PendingRequest, Place } from '@/types';
 
 type Merchant = { id: string; display_name: string; is_active: boolean };
 type Profile = {
@@ -109,6 +110,7 @@ type AdminWorkspaceProps = {
   feedbackRequests: FeedbackRequest[];
   drivers: DirectoryDriver[];
   auditLog: AuditEntry[];
+  accountRequests: AccountRequest[];
 };
 
 export function AdminWorkspace(props: AdminWorkspaceProps) {
@@ -149,6 +151,9 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
     ['general_suggestion', 'rating'].includes(request.feedback_type),
   );
   const pendingAdditions = props.pendingRequests.filter(
+    (request) => request.status === 'pending',
+  );
+  const pendingAccounts = props.accountRequests.filter(
     (request) => request.status === 'pending',
   );
 
@@ -281,7 +286,12 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <Metric
+          label="طلبات الحسابات"
+          value={pendingAccounts.length}
+          icon={<UserCog className="size-5" />}
+        />
         <Metric
           label="الحسابات النشطة"
           value={props.profiles.filter((profile) => profile.is_active).length}
@@ -310,6 +320,19 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
       </div>
 
       <Tabs aria-label="إدارة المنصة">
+        <Tab
+          id="account-requests"
+          key="account-requests"
+          title={`طلبات الحسابات (${pendingAccounts.length})`}
+        >
+          <AccountRequestManager
+            requests={props.accountRequests}
+            places={props.places}
+            onRefresh={() => router.refresh()}
+            onMessage={setMessage}
+          />
+        </Tab>
+
         <Tab id="orders" key="orders" title="الطلبات">
           <OrdersTab orders={props.orders} />
         </Tab>

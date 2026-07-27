@@ -1,9 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { Button, Chip } from '@heroui/react';
-import { Bike, ChevronLeft, UserPlus } from 'lucide-react';
+import { Bike, ChevronLeft, RefreshCw, UserPlus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import type { Driver } from '@/types';
+import { createClient } from '@/lib/supabase/client';
+import { renewDriverAvailability } from '@/lib/operations/actions';
 import { DriverCard } from './DriverCard';
 
 export function DeliveryBar({
@@ -15,6 +18,47 @@ export function DeliveryBar({
 }) {
   const availableCount = drivers.filter((driver) => driver.is_available).length;
   const [activeDriver, setActiveDriver] = useState(0);
+  const [isDriverAccount, setIsDriverAccount] = useState(false);
+  const [renewalMessage, setRenewalMessage] = useState('');
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+
+  useEffect(() => {
+    let mounted = true;
+    const supabase = createClient();
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+      const { data: profile } = await (supabase as any)
+        .from('profiles')
+        .select('role, is_active, must_change_password')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      if (
+        mounted
+        && profile?.role === 'driver'
+        && profile.is_active
+        && !profile.must_change_password
+      ) {
+        setIsDriverAccount(true);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function renewPresence() {
+    setRenewalMessage('');
+    startTransition(async () => {
+      const result = await renewDriverAvailability();
+      setRenewalMessage(
+        result.success
+          ? 'تم تجديد تواجدك لساعتين.'
+          : result.message,
+      );
+      if (result.success) router.refresh();
+    });
+  }
 
   const updateActiveDriver = (event: React.UIEvent<HTMLDivElement>) => {
     const scroller = event.currentTarget;
@@ -49,13 +93,31 @@ export function DeliveryBar({
             </div>
           </div>
 
-          <Button
-            onPress={onOpenRegistration}
-            startContent={<UserPlus className="size-4" />}
-            className="self-start border border-zinc-700 bg-white px-3 text-xs font-bold text-zinc-950 sm:self-auto"
-          >
-            سجّل كابتن
-          </Button>
+          <div className="flex flex-col items-start gap-1 sm:items-end">
+            {isDriverAccount ? (
+              <Button
+                onPress={renewPresence}
+                isLoading={pending}
+                startContent={!pending && <RefreshCw className="size-4" />}
+                className="self-start border border-zinc-700 bg-white px-3 text-xs font-bold text-zinc-950 sm:self-auto"
+              >
+                جدّد تواجدي لساعتين
+              </Button>
+            ) : (
+              <Button
+                onPress={onOpenRegistration}
+                startContent={<UserPlus className="size-4" />}
+                className="self-start border border-zinc-700 bg-white px-3 text-xs font-bold text-zinc-950 sm:self-auto"
+              >
+                اطلب حساب كابتن
+              </Button>
+            )}
+            {renewalMessage && (
+              <span role="status" className="text-[11px] font-semibold text-zinc-300">
+                {renewalMessage}
+              </span>
+            )}
+          </div>
         </div>
         </div>
 
@@ -84,7 +146,7 @@ export function DeliveryBar({
               {drivers.map((driver, index) => (
                 <span
                   key={`${driver.source}:${driver.id}:dot`}
-                  className={`h-1.5 rounded-full transition-all ${
+                  className={`h-1.5 rounded-full transition-[width,background-color] ${
                     index === activeDriver ? 'w-4 bg-white' : 'w-1.5 bg-zinc-700'
                   }`}
                 />

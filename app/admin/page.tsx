@@ -17,6 +17,7 @@ export default async function AdminDashboard() {
     { data: feedbackRequests },
     { data: drivers },
     { data: auditLog },
+    { data: accountRequests },
   ] = await Promise.all([
     (supabase as any)
       .from('merchants')
@@ -56,6 +57,10 @@ export default async function AdminDashboard() {
       .select('id, action, entity_type, entity_id, metadata, created_at')
       .order('created_at', { ascending: false })
       .limit(100),
+    (supabase as any)
+      .from('account_requests')
+      .select('id, kind, status, auth_user_id, display_name, phone, whatsapp, vehicle_type, legacy_driver_id, place_mode, existing_place_id, place_title, place_category, rejection_reason, created_at')
+      .order('created_at', { ascending: false }),
   ]);
 
   return (
@@ -71,6 +76,7 @@ export default async function AdminDashboard() {
         feedbackRequests={feedbackRequests ?? []}
         drivers={drivers ?? []}
         auditLog={auditLog ?? []}
+        accountRequests={accountRequests ?? []}
       />
     </>
   );

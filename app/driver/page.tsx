@@ -17,6 +17,7 @@ export default async function DriverPage() {
         orders={orders ?? []}
         availableUntil={driver?.active_until ?? null}
         publicProfile={{
+          displayName: profile.display_name,
           whatsapp: driver?.whatsapp ?? '',
           vehicleType: driver?.vehicle_type ?? '',
         }}

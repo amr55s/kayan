@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState, useTransition } from 'react';
 import { Button, Card, CardBody, CardHeader, Chip, Input } from '@heroui/react';
 import { Bike, CheckCircle2, Clock3, MapPin, PackageCheck, RotateCcw } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { changeDeliveryOrderStatus, claimDeliveryOrder, renewDriverAvailability, updateDriverPublicProfile } from '@/lib/operations/actions';
 import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
 import { PushSubscriptionButton } from './PushSubscriptionButton';
@@ -11,13 +12,25 @@ type Order = { id: string; public_code: string; status: string; recipient_name: 
 
 const statusLabel: Record<string, string> = { open: 'مهمة متاحة', assigned: 'في انتظار الاستلام', picked_up: 'قيد التوصيل', issue: 'تحتاج تدخل الإدارة' };
 
-export function DriverWorkspace({ orders, availableUntil, publicProfile }: { orders: Order[]; availableUntil: string | null; publicProfile: { whatsapp: string; vehicleType: string } }) {
+export function DriverWorkspace({ orders, availableUntil, publicProfile }: { orders: Order[]; availableUntil: string | null; publicProfile: { displayName: string; whatsapp: string; vehicleType: string } }) {
   useDeliveryRealtime('driver');
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [actionMessage, setActionMessage] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
   const [profileForm, setProfileForm] = useState(publicProfile);
   const active = availableUntil && new Date(availableUntil) > new Date();
-  function run(action: () => Promise<{ success: boolean }>) { startTransition(async () => { await action(); }); }
+  function run(action: () => Promise<{ success: boolean; message?: string }>) {
+    setActionMessage('');
+    startTransition(async () => {
+      const result = await action();
+      if (!result.success) {
+        setActionMessage(result.message || 'تعذر تنفيذ العملية.');
+        return;
+      }
+      router.refresh();
+    });
+  }
   function saveProfile(event: FormEvent) {
     event.preventDefault();
     startTransition(async () => {
@@ -27,8 +40,8 @@ export function DriverWorkspace({ orders, availableUntil, publicProfile }: { ord
   }
 
   return <main className="mx-auto max-w-3xl space-y-5 px-3 py-5 sm:px-6 dir-rtl">
-    <Card className="border border-zinc-200 bg-zinc-950 text-white"><CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-xl font-black">منطقة الكابتن</h1><p className="mt-1 text-sm text-zinc-300">{active ? `متاح حتى ${new Date(availableUntil).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}` : 'أنت غير متاح حالياً'}</p></div><Button isLoading={pending} onPress={() => run(renewDriverAvailability)} className="bg-white font-extrabold text-zinc-950" startContent={!pending && <Bike className="size-4" />}>تفعيل التواجد لساعتين</Button></CardBody></Card>
-    <Card className="border border-zinc-200"><CardHeader className="font-black">بيانات البطاقة العامة</CardHeader><CardBody><form onSubmit={saveProfile} className="grid gap-3 sm:grid-cols-2">{profileMessage && <p className="rounded-xl bg-zinc-100 p-3 text-sm font-semibold sm:col-span-2">{profileMessage}</p>}<Input type="tel" label="رقم واتساب" value={profileForm.whatsapp} onValueChange={(whatsapp) => setProfileForm({ ...profileForm, whatsapp })} /><Input label="نوع المركبة" value={profileForm.vehicleType} onValueChange={(vehicleType) => setProfileForm({ ...profileForm, vehicleType })} /><Button type="submit" isLoading={pending} className="bg-zinc-900 font-bold text-white sm:col-span-2">حفظ البيانات العامة</Button></form></CardBody></Card>
+    <Card className="border border-zinc-200 bg-zinc-950 text-white"><CardBody className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-xl font-black">منطقة الكابتن</h1><p className="mt-1 text-sm text-zinc-300">{active ? `متاح حتى ${new Date(availableUntil).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}` : 'أنت غير متاح حالياً'}</p>{actionMessage && <p role="alert" className="mt-2 text-sm font-bold text-rose-300">{actionMessage}</p>}</div><Button isLoading={pending} onPress={() => run(renewDriverAvailability)} className="bg-white font-extrabold text-zinc-950" startContent={!pending && <Bike className="size-4" />}>تفعيل التواجد لساعتين</Button></CardBody></Card>
+    <Card className="border border-zinc-200"><CardHeader className="font-black">بيانات البطاقة العامة</CardHeader><CardBody><form onSubmit={saveProfile} className="grid gap-3 sm:grid-cols-2">{profileMessage && <p className="rounded-xl bg-zinc-100 p-3 text-sm font-semibold sm:col-span-2">{profileMessage}</p>}<Input isRequired name="displayName" autoComplete="name" label="اسم الكابتن" value={profileForm.displayName} onValueChange={(displayName) => setProfileForm({ ...profileForm, displayName })} /><Input name="whatsapp" autoComplete="tel" type="tel" label="رقم واتساب" value={profileForm.whatsapp} onValueChange={(whatsapp) => setProfileForm({ ...profileForm, whatsapp })} /><Input name="vehicleType" autoComplete="off" label="نوع المركبة" value={profileForm.vehicleType} onValueChange={(vehicleType) => setProfileForm({ ...profileForm, vehicleType })} /><Button type="submit" isLoading={pending} className="bg-zinc-900 font-bold text-white sm:col-span-2">حفظ البيانات العامة</Button></form></CardBody></Card>
     <section className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-black">العروض والمهام</h2><p className="text-sm text-zinc-500">ستظهر هنا جميع التفاصيل طالما العرض متاح أو أنت الكابتن المعيّن.</p></div><div className="flex items-center gap-2"><PushSubscriptionButton /><Chip>{orders.length}</Chip></div></section>
     <div className="grid gap-4">
       {orders.length ? orders.map((order) => <OrderCard key={order.id} order={order} pending={pending} run={run} />) : <Card><CardBody className="py-10 text-center text-sm text-zinc-500">لا توجد مهام متاحة الآن. أبقِ التواجد مفعلاً لتصلك الإشعارات.</CardBody></Card>}

@@ -145,7 +145,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 variant={showFavoritesOnly ? 'solid' : 'flat'}
                 onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
                 startContent={<Heart className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />}
-                className={`self-start font-bold text-xs h-8 rounded-full px-3 transition-all ${
+                className={`self-start font-bold text-xs h-8 rounded-full px-3 transition-[background-color,color,box-shadow] ${
                   showFavoritesOnly
                     ? 'bg-zinc-900 text-white shadow-sm'
                     : 'border border-zinc-200 bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
@@ -226,7 +226,11 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
       {/* PWA Install Banner */}
       <PwaInstaller />
 
-      <AddListingModal isOpen={isAddOpen} onOpenChange={setIsAddOpen} />
+      <AddListingModal
+        isOpen={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        placesList={initialPlaces}
+      />
       <FeedbackModal isOpen={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} placesList={initialPlaces} />
       <DriverModal
         isOpen={isDriverOpen}

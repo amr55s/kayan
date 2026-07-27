@@ -11,14 +11,12 @@ import {
   Chip,
   Tooltip,
 } from '@heroui/react';
-import { Bike, UserPlus, Trash2, Plus, Phone, Pencil, Save, X } from 'lucide-react';
+import { Bike, Trash2, Phone, Pencil, Save, X } from 'lucide-react';
 import {
-  serverAddDriver,
   serverToggleDriverStatus,
   serverDeleteDriver,
   serverUpdateDriver,
 } from '@/lib/supabase/admin-actions';
-import { isValidEgyptianPhone } from '@/lib/utils';
 
 type ManagedDriver = {
   id: string;
@@ -35,8 +33,6 @@ interface DriverManagerProps {
 }
 
 export const DriverManager: React.FC<DriverManagerProps> = ({ drivers, onRefresh }) => {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [editing, setEditing] = useState<ManagedDriver | null>(null);
@@ -46,32 +42,6 @@ export const DriverManager: React.FC<DriverManagerProps> = ({ drivers, onRefresh
     whatsapp: '',
     vehicleType: '',
   });
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone.trim()) return;
-
-    if (!isValidEgyptianPhone(phone.trim())) {
-      setErrorMsg('يرجى إدخال رقم هاتف مصري صحيح (مثال: 01012345678).');
-      return;
-    }
-
-    setErrorMsg('');
-    setIsSubmitting(true);
-    const res = await serverAddDriver(name.trim() || 'كابتن توصيل', phone.trim());
-    setIsSubmitting(false);
-
-    if (res.success) {
-      setName('');
-      setPhone('');
-      if (res.pinCode) {
-        alert(`تمت إضافة الكابتن بنجاح!\nكود التفعيل الخاص به هو: ${res.pinCode}`);
-      }
-      onRefresh();
-    } else {
-      setErrorMsg(res.message || 'حدث خطأ أثناء إضافة الكابتن.');
-    }
-  };
 
   const handleToggle = async (driver: ManagedDriver) => {
     const res = await serverToggleDriverStatus(driver.id, driver.is_active);
@@ -111,58 +81,18 @@ export const DriverManager: React.FC<DriverManagerProps> = ({ drivers, onRefresh
 
   return (
     <div className="space-y-6 dir-rtl">
-      {/* Form Card: Add Driver */}
-      <Card shadow="sm" className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-        <CardHeader className="font-extrabold text-base flex items-center gap-2 text-zinc-900 dark:text-white border-b border-zinc-100 dark:border-zinc-800 pb-3">
-          <UserPlus className="w-5 h-5 text-zinc-900 dark:text-white" />
-          <span>إضافة كابتن / مندوب توصيل جديد (دليفري)</span>
-        </CardHeader>
-        <CardBody className="py-4 space-y-3">
-          {errorMsg && (
-            <div className="p-3 text-xs bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 font-semibold">
-              {errorMsg}
-            </div>
-          )}
-          <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3 items-end">
-            <Input
-              labelPlacement="outside"
-              label="اسم الكابتن"
-              value={name}
-              onValueChange={setName}
-              size="md"
-              variant="bordered"
-              className="flex-1"
-              classNames={{
-                label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-              }}
-            />
-            <Input
-              isRequired
-              labelPlacement="outside"
-              label="رقم الهاتف"
-              value={phone}
-              onValueChange={setPhone}
-              size="md"
-              variant="bordered"
-              type="tel"
-              className="flex-1"
-              classNames={{
-                label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-              }}
-            />
-            <Button
-              type="submit"
-              isLoading={isSubmitting}
-              startContent={!isSubmitting && <Plus className="w-4 h-4 stroke-[3]" />}
-              className="font-bold text-xs text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 h-12 sm:w-44 shadow-sm rounded-xl"
-            >
-              إضافة الكابتن
-            </Button>
-          </form>
+      <Card shadow="sm" className="border border-zinc-200 bg-zinc-50">
+        <CardBody className="text-sm leading-7 text-zinc-600">
+          إضافة حسابات الكباتن الجديدة تتم من تبويب «طلبات الحسابات». هذه القائمة
+          مخصصة لإدارة البطاقات القديمة وتعديلها أو حذفها.
         </CardBody>
       </Card>
+
+      {errorMsg && (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
+          {errorMsg}
+        </div>
+      )}
 
       {editing && (
         <Card className="border border-zinc-300 bg-zinc-50">

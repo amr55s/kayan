@@ -344,28 +344,6 @@ export async function serverDeleteActivePlace(
   }
 }
 
-export async function serverAddDriver(
-  name: string,
-  phone: string,
-  whatsapp?: string
-): Promise<{ success: boolean; message?: string; pinCode?: string }> {
-  await requireAdminSession();
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc('register_public_driver', {
-    p_name: name.trim() || 'كابتن توصيل',
-    p_phone: phone.trim(),
-    p_whatsapp: whatsapp?.trim() || phone.trim(),
-    p_vehicle_type: null,
-  });
-
-  if (error) {
-    return { success: false, message: 'حدث خطأ أثناء إضافة السائق.' };
-  }
-
-  triggerInstantRevalidation();
-  return { success: true, pinCode: data?.[0]?.activation_pin };
-}
-
 export async function serverToggleDriverStatus(
   driverId: string,
   currentStatus: boolean

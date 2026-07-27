@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { headers } from 'next/headers';
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -9,6 +11,7 @@ import { uploadImageToStorage } from '@/lib/supabase/actions';
 import { authEmailForPhone } from '@/lib/auth/phone';
 import {
   branchSchema,
+  accountRequestSchema,
   createOrderSchema,
   driverPublicProfileSchema,
   merchantPlaceSchema,
@@ -117,6 +120,7 @@ export async function renewDriverAvailability(): Promise<ActionResult<{ activeUn
     const supabase = await createClient();
     const { data, error } = await (supabase as any).rpc('renew_driver_availability');
     if (error) throw error;
+    revalidatePath('/');
     revalidatePath('/driver');
     return { success: true, data: { activeUntil: data.active_until } };
   } catch (error) {
@@ -129,16 +133,221 @@ export async function updateDriverPublicProfile(input: unknown): Promise<ActionR
     const profile = await requireRole('driver');
     const data = driverPublicProfileSchema.parse(input);
     const supabase = await createClient();
-    const { error } = await (supabase as any)
-      .from('driver_profiles')
-      .update({
-        whatsapp: data.whatsapp || null,
-        vehicle_type: data.vehicleType || null,
-      })
-      .eq('profile_id', profile.id);
+    const { error } = await (supabase as any).rpc('update_driver_public_profile', {
+      p_display_name: data.displayName,
+      p_whatsapp: data.whatsapp || null,
+      p_vehicle_type: data.vehicleType || null,
+    });
     if (error) throw error;
     revalidatePath('/');
     revalidatePath('/driver');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function submitAccountRequest(
+  input: unknown,
+  imageFiles: File[] = [],
+): Promise<ActionResult<{ requestId: string }>> {
+  let authUserId: string | null = null;
+  try {
+    const data = accountRequestSchema.parse(input);
+    if (imageFiles.length > 3) throw new Error('يمكن رفع 3 صور كحد أقصى.');
+
+    const admin = createAdminClient();
+    const rateLimitSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!rateLimitSecret) throw new Error('إعدادات الخادم غير مكتملة.');
+    const requestHeaders = await headers();
+    const forwardedIp = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const requestIp = forwardedIp || requestHeaders.get('x-real-ip') || 'local';
+    const rateLimitKey = createHash('sha256')
+      .update(`${requestIp}:${rateLimitSecret}`)
+      .digest('hex');
+    const { data: rateLimitAllowed, error: rateLimitError } = await (admin as any).rpc(
+      'consume_account_request_rate_limit',
+      { p_request_key: rateLimitKey, p_limit: 8 },
+    );
+    if (rateLimitError) throw new Error('تعذر التحقق من الطلب. حاول مرة أخرى.');
+    if (!rateLimitAllowed) {
+      throw new Error('تم إرسال طلبات كثيرة من هذا الاتصال. حاول بعد ساعة.');
+    }
+
+    const { data: existingProfile } = await (admin as any)
+      .from('profiles')
+      .select('id')
+      .eq('phone', data.phone)
+      .maybeSingle();
+    if (existingProfile) {
+      throw new Error('رقم الهاتف لديه حساب بالفعل. استخدم صفحة تسجيل الدخول.');
+    }
+
+    const { data: pendingRequest } = await (admin as any)
+      .from('account_requests')
+      .select('id')
+      .eq('phone', data.phone)
+      .eq('kind', data.kind)
+      .eq('status', 'pending')
+      .maybeSingle();
+    if (pendingRequest) {
+      throw new Error('يوجد طلب حساب قيد المراجعة بالفعل لهذا الرقم.');
+    }
+
+    let legacyDriverId: string | null = null;
+    if (data.kind === 'driver') {
+      const { data: legacyDriver } = await (admin as any)
+        .from('drivers')
+        .select('id')
+        .eq('phone', data.phone)
+        .maybeSingle();
+      legacyDriverId = legacyDriver?.id ?? null;
+    } else if (data.placeMode === 'existing') {
+      const { data: place } = await (admin as any)
+        .from('places')
+        .select('id')
+        .eq('id', data.existingPlaceId)
+        .maybeSingle();
+      if (!place) throw new Error('المكان المختار غير موجود.');
+      const { data: linkedBranch } = await (admin as any)
+        .from('merchant_branches')
+        .select('id')
+        .eq('place_id', data.existingPlaceId)
+        .maybeSingle();
+      if (linkedBranch) throw new Error('هذا المكان مرتبط بالفعل بحساب نشاط.');
+    }
+
+    const uploadedImages: string[] = [];
+    if (data.kind === 'merchant' && data.placeMode === 'new') {
+      for (const file of imageFiles) {
+        const url = await uploadImageToStorage(file, 'requests');
+        if (url) uploadedImages.push(url);
+      }
+    }
+
+    const { data: authData, error: authError } = await admin.auth.admin.createUser({
+      email: authEmailForPhone(data.phone),
+      email_confirm: true,
+      phone: `+2${data.phone}`,
+      phone_confirm: true,
+      password: data.password,
+      user_metadata: {
+        display_name: data.displayName,
+        account_status: 'pending_review',
+        requested_role: data.kind,
+      },
+    });
+    if (authError || !authData.user) {
+      const authMessage = authError?.message.toLowerCase() ?? '';
+      if (authMessage.includes('already') || authMessage.includes('registered')) {
+        throw new Error('رقم الهاتف لديه حساب أو طلب سابق. جرّب تسجيل الدخول أو تواصل مع الإدارة.');
+      }
+      throw authError ?? new Error('تعذر إنشاء طلب الدخول.');
+    }
+    authUserId = authData.user.id;
+
+    const { data: request, error: requestError } = await (admin as any)
+      .from('account_requests')
+      .insert({
+        kind: data.kind,
+        auth_user_id: authUserId,
+        display_name: data.displayName,
+        phone: data.phone,
+        whatsapp: data.whatsapp || null,
+        vehicle_type: data.kind === 'driver' ? data.vehicleType || null : null,
+        legacy_driver_id: legacyDriverId,
+        place_mode: data.kind === 'merchant' ? data.placeMode : null,
+        existing_place_id:
+          data.kind === 'merchant' && data.placeMode === 'existing'
+            ? data.existingPlaceId
+            : null,
+        place_title:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placeTitle
+            : null,
+        place_category:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placeCategory
+            : null,
+        place_whatsapp:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placeWhatsapp || data.whatsapp || data.phone
+            : null,
+        place_payment:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placePayment || null
+            : null,
+        place_description:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placeDescription || null
+            : null,
+        place_images: uploadedImages,
+        status: 'pending',
+      })
+      .select('id')
+      .single();
+    if (requestError || !request) throw requestError ?? new Error('تعذر حفظ طلب الحساب.');
+
+    revalidatePath('/admin');
+    return { success: true, data: { requestId: request.id } };
+  } catch (error) {
+    if (authUserId) {
+      try {
+        await createAdminClient().auth.admin.deleteUser(authUserId);
+      } catch {
+        // The orphaned Auth user has no profile and therefore no app permissions.
+      }
+    }
+    return actionError(error);
+  }
+}
+
+export async function approveAccountRequest(
+  requestId: string,
+): Promise<ActionResult> {
+  try {
+    await requireRole('admin');
+    const id = z.uuid().parse(requestId);
+    const supabase = await createClient();
+    const { data: authUserId, error } = await (supabase as any).rpc(
+      'approve_account_request',
+      { p_request_id: id },
+    );
+    if (error) throw error;
+
+    const admin = createAdminClient();
+    await admin.auth.admin.updateUserById(authUserId, {
+      user_metadata: { account_status: 'approved' },
+    });
+    revalidatePath('/');
+    revalidatePath('/admin');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function rejectAccountRequest(
+  requestId: string,
+  reason?: string,
+): Promise<ActionResult> {
+  try {
+    await requireRole('admin');
+    const id = z.uuid().parse(requestId);
+    const rejectionReason = z.string().trim().max(500).optional().parse(reason);
+    const supabase = await createClient();
+    const { data: authUserId, error } = await (supabase as any).rpc(
+      'reject_account_request',
+      { p_request_id: id, p_reason: rejectionReason || null },
+    );
+    if (error) throw error;
+
+    const admin = createAdminClient();
+    const { error: deleteError } = await admin.auth.admin.deleteUser(authUserId);
+    if (deleteError) {
+      console.error('Rejected account Auth cleanup failed:', deleteError.message);
+    }
+    revalidatePath('/admin');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -467,14 +676,28 @@ export async function deleteManagedUser(profileId: string): Promise<ActionResult
     if (id === actor.id) throw new Error('لا يمكنك حذف حسابك الحالي.');
 
     const admin = createAdminClient();
+    const { data: profile, error: profileError } = await (admin as any)
+      .from('profiles')
+      .select('id, role, merchant_id')
+      .eq('id', id)
+      .single();
+    if (profileError || !profile) throw profileError ?? new Error('الحساب غير موجود.');
+
     const { error } = await admin.auth.admin.deleteUser(id);
     if (error) throw error;
+    if (profile.role === 'merchant' && profile.merchant_id) {
+      const { error: unlinkError } = await (admin as any)
+        .from('merchant_branches')
+        .update({ place_id: null, is_active: false })
+        .eq('merchant_id', profile.merchant_id);
+      if (unlinkError) throw unlinkError;
+    }
     await (admin as any).from('audit_log').insert({
       actor_id: actor.id,
       action: 'user_deleted',
       entity_type: 'profile',
       entity_id: id,
-      metadata: {},
+      metadata: { role: profile.role, merchant_id: profile.merchant_id },
     });
     revalidatePath('/admin');
     return { success: true };

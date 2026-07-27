@@ -107,7 +107,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place }) => {
                     className="size-11 min-w-11 bg-transparent p-0 transition-colors hover:bg-transparent"
                   >
                     <Heart
-                      className={`size-4 transition-all ${
+                      className={`size-4 transition-[color,fill,transform] ${
                         isFavorite(place.id)
                           ? 'scale-110 fill-rose-800 text-rose-800'
                           : 'text-zinc-400'
@@ -289,7 +289,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place }) => {
                           type="button"
                           onClick={() => setSelectedImageIndex(i)}
                           aria-label={`عرض الصورة ${i + 1}`}
-                          className={`size-12 shrink-0 overflow-hidden rounded-xl border-2 transition-all ${
+                          className={`size-12 shrink-0 overflow-hidden rounded-xl border-2 transition-[border-color,opacity,transform] ${
                             i === selectedImageIndex ? 'scale-105 border-white' : 'border-zinc-700 opacity-60'
                           }`}
                         >
