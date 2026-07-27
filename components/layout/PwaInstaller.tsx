@@ -50,7 +50,7 @@ export const PwaInstaller: React.FC = () => {
   if (!showBanner) return null;
 
   return (
-    <div className="fixed bottom-16 sm:bottom-4 left-3 right-3 z-50 bg-zinc-900 text-white rounded-2xl p-3 flex items-center justify-between gap-3 shadow-xl border border-zinc-800 max-w-md mx-auto">
+    <div className="fixed bottom-24 sm:bottom-4 left-3 right-3 z-50 bg-zinc-900 text-white rounded-2xl p-3 flex items-center justify-between gap-3 shadow-xl border border-zinc-800 max-w-md mx-auto">
       <div className="flex items-center gap-2.5 min-w-0">
         <div className="w-9 h-9 rounded-xl bg-zinc-800 text-white flex items-center justify-center shrink-0 border border-zinc-700">
           <Download className="w-4 h-4" />

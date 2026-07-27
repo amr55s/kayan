@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { SITE_NAME, SITE_NAME_AR, SITE_TAGLINE } from '@/lib/brand';
+import { WhatsAppGroupButton } from '@/components/layout/WhatsAppGroupButton';
 import { Providers } from './providers';
 import '@fontsource/ibm-plex-sans-arabic/400.css';
 import '@fontsource/ibm-plex-sans-arabic/500.css';
@@ -37,6 +38,7 @@ export default function RootLayout({
       >
         <Providers>
           {children}
+          <WhatsAppGroupButton />
         </Providers>
       </body>
     </html>

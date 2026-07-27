@@ -72,6 +72,24 @@ test('public branding uses KAYAN CITY SPOT consistently', () => {
   }
 });
 
+test('WhatsApp community link stays visible across the whole site', () => {
+  const layout = read('app/layout.tsx');
+  const groupButton = read('components/layout/WhatsAppGroupButton.tsx');
+  const installer = read('components/layout/PwaInstaller.tsx');
+
+  assert.match(layout, /<WhatsAppGroupButton \/>/);
+  assert.match(
+    groupButton,
+    /https:\/\/chat\.whatsapp\.com\/HFRuGccY946F74VnYDjbVO\?mode=gi_t/,
+  );
+  assert.match(groupButton, /fixed bottom-/);
+  assert.match(groupButton, /جروب واتساب/);
+  assert.match(groupButton, /للتواصل والاقتراحات/);
+  assert.match(groupButton, /target="_blank"/);
+  assert.match(groupButton, /rel="noopener noreferrer"/);
+  assert.match(installer, /bottom-24 sm:bottom-4/);
+});
+
 test('listing images are optimized before storage without sacrificing menu resolution', () => {
   const clientPipeline = read('lib/images/client.ts');
   const serverPipeline = read('lib/images/server.ts');
