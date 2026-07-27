@@ -72,7 +72,7 @@ test('public branding uses KAYAN CITY SPOT consistently', () => {
   }
 });
 
-test('WhatsApp community link stays visible across the whole site', () => {
+test('WhatsApp support link stays visible across the whole site', () => {
   const layout = read('app/layout.tsx');
   const groupButton = read('components/layout/WhatsAppGroupButton.tsx');
   const installer = read('components/layout/PwaInstaller.tsx');
@@ -80,11 +80,12 @@ test('WhatsApp community link stays visible across the whole site', () => {
   assert.match(layout, /<WhatsAppGroupButton \/>/);
   assert.match(
     groupButton,
-    /https:\/\/chat\.whatsapp\.com\/HFRuGccY946F74VnYDjbVO\?mode=gi_t/,
+    /https:\/\/wa\.me\/201094552421/,
   );
   assert.match(groupButton, /fixed bottom-/);
-  assert.match(groupButton, /جروب واتساب/);
-  assert.match(groupButton, /للتواصل والاقتراحات/);
+  assert.match(groupButton, /التواصل مع الدعم/);
+  assert.match(groupButton, /01094552421/);
+  assert.doesNotMatch(groupButton, /chat\.whatsapp\.com/);
   assert.match(groupButton, /target="_blank"/);
   assert.match(groupButton, /rel="noopener noreferrer"/);
   assert.match(installer, /bottom-24 sm:bottom-4/);

@@ -1,5 +1,5 @@
-const WHATSAPP_GROUP_URL =
-  'https://chat.whatsapp.com/HFRuGccY946F74VnYDjbVO?mode=gi_t';
+const WHATSAPP_SUPPORT_URL =
+  'https://wa.me/201094552421?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%D8%8C%20%D8%A3%D8%AA%D9%88%D8%A7%D8%B5%D9%84%20%D9%85%D9%86%20%D9%85%D9%88%D9%82%D8%B9%20KAYAN%20CITY%20SPOT';
 
 function WhatsAppIcon() {
   return (
@@ -16,19 +16,19 @@ function WhatsAppIcon() {
 export function WhatsAppGroupButton() {
   return (
     <a
-      href={WHATSAPP_GROUP_URL}
+      href={WHATSAPP_SUPPORT_URL}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="الانضمام إلى جروب واتساب كيان سيتي سبوت للتواصل والاقتراحات"
+      aria-label="التواصل مع دعم كيان سيتي سبوت عبر واتساب على رقم 01094552421"
       className="group fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] end-3 z-50 inline-flex min-h-14 items-center gap-2.5 rounded-full border border-white/30 bg-[#25D366] py-2 pe-4 ps-2.5 text-white shadow-[0_12px_35px_rgba(37,211,102,0.38)] transition-[transform,background-color,box-shadow] hover:-translate-y-1 hover:bg-[#20bd5a] hover:shadow-[0_16px_40px_rgba(37,211,102,0.48)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transform-none sm:end-5"
     >
       <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#20bd5a] shadow-sm">
         <WhatsAppIcon />
       </span>
       <span className="flex flex-col text-right leading-tight">
-        <strong className="text-sm font-black">جروب واتساب</strong>
+        <strong className="text-sm font-black">التواصل مع الدعم</strong>
         <span className="mt-0.5 text-[11px] font-semibold text-white/90">
-          للتواصل والاقتراحات
+          واتساب: <bdi dir="ltr">01094552421</bdi>
         </span>
       </span>
     </a>
