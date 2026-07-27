@@ -77,6 +77,12 @@ test('listing images are optimized before storage without sacrificing menu resol
   const serverPipeline = read('lib/images/server.ts');
   const storageAction = read('lib/supabase/actions.ts');
   const nextConfig = read('next.config.ts');
+  const imageForms = [
+    'components/admin/EditPlaceModal.tsx',
+    'components/modals/AddListingModal.tsx',
+    'components/modals/FeedbackModal.tsx',
+    'components/operations/MerchantOrderWorkspace.tsx',
+  ];
 
   assert.match(clientPipeline, /MAX_WIDTH = 2400/);
   assert.match(clientPipeline, /MAX_HEIGHT = 3400/);
@@ -88,10 +94,29 @@ test('listing images are optimized before storage without sacrificing menu resol
   assert.match(serverPipeline, /\.rotate\(\)/);
   assert.match(serverPipeline, /\.sharpen\(\{ sigma: 0\.45 \}\)/);
   assert.match(serverPipeline, /\.webp\(\{/);
+  assert.match(serverPipeline, /PASSTHROUGH_WEBP_BYTES/);
+  assert.match(serverPipeline, /source\.format === 'webp'/);
   assert.match(storageAction, /contentType: processed\.contentType/);
   assert.match(storageAction, /cacheControl: '31536000'/);
+  assert.match(storageAction, /toPlainArrayBuffer\(processed\.buffer\)/);
+  assert.match(storageAction, /STORAGE_UPLOAD_ATTEMPTS = 2/);
   assert.doesNotMatch(storageAction, /ALLOWED_IMAGE_TYPES/);
   assert.match(nextConfig, /bodySizeLimit: '4mb'/);
+  for (const form of imageForms) {
+    assert.match(read(form), /uploadOptimizedImages/);
+  }
+});
+
+test('storage image bytes are copied out of SharedArrayBuffer exactly', async () => {
+  const { toPlainArrayBuffer } = await import('../lib/images/buffer.ts');
+  const shared = new SharedArrayBuffer(12);
+  const source = new Uint8Array(shared, 3, 4);
+  source.set([11, 22, 33, 44]);
+
+  const copied = toPlainArrayBuffer(source);
+  assert.ok(copied instanceof ArrayBuffer);
+  assert.equal(copied.byteLength, 4);
+  assert.deepEqual(Array.from(new Uint8Array(copied)), [11, 22, 33, 44]);
 });
 
 test('admin mutations recover from transient response failures', () => {

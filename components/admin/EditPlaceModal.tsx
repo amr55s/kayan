@@ -94,11 +94,6 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
-    const oversized = filesArray.find((file) => file.size > 15 * 1024 * 1024);
-    if (oversized) {
-      setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
-      return;
-    }
     if (newImageFiles.length + filesArray.length > 6) {
       setErrorMsg('يمكن رفع 6 صور جديدة كحد أقصى في المرة الواحدة.');
       return;

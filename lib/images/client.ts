@@ -5,7 +5,7 @@ import {
   type ListingUploadFolder,
 } from '@/lib/supabase/actions';
 
-const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
+const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
 const TARGET_UPLOAD_BYTES = 1_050_000;
 const MAX_WIDTH = 2400;
 const MAX_HEIGHT = 3400;
@@ -109,7 +109,7 @@ async function renderWebp(
 export async function optimizeImageForUpload(file: File): Promise<File> {
   if (!file.size) throw new Error(`الصورة "${file.name}" فارغة.`);
   if (file.size > MAX_SOURCE_BYTES) {
-    throw new Error(`الصورة "${file.name}" أكبر من 15 ميجابايت.`);
+    throw new Error(`الصورة "${file.name}" أكبر من 50 ميجابايت.`);
   }
 
   try {

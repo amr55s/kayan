@@ -6,6 +6,7 @@ const MAX_INPUT_PIXELS = 40_000_000;
 const MAX_WIDTH = 2400;
 const MAX_HEIGHT = 3400;
 const TARGET_OUTPUT_BYTES = 1_500_000;
+const PASSTHROUGH_WEBP_BYTES = 1_600_000;
 
 export type ProcessedImage = {
   buffer: Buffer;
@@ -14,6 +15,14 @@ export type ProcessedImage = {
   width: number;
   height: number;
 };
+
+async function inspectImage(input: Buffer) {
+  return sharp(input, {
+    failOn: 'error',
+    limitInputPixels: MAX_INPUT_PIXELS,
+    sequentialRead: true,
+  }).metadata();
+}
 
 async function encodeWebp(input: Buffer, quality: number, scale = 1) {
   return sharp(input, {
@@ -48,6 +57,29 @@ async function encodeWebp(input: Buffer, quality: number, scale = 1) {
 export async function processImageForStorage(
   input: Buffer,
 ): Promise<ProcessedImage> {
+  const source = await inspectImage(input);
+  if (!source.width || !source.height) {
+    throw new Error('invalid_image_dimensions');
+  }
+
+  // Browser-generated WebP files are already auto-oriented, resized and
+  // compressed. Keeping their original bytes avoids a second lossy encode,
+  // which is especially important for menu text and small Arabic lettering.
+  if (
+    source.format === 'webp' &&
+    source.width <= MAX_WIDTH &&
+    source.height <= MAX_HEIGHT &&
+    input.length <= PASSTHROUGH_WEBP_BYTES
+  ) {
+    return {
+      buffer: Buffer.from(input),
+      contentType: 'image/webp',
+      extension: 'webp',
+      width: source.width,
+      height: source.height,
+    };
+  }
+
   let best = await encodeWebp(input, 90);
   if (best.data.length > TARGET_OUTPUT_BYTES) best = await encodeWebp(input, 86);
   if (best.data.length > TARGET_OUTPUT_BYTES) best = await encodeWebp(input, 82);
@@ -55,11 +87,20 @@ export async function processImageForStorage(
     best = await encodeWebp(input, 82, 0.88);
   }
 
+  const verified = await inspectImage(best.data);
+  if (
+    verified.format !== 'webp' ||
+    !verified.width ||
+    !verified.height
+  ) {
+    throw new Error('invalid_processed_image');
+  }
+
   return {
-    buffer: best.data,
+    buffer: Buffer.from(best.data),
     contentType: 'image/webp',
     extension: 'webp',
-    width: best.info.width,
-    height: best.info.height,
+    width: verified.width,
+    height: verified.height,
   };
 }

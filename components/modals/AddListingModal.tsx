@@ -83,11 +83,6 @@ export function AddListingModal({
   function handleFiles(files: FileList | null) {
     if (!files) return;
     const next = Array.from(files);
-    const oversized = next.find((file) => file.size > 15 * 1024 * 1024);
-    if (oversized) {
-      setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
-      return;
-    }
     if (selectedFiles.length + next.length > 3) {
       setErrorMsg('يمكن رفع 3 صور كحد أقصى.');
       return;

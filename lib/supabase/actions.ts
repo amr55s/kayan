@@ -4,6 +4,7 @@ import { createClient } from './server';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { FeedbackType } from '@/types';
 import { processImageForStorage } from '@/lib/images/server';
+import { toPlainArrayBuffer } from '@/lib/images/buffer';
 import { validateListingImageUrls } from '@/lib/images/urls';
 
 export type ListingUploadFolder = 'requests' | 'feedback' | 'merchant';
@@ -11,6 +12,7 @@ export type ImageUploadResult =
   | { success: true; url: string | null }
   | { success: false; message: string };
 const MAX_IMAGE_BYTES = 3_500_000;
+const STORAGE_UPLOAD_ATTEMPTS = 2;
 
 /**
  * Helper to check if Supabase is running in demo/placeholder mode
@@ -63,18 +65,29 @@ export async function uploadImageToStorage(
     const processed = await processImageForStorage(
       Buffer.from(await file.arrayBuffer()),
     );
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${processed.extension}`;
-    const filePath = `${folder}/${fileName}`;
-    const { data, error } = await supabase.storage
-      .from('listing-images')
-      .upload(filePath, processed.buffer, {
-        cacheControl: '31536000',
-        contentType: processed.contentType,
-        upsert: false,
-      });
+    const uploadBody = toPlainArrayBuffer(processed.buffer);
+    let storedPath: string | null = null;
 
-    if (error) {
-      console.error('Storage upload failed:', error);
+    for (let attempt = 1; attempt <= STORAGE_UPLOAD_ATTEMPTS; attempt += 1) {
+      const fileName = `${Date.now()}_${attempt}_${Math.random().toString(36).substring(2, 9)}.${processed.extension}`;
+      const filePath = `${folder}/${fileName}`;
+      const { data, error } = await supabase.storage
+        .from('listing-images')
+        .upload(filePath, uploadBody.slice(0), {
+          cacheControl: '31536000',
+          contentType: processed.contentType,
+          upsert: false,
+        });
+
+      if (!error && data?.path) {
+        storedPath = data.path;
+        break;
+      }
+
+      console.error(`Storage upload attempt ${attempt} failed:`, error);
+    }
+
+    if (!storedPath) {
       return {
         success: false,
         message: 'تعذر رفع الصورة حالياً.',
@@ -83,7 +96,14 @@ export async function uploadImageToStorage(
 
     const { data: publicUrlData } = supabase.storage
       .from('listing-images')
-      .getPublicUrl(data.path);
+      .getPublicUrl(storedPath);
+
+    if (!publicUrlData.publicUrl) {
+      return {
+        success: false,
+        message: 'تم رفع الصورة لكن تعذر إنشاء رابط العرض.',
+      };
+    }
 
     return { success: true, url: publicUrlData.publicUrl };
   } catch (err) {

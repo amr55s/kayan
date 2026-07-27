@@ -91,11 +91,6 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
-    const oversized = filesArray.find((file) => file.size > 15 * 1024 * 1024);
-    if (oversized) {
-      setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
-      return;
-    }
 
     if (selectedFiles.length + filesArray.length > 3) {
       setErrorMsg('يمكنك رفع حتى 3 صور فقط.');
