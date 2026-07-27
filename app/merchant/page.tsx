@@ -3,6 +3,8 @@ import { DashboardHeader } from '@/components/operations/DashboardHeader';
 import { requireProfile } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
 
+export const maxDuration = 60;
+
 export default async function MerchantPage() {
   const profile = await requireProfile(['merchant']);
   const supabase = await createClient();

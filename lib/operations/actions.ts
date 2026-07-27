@@ -28,6 +28,24 @@ function actionError(error: unknown): ActionResult {
   return { success: false, message: message.replace(/^.*?:\s*/, '') };
 }
 
+function validateListingImageUrls(urls: string[], max: number): string[] {
+  if (urls.length > max) {
+    throw new Error(`يمكن رفع ${max} صور كحد أقصى في المرة الواحدة.`);
+  }
+  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!projectUrl && urls.length) throw new Error('إعدادات تخزين الصور غير مكتملة.');
+  const allowedOrigin = projectUrl ? new URL(projectUrl).origin : '';
+  const allowedPath = '/storage/v1/object/public/listing-images/';
+
+  return urls.map((value) => {
+    const url = new URL(z.url().parse(value));
+    if (url.origin !== allowedOrigin || !url.pathname.startsWith(allowedPath)) {
+      throw new Error('رابط صورة غير صالح.');
+    }
+    return url.toString();
+  });
+}
+
 async function requireRole(role: 'admin' | 'merchant' | 'driver') {
   const profile = await getCurrentProfile();
   if (!profile || !profile.is_active || profile.role !== role || profile.must_change_password) {
@@ -393,13 +411,13 @@ export async function createMerchant(displayName: string): Promise<ActionResult<
 
 export async function updateMerchantPlace(
   input: unknown,
-  newFiles: File[] = [],
+  newImageUrls: string[] = [],
 ): Promise<ActionResult> {
   try {
     const profile = await requireRole('merchant');
     if (!profile.merchant_id) throw new Error('الحساب غير مرتبط بمحل.');
     const data = merchantPlaceSchema.parse(input);
-    if (newFiles.length > 6) throw new Error('يمكن رفع 6 صور كحد أقصى في المرة الواحدة.');
+    const uploadedImages = validateListingImageUrls(newImageUrls, 6);
 
     const supabase = await createClient();
     const { data: branch } = await (supabase as any)
@@ -423,11 +441,6 @@ export async function updateMerchantPlace(
       throw new Error('قائمة الصور الحالية غير صالحة.');
     }
 
-    const uploadedImages: string[] = [];
-    for (const file of newFiles) {
-      const url = await uploadImageToStorage(file, 'merchant');
-      if (url) uploadedImages.push(url);
-    }
     const finalImages = Array.from(new Set([...data.existingImages, ...uploadedImages]));
 
     const admin = createAdminClient();

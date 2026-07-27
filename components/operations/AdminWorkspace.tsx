@@ -162,6 +162,12 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
     router.refresh();
   }
 
+  function recoverFromActionError(error: unknown) {
+    console.error('Admin action transport failed:', error);
+    setMessage('انقطع الاتصال بعد تنفيذ العملية. جاري تحديث البيانات للتحقق من النتيجة.');
+    router.refresh();
+  }
+
   function createMerchantSubmit(event: FormEvent) {
     event.preventDefault();
     startTransition(async () => {
@@ -239,25 +245,37 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
 
   function approveRequest(requestId: string) {
     startTransition(async () => {
-      const result = await approvePendingPlace(requestId);
-      if (result.success) complete(result.message);
-      else setMessage(result.message);
+      try {
+        const result = await approvePendingPlace(requestId);
+        if (result.success) complete(result.message);
+        else setMessage(result.message);
+      } catch (error) {
+        recoverFromActionError(error);
+      }
     });
   }
 
   function rejectRequest(requestId: string) {
     startTransition(async () => {
-      const result = await rejectPendingPlace(requestId);
-      if (result.success) complete(result.message);
-      else setMessage(result.message);
+      try {
+        const result = await rejectPendingPlace(requestId);
+        if (result.success) complete(result.message);
+        else setMessage(result.message);
+      } catch (error) {
+        recoverFromActionError(error);
+      }
     });
   }
 
   function resolveSuggestion(requestId: string) {
     startTransition(async () => {
-      const result = await resolveFeedbackWithoutChanges(requestId);
-      if (result.success) complete('تمت أرشفة الاقتراح أو التقييم.');
-      else setMessage(result.message);
+      try {
+        const result = await resolveFeedbackWithoutChanges(requestId);
+        if (result.success) complete('تمت أرشفة الاقتراح أو التقييم.');
+        else setMessage(result.message);
+      } catch (error) {
+        recoverFromActionError(error);
+      }
     });
   }
 

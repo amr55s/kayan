@@ -16,6 +16,7 @@ import {
 } from '@heroui/react';
 import { MessageSquarePlus, Send, CheckCircle2, Upload, X, Building, Phone, Star } from 'lucide-react';
 import { submitFeedbackSubmission } from '@/lib/supabase/actions';
+import { optimizeImagesForUpload } from '@/lib/images/client';
 import { isValidEgyptianPhone } from '@/lib/utils';
 import { FeedbackType, Place } from '@/types';
 import { createClient } from '@/lib/supabase/client';
@@ -49,6 +50,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [processingMsg, setProcessingMsg] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,12 +83,24 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
     setFilePreviews([]);
     setIsSuccess(false);
     setErrorMsg('');
+    setProcessingMsg('');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
-    const validImages = filesArray.filter((file) => file.type.startsWith('image/'));
+    const validImages = filesArray.filter((file) =>
+      ['image/jpeg', 'image/png', 'image/webp'].includes(file.type),
+    );
+    if (validImages.length !== filesArray.length) {
+      setErrorMsg('الصور المسموحة هي JPG أو PNG أو WEBP.');
+      return;
+    }
+    const oversized = validImages.find((file) => file.size > 15 * 1024 * 1024);
+    if (oversized) {
+      setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
+      return;
+    }
 
     if (selectedFiles.length + validImages.length > 3) {
       setErrorMsg('يمكنك رفع حتى 3 صور فقط.');
@@ -95,6 +109,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
 
     setErrorMsg('');
     const newFiles = [...selectedFiles, ...validImages].slice(0, 3);
+    filePreviews.forEach((url) => URL.revokeObjectURL(url));
     setSelectedFiles(newFiles);
     setFilePreviews(newFiles.map((file) => URL.createObjectURL(file)));
   };
@@ -131,6 +146,13 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
     setErrorMsg('');
 
     try {
+      const optimizedFiles = await optimizeImagesForUpload(
+        selectedFiles,
+        ({ current, total }) => setProcessingMsg(
+          `جاري تحسين الصورة ${current} من ${total} مع الحفاظ على وضوح المنيو...`,
+        ),
+      );
+      if (optimizedFiles.length) setProcessingMsg('جاري رفع الصور وإرسال الطلب...');
       const selectedPlace = fetchedPlaces.find((p) => p.id === targetPlaceId);
       const placeDisplayName = isOpinion
         ? 'رأي عام في كيان سيتي سبوت'
@@ -143,7 +165,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
         feedbackType,
         contactPhone,
         notes,
-        selectedFiles,
+        optimizedFiles,
         !isOpinion && targetPlaceId !== 'unlisted' ? targetPlaceId : null,
         !isOpinion ? proposedPhone.trim() || null : null,
         feedbackType === 'rating' ? rating : null,
@@ -159,6 +181,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
       setErrorMsg(err?.message || 'تعذر إرسال الطلب. حاول مرة أخرى.');
     } finally {
       setIsSubmitting(false);
+      setProcessingMsg('');
     }
   };
 
@@ -222,6 +245,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
                   {errorMsg && (
                     <div className="p-3 text-xs bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 font-semibold">
                       {errorMsg}
+                    </div>
+                  )}
+                  {processingMsg && (
+                    <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs font-semibold text-sky-800">
+                      {processingMsg}
                     </div>
                   )}
 
@@ -380,7 +408,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
                     <input
                       type="file"
                       ref={fileInputRef}
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       multiple
                       onChange={handleFileChange}
                       className="hidden"

@@ -28,32 +28,44 @@ export function AccountRequestManager({
 
   function approve(request: AccountRequest) {
     startTransition(async () => {
-      const result = await approveAccountRequest(request.id);
-      if (!result.success) {
-        onMessage(result.message);
-        return;
+      try {
+        const result = await approveAccountRequest(request.id);
+        if (!result.success) {
+          onMessage(result.message);
+          return;
+        }
+        onMessage(
+          request.kind === 'driver'
+            ? 'تم اعتماد حساب الكابتن وربطه ببطاقته.'
+            : 'تم اعتماد حساب النشاط وربطه بالمكان.',
+        );
+        setApprovingId(null);
+        onRefresh();
+      } catch (error) {
+        console.error('Approve account request failed:', error);
+        onMessage('انقطع الاتصال بعد تنفيذ الطلب. جاري تحديث البيانات للتحقق من النتيجة.');
+        onRefresh();
       }
-      onMessage(
-        request.kind === 'driver'
-          ? 'تم اعتماد حساب الكابتن وربطه ببطاقته.'
-          : 'تم اعتماد حساب النشاط وربطه بالمكان.',
-      );
-      setApprovingId(null);
-      onRefresh();
     });
   }
 
   function reject(request: AccountRequest) {
     startTransition(async () => {
-      const result = await rejectAccountRequest(request.id, reason);
-      if (!result.success) {
-        onMessage(result.message);
-        return;
+      try {
+        const result = await rejectAccountRequest(request.id, reason);
+        if (!result.success) {
+          onMessage(result.message);
+          return;
+        }
+        setRejectingId(null);
+        setReason('');
+        onMessage('تم رفض الطلب وحذف بيانات الدخول المعلقة.');
+        onRefresh();
+      } catch (error) {
+        console.error('Reject account request failed:', error);
+        onMessage('انقطع الاتصال بعد تنفيذ الطلب. جاري تحديث البيانات للتحقق من النتيجة.');
+        onRefresh();
       }
-      setRejectingId(null);
-      setReason('');
-      onMessage('تم رفض الطلب وحذف بيانات الدخول المعلقة.');
-      onRefresh();
     });
   }
 

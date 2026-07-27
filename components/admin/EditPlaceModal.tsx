@@ -18,7 +18,7 @@ import {
 import { Edit, PlusCircle, Check, Upload, X, Star, Building, CreditCard, Trash2 } from 'lucide-react';
 import { Place } from '@/types';
 import { serverInsertPlaceDirectly, serverUpdateActivePlace, serverDeleteActivePlace } from '@/lib/supabase/admin-actions';
-import { uploadImageToStorage } from '@/lib/supabase/actions';
+import { uploadOptimizedImages } from '@/lib/images/client';
 import { CATEGORY_OPTIONS } from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
 
@@ -52,6 +52,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [processingMsg, setProcessingMsg] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -68,6 +69,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
       setNewImageFiles([]);
       setNewImagePreviews([]);
       setErrorMsg('');
+      setProcessingMsg('');
     });
     return () => window.cancelAnimationFrame(frame);
   }, [mode, place, isOpen]);
@@ -86,14 +88,31 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
     setNewImageFiles([]);
     setNewImagePreviews([]);
     setErrorMsg('');
+    setProcessingMsg('');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
-    const validImages = filesArray.filter((file) => file.type.startsWith('image/'));
+    const validImages = filesArray.filter((file) =>
+      ['image/jpeg', 'image/png', 'image/webp'].includes(file.type),
+    );
+    if (validImages.length !== filesArray.length) {
+      setErrorMsg('الصور المسموحة هي JPG أو PNG أو WEBP.');
+      return;
+    }
+    const oversized = validImages.find((file) => file.size > 15 * 1024 * 1024);
+    if (oversized) {
+      setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
+      return;
+    }
+    if (newImageFiles.length + validImages.length > 6) {
+      setErrorMsg('يمكن رفع 6 صور جديدة كحد أقصى في المرة الواحدة.');
+      return;
+    }
 
     const updatedFiles = [...newImageFiles, ...validImages];
+    newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
     const updatedPreviews = updatedFiles.map((file) => URL.createObjectURL(file));
 
     setNewImageFiles(updatedFiles);
@@ -129,14 +148,20 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
 
     setIsSubmitting(true);
     setErrorMsg('');
+    setProcessingMsg('');
 
     try {
-      // Upload new images to storage
-      const uploadedUrls: string[] = [];
-      for (const file of newImageFiles) {
-        const url = await uploadImageToStorage(file);
-        if (url) uploadedUrls.push(url);
-      }
+      const uploadedUrls = await uploadOptimizedImages(
+        newImageFiles,
+        'requests',
+        ({ current, total, stage }) => {
+          setProcessingMsg(
+            stage === 'optimizing'
+              ? `جاري تحسين الصورة ${current} من ${total} مع الحفاظ على وضوح النص...`
+              : `جاري رفع الصورة ${current} من ${total}...`,
+          );
+        },
+      );
 
       const finalImages = Array.from(new Set([...existingImages, ...uploadedUrls]));
 
@@ -168,13 +193,14 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
         if (!res.success) throw new Error(res.message);
       }
 
-      onSuccess();
       onOpenChange(false);
+      onSuccess();
     } catch (err: any) {
       console.error('Error submitting place form:', err);
       setErrorMsg(err.message || 'حدث خطأ أثناء حفظ المكان، يرجى المحاولة لاحقاً.');
     } finally {
       setIsSubmitting(false);
+      setProcessingMsg('');
     }
   };
 
@@ -214,6 +240,11 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                 {errorMsg && (
                   <div className="p-3 text-xs bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 font-semibold">
                     {errorMsg}
+                  </div>
+                )}
+                {processingMsg && (
+                  <div role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs font-semibold text-sky-800">
+                    {processingMsg}
                   </div>
                 )}
 
@@ -342,7 +373,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   <input
                     type="file"
                     ref={fileInputRef}
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     multiple
                     onChange={handleFileChange}
                     className="hidden"

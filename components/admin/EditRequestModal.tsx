@@ -40,6 +40,7 @@ export const EditRequestModal: React.FC<EditRequestModalProps> = ({
   const [description, setDescription] = useState('');
   const [isFeatured, setIsFeatured] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -51,6 +52,7 @@ export const EditRequestModal: React.FC<EditRequestModalProps> = ({
       setInstapayVfcash(request.instapay_vfcash || '');
       setDescription(request.description || '');
       setIsFeatured(false);
+      setErrorMsg('');
     });
     return () => window.cancelAnimationFrame(frame);
   }, [request]);
@@ -60,6 +62,7 @@ export const EditRequestModal: React.FC<EditRequestModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setErrorMsg('');
 
     const updatedData = {
       title: title.trim(),
@@ -72,14 +75,20 @@ export const EditRequestModal: React.FC<EditRequestModalProps> = ({
       is_featured: isFeatured,
     };
 
-    const res = await serverEditAndApproveRequest(request.id, updatedData);
-    setIsSubmitting(false);
-
-    if (res.success) {
-      onSuccess();
+    try {
+      const res = await serverEditAndApproveRequest(request.id, updatedData);
+      if (!res.success) {
+        setErrorMsg(res.message || 'حدث خطأ أثناء تعديل وتفعيل الطلب.');
+        return;
+      }
       onOpenChange(false);
-    } else {
-      alert(res.message || 'حدث خطأ أثناء تعديل وتفعيل الطلب.');
+      onSuccess();
+    } catch (error) {
+      console.error('Edit and approve request failed:', error);
+      setErrorMsg('انقطع الاتصال أثناء تحديث الشاشة. جاري التحقق من نتيجة العملية.');
+      onSuccess();
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -104,6 +113,11 @@ export const EditRequestModal: React.FC<EditRequestModalProps> = ({
             </ModalHeader>
 
             <ModalBody className="py-4 space-y-4">
+              {errorMsg && (
+                <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+                  {errorMsg}
+                </p>
+              )}
               <form id="edit-request-form" onSubmit={handleSubmit} className="space-y-4">
                 <Input
                   isRequired

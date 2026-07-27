@@ -3,10 +3,11 @@
 import { createClient } from './server';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { FeedbackType } from '@/types';
+import { processImageForStorage } from '@/lib/images/server';
 
-type ListingUploadFolder = 'requests' | 'feedback' | 'merchant';
+export type ListingUploadFolder = 'requests' | 'feedback' | 'merchant';
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 1_500_000;
 
 /**
  * Helper to check if Supabase is running in demo/placeholder mode
@@ -52,21 +53,22 @@ export async function uploadImageToStorage(
   }
 
   const supabase = await createClient();
-  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-  const filePath = `${folder}/${fileName}`;
-
   try {
+    const processed = await processImageForStorage(
+      Buffer.from(await file.arrayBuffer()),
+    );
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${processed.extension}`;
+    const filePath = `${folder}/${fileName}`;
     const { data, error } = await supabase.storage
       .from('listing-images')
-      .upload(filePath, file, {
-        cacheControl: '3600',
+      .upload(filePath, processed.buffer, {
+        cacheControl: '31536000',
+        contentType: processed.contentType,
         upsert: false,
       });
 
     if (error) {
-      console.warn('Supabase storage upload error:', error.message);
-      return null;
+      throw new Error(`تعذر رفع الصورة: ${error.message}`);
     }
 
     const { data: publicUrlData } = supabase.storage
@@ -76,7 +78,9 @@ export async function uploadImageToStorage(
     return publicUrlData.publicUrl;
   } catch (err) {
     console.error('Storage upload exception:', err);
-    return null;
+    throw err instanceof Error
+      ? err
+      : new Error('تعذر معالجة الصورة أو رفعها.');
   }
 }
 
@@ -104,6 +108,9 @@ export async function submitFeedbackSubmission(
     }
     if (feedbackType === 'rating' && (!rating || rating < 1 || rating > 5)) {
       throw new Error('اختر تقييماً من نجمة إلى خمس نجوم.');
+    }
+    if (imageFiles.length > 3) {
+      throw new Error('يمكن رفع 3 صور كحد أقصى.');
     }
 
     if (isDemoMode()) {

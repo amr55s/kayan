@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import { submitAccountRequest } from '@/lib/operations/actions';
+import { optimizeImagesForUpload } from '@/lib/images/client';
 import { CATEGORY_OPTIONS } from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
 import type { Place } from '@/types';
@@ -56,6 +57,7 @@ export function AddListingModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [processingMsg, setProcessingMsg] = useState('');
 
   function resetForm() {
     setMode('existing');
@@ -73,14 +75,15 @@ export function AddListingModal({
     setIsSubmitting(false);
     setIsSuccess(false);
     setErrorMsg('');
+    setProcessingMsg('');
   }
 
   function handleFiles(files: FileList | null) {
     if (!files) return;
     const next = Array.from(files).filter((file) => file.type.startsWith('image/'));
-    const oversized = next.find((file) => file.size > 5 * 1024 * 1024);
+    const oversized = next.find((file) => file.size > 15 * 1024 * 1024);
     if (oversized) {
-      setErrorMsg(`الصورة "${oversized.name}" أكبر من 5 ميجابايت.`);
+      setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
       return;
     }
     if (selectedFiles.length + next.length > 3) {
@@ -113,30 +116,46 @@ export function AddListingModal({
     }
 
     setIsSubmitting(true);
-    const result = await submitAccountRequest(
-      {
-        kind: 'merchant',
-        displayName,
-        phone,
-        whatsapp: whatsapp || phone,
-        password,
-        placeMode: mode,
-        existingPlaceId: mode === 'existing' ? existingPlaceId : null,
-        placeTitle: mode === 'new' ? title : null,
-        placeCategory: mode === 'new' ? category : null,
-        placeWhatsapp: mode === 'new' ? whatsapp || phone : null,
-        placePayment: mode === 'new' ? payment : null,
-        placeDescription: mode === 'new' ? description : null,
-      },
-      mode === 'new' ? selectedFiles : [],
-    );
-    setIsSubmitting(false);
+    try {
+      const optimizedFiles = mode === 'new'
+        ? await optimizeImagesForUpload(
+            selectedFiles,
+            ({ current, total }) => setProcessingMsg(
+              `جاري تحسين الصورة ${current} من ${total} مع الحفاظ على وضوح المنيو...`,
+            ),
+          )
+        : [];
+      setProcessingMsg(optimizedFiles.length ? 'جاري رفع الصور وإرسال الطلب...' : 'جاري إرسال الطلب...');
+      const result = await submitAccountRequest(
+        {
+          kind: 'merchant',
+          displayName,
+          phone,
+          whatsapp: whatsapp || phone,
+          password,
+          placeMode: mode,
+          existingPlaceId: mode === 'existing' ? existingPlaceId : null,
+          placeTitle: mode === 'new' ? title : null,
+          placeCategory: mode === 'new' ? category : null,
+          placeWhatsapp: mode === 'new' ? whatsapp || phone : null,
+          placePayment: mode === 'new' ? payment : null,
+          placeDescription: mode === 'new' ? description : null,
+        },
+        optimizedFiles,
+      );
 
-    if (!result.success) {
-      setErrorMsg(result.message);
-      return;
+      if (!result.success) {
+        setErrorMsg(result.message);
+        return;
+      }
+      setIsSuccess(true);
+    } catch (error) {
+      console.error('Account request submission failed:', error);
+      setErrorMsg(error instanceof Error ? error.message : 'تعذر إرسال الطلب. حاول مرة أخرى.');
+    } finally {
+      setIsSubmitting(false);
+      setProcessingMsg('');
     }
-    setIsSuccess(true);
   }
 
   return (
@@ -190,6 +209,11 @@ export function AddListingModal({
                   {errorMsg && (
                     <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
                       {errorMsg}
+                    </p>
+                  )}
+                  {processingMsg && (
+                    <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-semibold text-sky-800">
+                      {processingMsg}
                     </p>
                   )}
 

@@ -35,6 +35,7 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
 }) => {
   const [isApplying, setIsApplying] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
+  const [actionError, setActionError] = useState('');
   const [imageMode, setImageMode] = useState<FeedbackImageMode>(
     feedback.feedback_type === 'merchant_update' ? 'replace' : 'append',
   );
@@ -53,28 +54,43 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
 
   const handleApply = async () => {
     setIsApplying(true);
-    const res = await applyFeedbackToPlace(feedback.id, imageMode);
-    setIsApplying(false);
-
-    if (res.success) {
-      alert(res.message || 'تم تطبيق التعديلات وإكمال الطلب.');
-      onSuccess();
+    setActionError('');
+    try {
+      const res = await applyFeedbackToPlace(feedback.id, imageMode);
+      if (!res.success) {
+        setActionError(res.message || 'حدث خطأ أثناء تطبيق التعديلات.');
+        return;
+      }
       onOpenChange(false);
-    } else {
-      alert(res.message || 'حدث خطأ أثناء تطبيق التعديلات.');
+      onSuccess();
+    } catch (error) {
+      console.error('Apply feedback action failed:', error);
+      setActionError(
+        'انقطع الاتصال أثناء تحديث الشاشة. سيتم التحقق من نتيجة العملية عند تحديث البيانات.',
+      );
+      onSuccess();
+    } finally {
+      setIsApplying(false);
     }
   };
 
   const handleResolveOnly = async () => {
     setIsResolving(true);
-    const res = await resolveFeedbackWithoutChanges(feedback.id);
-    setIsResolving(false);
-
-    if (res.success) {
-      onSuccess();
+    setActionError('');
+    try {
+      const res = await resolveFeedbackWithoutChanges(feedback.id);
+      if (!res.success) {
+        setActionError(res.message || 'حدث خطأ أثناء تحديث حالة الطلب.');
+        return;
+      }
       onOpenChange(false);
-    } else {
-      alert('حدث خطأ أثناء تحديث حالة الطلب.');
+      onSuccess();
+    } catch (error) {
+      console.error('Resolve feedback action failed:', error);
+      setActionError('انقطع الاتصال أثناء تحديث الشاشة. جاري التحقق من حالة الطلب.');
+      onSuccess();
+    } finally {
+      setIsResolving(false);
     }
   };
 
@@ -122,6 +138,11 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
             </ModalHeader>
 
             <ModalBody className="py-4 space-y-4">
+              {actionError && (
+                <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+                  {actionError}
+                </p>
+              )}
               {/* Contact Info & Notes */}
               <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700 space-y-2 text-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">

@@ -71,3 +71,34 @@ test('public branding uses KAYAN CITY SPOT consistently', () => {
     assert.doesNotMatch(read(file), /خدمات الكيان|كيان هب|Kayan Hub|KayanHub/);
   }
 });
+
+test('listing images are optimized before storage without sacrificing menu resolution', () => {
+  const clientPipeline = read('lib/images/client.ts');
+  const serverPipeline = read('lib/images/server.ts');
+  const storageAction = read('lib/supabase/actions.ts');
+  const nextConfig = read('next.config.ts');
+
+  assert.match(clientPipeline, /MAX_WIDTH = 2400/);
+  assert.match(clientPipeline, /MAX_HEIGHT = 3400/);
+  assert.match(clientPipeline, /TARGET_UPLOAD_BYTES = 1_050_000/);
+  assert.match(clientPipeline, /image\/webp/);
+  assert.match(clientPipeline, /imageSmoothingQuality = 'high'/);
+  assert.match(serverPipeline, /\.rotate\(\)/);
+  assert.match(serverPipeline, /\.sharpen\(\{ sigma: 0\.45 \}\)/);
+  assert.match(serverPipeline, /\.webp\(\{/);
+  assert.match(storageAction, /contentType: processed\.contentType/);
+  assert.match(storageAction, /cacheControl: '31536000'/);
+  assert.match(nextConfig, /bodySizeLimit: '4mb'/);
+});
+
+test('admin mutations recover from transient response failures', () => {
+  const adminWorkspace = read('components/operations/AdminWorkspace.tsx');
+  const feedbackModal = read('components/admin/FeedbackDetailsModal.tsx');
+  const adminError = read('app/admin/error.tsx');
+  const serverClient = read('lib/supabase/server.ts');
+
+  assert.match(adminWorkspace, /recoverFromActionError/);
+  assert.match(feedbackModal, /try \{[\s\S]*applyFeedbackToPlace/);
+  assert.match(adminError, /window\.setTimeout\(reset, 1200\)/);
+  assert.match(serverClient, /AbortSignal\.timeout\(10_000\)/);
+});

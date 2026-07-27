@@ -36,6 +36,7 @@ import {
 import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
 import type { Place } from '@/types';
 import { CATEGORY_OPTIONS } from '@/lib/categories';
+import { uploadOptimizedImages } from '@/lib/images/client';
 
 type Branch = {
   id: string;
@@ -451,20 +452,38 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
   function submit(event: FormEvent) {
     event.preventDefault();
     startTransition(async () => {
-      const result = await updateMerchantPlace(
-        {
-          placeId: place.id,
-          ...form,
-          existingImages: images,
-        },
-        files,
-      );
-      setMessage(
-        result.success
-          ? 'تم إرسال التعديلات للإدارة. ستظهر في كيان سيتي سبوت فور الموافقة عليها.'
-          : result.message,
-      );
-      if (result.success) setFiles([]);
+      try {
+        const uploadedUrls = await uploadOptimizedImages(
+          files,
+          'merchant',
+          ({ current, total, stage }) => setMessage(
+            stage === 'optimizing'
+              ? `جاري تحسين الصورة ${current} من ${total} مع الحفاظ على وضوح المنيو...`
+              : `جاري رفع الصورة ${current} من ${total}...`,
+          ),
+        );
+        const result = await updateMerchantPlace(
+          {
+            placeId: place.id,
+            ...form,
+            existingImages: images,
+          },
+          uploadedUrls,
+        );
+        setMessage(
+          result.success
+            ? 'تم إرسال التعديلات للإدارة. ستظهر في كيان سيتي سبوت فور الموافقة عليها.'
+            : result.message,
+        );
+        if (result.success) setFiles([]);
+      } catch (error) {
+        console.error('Merchant place update failed:', error);
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : 'تعذر إرسال التعديلات. حاول مرة أخرى.',
+        );
+      }
     });
   }
 

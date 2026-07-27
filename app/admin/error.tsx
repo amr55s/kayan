@@ -14,7 +14,14 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error('Application error:', error);
-  }, [error]);
+    const retryKey = `admin-error-retry:${error.digest || error.message}`;
+    const lastRetry = Number(sessionStorage.getItem(retryKey) || 0);
+    if (Date.now() - lastRetry > 30_000) {
+      sessionStorage.setItem(retryKey, String(Date.now()));
+      const timer = window.setTimeout(reset, 1200);
+      return () => window.clearTimeout(timer);
+    }
+  }, [error, reset]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 dir-rtl">
@@ -26,7 +33,7 @@ export default function Error({
           حدث خطأ في لوحة الإدارة
         </h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          نعتذر عن هذا الخطأ. يرجى تحديث الصفحة أو العودة إلى كيان سيتي سبوت.
+          حدث انقطاع مؤقت أثناء تحديث البيانات. سنحاول استعادة لوحة الإدارة تلقائياً.
         </p>
         <div className="flex justify-center gap-4">
           <Button

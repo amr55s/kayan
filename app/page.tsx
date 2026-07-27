@@ -4,6 +4,7 @@ import { DirectoryView } from '@/components/directory/DirectoryView';
 import Loading from './loading';
 
 export const revalidate = 60;
+export const maxDuration = 60;
 
 export default async function HomePage() {
   const { places, drivers, directoryError } = await fetchHomePageData();
