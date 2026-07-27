@@ -19,6 +19,11 @@ export type ImageProcessingProgress = {
   stage: 'optimizing' | 'uploading';
 };
 
+export type ImageBatchUploadResult = {
+  urls: string[];
+  failedFiles: string[];
+};
+
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -166,22 +171,37 @@ export async function uploadOptimizedImages(
   files: File[],
   folder: ListingUploadFolder,
   onProgress?: (progress: ImageProcessingProgress) => void,
-): Promise<string[]> {
-  const optimized = await optimizeImagesForUpload(files, onProgress);
+): Promise<ImageBatchUploadResult> {
   const urls: string[] = [];
+  const failedFiles: string[] = [];
 
-  for (let index = 0; index < optimized.length; index += 1) {
-    const file = optimized[index];
-    onProgress?.({
-      current: index + 1,
-      total: optimized.length,
-      fileName: file.name,
-      stage: 'uploading',
-    });
-    const url = await uploadImageToStorage(file, folder);
-    if (!url) throw new Error('تعذر رفع إحدى الصور. حاول مرة أخرى.');
-    urls.push(url);
+  for (let index = 0; index < files.length; index += 1) {
+    const originalFile = files[index];
+    try {
+      onProgress?.({
+        current: index + 1,
+        total: files.length,
+        fileName: originalFile.name,
+        stage: 'optimizing',
+      });
+      const optimizedFile = await optimizeImageForUpload(originalFile);
+      onProgress?.({
+        current: index + 1,
+        total: files.length,
+        fileName: optimizedFile.name,
+        stage: 'uploading',
+      });
+      const result = await uploadImageToStorage(optimizedFile, folder);
+      if (!result.success || !result.url) {
+        failedFiles.push(originalFile.name);
+        continue;
+      }
+      urls.push(result.url);
+    } catch (error) {
+      console.error(`Image upload failed for "${originalFile.name}":`, error);
+      failedFiles.push(originalFile.name);
+    }
   }
 
-  return urls;
+  return { urls, failedFiles };
 }

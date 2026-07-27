@@ -49,6 +49,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [successWarning, setSuccessWarning] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [processingMsg, setProcessingMsg] = useState('');
 
@@ -82,6 +83,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
     setSelectedFiles([]);
     setFilePreviews([]);
     setIsSuccess(false);
+    setSuccessWarning('');
     setErrorMsg('');
     setProcessingMsg('');
   };
@@ -139,7 +141,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
     setErrorMsg('');
 
     try {
-      const uploadedUrls = await uploadOptimizedImages(
+      const uploadResult = await uploadOptimizedImages(
         selectedFiles,
         'feedback',
         ({ current, total, stage }) => setProcessingMsg(
@@ -148,7 +150,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
             : `جاري رفع الصورة ${current} من ${total}...`,
         ),
       );
-      if (uploadedUrls.length) setProcessingMsg('جاري إرسال الطلب...');
+      if (selectedFiles.length) setProcessingMsg('جاري إرسال الطلب...');
       const selectedPlace = fetchedPlaces.find((p) => p.id === targetPlaceId);
       const placeDisplayName = isOpinion
         ? 'رأي عام في كيان سيتي سبوت'
@@ -161,7 +163,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
         feedbackType,
         contactPhone,
         notes,
-        uploadedUrls,
+        uploadResult.urls,
         !isOpinion && targetPlaceId !== 'unlisted' ? targetPlaceId : null,
         !isOpinion ? proposedPhone.trim() || null : null,
         feedbackType === 'rating' ? rating : null,
@@ -171,6 +173,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
         throw new Error(res.message);
       }
 
+      setSuccessWarning(
+        uploadResult.failedFiles.length
+          ? `تم استلام طلبك، لكن تعذر إرفاق ${uploadResult.failedFiles.length} من الصور. الطلب النصي لم يُفقد ويمكنك إرسال الصور لاحقاً.`
+          : '',
+      );
       setIsSuccess(true);
     } catch (err: any) {
       console.error('Feedback submission exception:', err);
@@ -226,6 +233,11 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
                       ? 'شكرًا لمشاركتنا رأيك. وصل مباشرة إلى الإدارة وسيتم مراجعته ضمن تطوير كيان سيتي سبوت.'
                       : 'شكرًا لتواصلك مع كيان سيتي سبوت. سيتم مراجعة طلبك وتحديث البيانات قريبًا إن شاء الله.'}
                   </p>
+                  {successWarning && (
+                    <p className="max-w-xs rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-800">
+                      {successWarning}
+                    </p>
+                  )}
                   <Button
                     onClick={() => {
                       resetForm();

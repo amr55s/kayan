@@ -105,3 +105,27 @@ test('admin mutations recover from transient response failures', () => {
   assert.match(adminError, /window\.setTimeout\(reset, 1200\)/);
   assert.match(serverClient, /AbortSignal\.timeout\(10_000\)/);
 });
+
+test('image and admin server actions return safe results instead of crashing RSC', () => {
+  const storageAction = read('lib/supabase/actions.ts');
+  const clientPipeline = read('lib/images/client.ts');
+  const adminActions = read('lib/supabase/admin-actions.ts');
+  const adminPage = read('app/admin/page.tsx');
+
+  assert.match(storageAction, /export type ImageUploadResult/);
+  assert.match(
+    storageAction,
+    /uploadImageToStorage\([\s\S]*Promise<ImageUploadResult>/,
+  );
+  assert.match(
+    storageAction,
+    /Storage upload exception:[\s\S]*success: false/,
+  );
+  assert.match(clientPipeline, /failedFiles: string\[\]/);
+  assert.match(clientPipeline, /continue;/);
+  assert.match(
+    adminActions,
+    /serverApprovePendingRequest[\s\S]*catch \(error\)/,
+  );
+  assert.match(adminPage, /safeAdminQuery/);
+});

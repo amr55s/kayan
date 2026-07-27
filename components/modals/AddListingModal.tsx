@@ -56,6 +56,7 @@ export function AddListingModal({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [successWarning, setSuccessWarning] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [processingMsg, setProcessingMsg] = useState('');
 
@@ -74,6 +75,7 @@ export function AddListingModal({
     setSelectedFiles([]);
     setIsSubmitting(false);
     setIsSuccess(false);
+    setSuccessWarning('');
     setErrorMsg('');
     setProcessingMsg('');
   }
@@ -117,7 +119,7 @@ export function AddListingModal({
 
     setIsSubmitting(true);
     try {
-      const uploadedUrls = mode === 'new'
+      const uploadResult = mode === 'new'
         ? await uploadOptimizedImages(
             selectedFiles,
             'requests',
@@ -127,7 +129,7 @@ export function AddListingModal({
                 : `جاري رفع الصورة ${current} من ${total}...`,
             )
           )
-        : [];
+        : { urls: [], failedFiles: [] };
       setProcessingMsg('جاري إرسال الطلب...');
       const result = await submitAccountRequest(
         {
@@ -144,13 +146,18 @@ export function AddListingModal({
           placePayment: mode === 'new' ? payment : null,
           placeDescription: mode === 'new' ? description : null,
         },
-        uploadedUrls,
+        uploadResult.urls,
       );
 
       if (!result.success) {
         setErrorMsg(result.message);
         return;
       }
+      setSuccessWarning(
+        uploadResult.failedFiles.length
+          ? `تم تسجيل الطلب، لكن تعذر إرفاق ${uploadResult.failedFiles.length} من الصور. يمكنك إرسالها لاحقاً من طلب تعديل.`
+          : '',
+      );
       setIsSuccess(true);
     } catch (error) {
       console.error('Account request submission failed:', error);
@@ -203,6 +210,11 @@ export function AddListingModal({
                     ستراجع الإدارة ملكية المكان والبيانات. بعد الموافقة يمكنك الدخول
                     برقم الهاتف وكلمة المرور وتعديل بطاقة خدمتك من لوحة النشاط.
                   </p>
+                  {successWarning && (
+                    <p className="max-w-md rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+                      {successWarning}
+                    </p>
+                  )}
                   <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
                     تم
                   </Button>

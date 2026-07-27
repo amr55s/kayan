@@ -7,6 +7,9 @@ import { processImageForStorage } from '@/lib/images/server';
 import { validateListingImageUrls } from '@/lib/images/urls';
 
 export type ListingUploadFolder = 'requests' | 'feedback' | 'merchant';
+export type ImageUploadResult =
+  | { success: true; url: string | null }
+  | { success: false; message: string };
 const MAX_IMAGE_BYTES = 3_500_000;
 
 /**
@@ -42,18 +45,21 @@ function triggerInstantRevalidation(tags?: ('places' | 'drivers')[]) {
 export async function uploadImageToStorage(
   file: File,
   folder: ListingUploadFolder = 'requests',
-): Promise<string | null> {
-  if (!file.size || file.size > MAX_IMAGE_BYTES) {
-    throw new Error('تعذر إرسال الصورة للمعالجة. حاول اختيارها مرة أخرى.');
-  }
-
-  if (isDemoMode()) {
-    console.warn('Supabase in demo mode: Skipping file storage upload.');
-    return null;
-  }
-
-  const supabase = await createClient();
+): Promise<ImageUploadResult> {
   try {
+    if (!file.size || file.size > MAX_IMAGE_BYTES) {
+      return {
+        success: false,
+        message: 'تعذر إرسال الصورة للمعالجة. حاول اختيارها مرة أخرى.',
+      };
+    }
+
+    if (isDemoMode()) {
+      console.warn('Supabase in demo mode: Skipping file storage upload.');
+      return { success: true, url: null };
+    }
+
+    const supabase = await createClient();
     const processed = await processImageForStorage(
       Buffer.from(await file.arrayBuffer()),
     );
@@ -68,19 +74,24 @@ export async function uploadImageToStorage(
       });
 
     if (error) {
-      throw new Error(`تعذر رفع الصورة: ${error.message}`);
+      console.error('Storage upload failed:', error);
+      return {
+        success: false,
+        message: 'تعذر رفع الصورة حالياً.',
+      };
     }
 
     const { data: publicUrlData } = supabase.storage
       .from('listing-images')
       .getPublicUrl(data.path);
 
-    return publicUrlData.publicUrl;
+    return { success: true, url: publicUrlData.publicUrl };
   } catch (err) {
     console.error('Storage upload exception:', err);
-    throw err instanceof Error
-      ? err
-      : new Error('تعذر معالجة الصورة أو رفعها.');
+    return {
+      success: false,
+      message: 'تعذر معالجة الصورة أو رفعها، لكن يمكنك إرسال باقي الطلب.',
+    };
   }
 }
 

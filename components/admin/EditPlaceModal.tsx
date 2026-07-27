@@ -144,7 +144,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
     setProcessingMsg('');
 
     try {
-      const uploadedUrls = await uploadOptimizedImages(
+      const uploadResult = await uploadOptimizedImages(
         newImageFiles,
         'requests',
         ({ current, total, stage }) => {
@@ -156,7 +156,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
         },
       );
 
-      const finalImages = Array.from(new Set([...existingImages, ...uploadedUrls]));
+      const finalImages = Array.from(new Set([...existingImages, ...uploadResult.urls]));
 
       if (mode === 'create') {
         const res = await serverInsertPlaceDirectly({
@@ -186,8 +186,17 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
         if (!res.success) throw new Error(res.message);
       }
 
-      onOpenChange(false);
+      if (uploadResult.failedFiles.length) {
+        setNewImageFiles([]);
+        newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+        setNewImagePreviews([]);
+        setErrorMsg(
+          `تم حفظ بيانات المكان، لكن تعذر رفع ${uploadResult.failedFiles.length} من الصور. اخترها مرة أخرى لإعادة المحاولة.`,
+        );
+        return;
+      }
       onSuccess();
+      onOpenChange(false);
     } catch (err: any) {
       console.error('Error submitting place form:', err);
       setErrorMsg(err.message || 'حدث خطأ أثناء حفظ المكان، يرجى المحاولة لاحقاً.');

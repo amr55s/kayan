@@ -144,41 +144,46 @@ export async function serverApprovePendingRequest(
     is_featured?: boolean;
   }
 ): Promise<{ success: boolean; message?: string }> {
-  await requireAdminSession();
-  const supabase = await createClient();
+  try {
+    await requireAdminSession();
+    const supabase = await createClient();
 
-  const { data: locked, error: lockError } = await (supabase as any)
-    .from('pending_requests')
-    .update({ status: 'approved' })
-    .eq('id', reqId)
-    .eq('status', 'pending')
-    .select()
-    .single();
+    const { data: locked, error: lockError } = await (supabase as any)
+      .from('pending_requests')
+      .update({ status: 'approved' })
+      .eq('id', reqId)
+      .eq('status', 'pending')
+      .select()
+      .single();
 
-  if (lockError || !locked) {
-    return { success: false, message: 'الطلب تمت معالجته بالفعل أو غير موجود.' };
+    if (lockError || !locked) {
+      return { success: false, message: 'الطلب تمت معالجته بالفعل أو غير موجود.' };
+    }
+
+    const { error: insertError } = await (supabase as any).from('places').insert([
+      {
+        title: reqData.title,
+        category: reqData.category,
+        phone: reqData.phone,
+        whatsapp: reqData.whatsapp,
+        instapay_vfcash: reqData.instapay_vfcash,
+        description: reqData.description,
+        images: reqData.images,
+        is_featured: reqData.is_featured || false,
+      },
+    ]);
+
+    if (insertError) {
+      await (supabase as any).from('pending_requests').update({ status: 'pending' }).eq('id', reqId);
+      return { success: false, message: 'فشل في إضافة المكان إلى كيان سيتي سبوت.' };
+    }
+
+    triggerInstantRevalidation();
+    return { success: true };
+  } catch (error) {
+    console.error('serverApprovePendingRequest error:', error);
+    return { success: false, message: 'تعذر اعتماد الطلب حالياً. لم يتم فقد الطلب، حاول مرة أخرى.' };
   }
-
-  const { error: insertError } = await (supabase as any).from('places').insert([
-    {
-      title: reqData.title,
-      category: reqData.category,
-      phone: reqData.phone,
-      whatsapp: reqData.whatsapp,
-      instapay_vfcash: reqData.instapay_vfcash,
-      description: reqData.description,
-      images: reqData.images,
-      is_featured: reqData.is_featured || false,
-    },
-  ]);
-
-  if (insertError) {
-    await (supabase as any).from('pending_requests').update({ status: 'pending' }).eq('id', reqId);
-    return { success: false, message: 'فشل في إضافة المكان إلى كيان سيتي سبوت.' };
-  }
-
-  triggerInstantRevalidation();
-  return { success: true };
 }
 
 export async function serverEditAndApproveRequest(
@@ -194,70 +199,80 @@ export async function serverEditAndApproveRequest(
     is_featured?: boolean;
   }
 ): Promise<{ success: boolean; message?: string }> {
-  await requireAdminSession();
-  const supabase = await createClient();
+  try {
+    await requireAdminSession();
+    const supabase = await createClient();
 
-  const { data: locked, error: lockError } = await (supabase as any)
-    .from('pending_requests')
-    .update({
-      title: updatedData.title,
-      category: updatedData.category,
-      phone: updatedData.phone,
-      whatsapp: updatedData.whatsapp,
-      instapay_vfcash: updatedData.instapay_vfcash,
-      description: updatedData.description,
-      images: updatedData.images,
-      status: 'approved'
-    })
-    .eq('id', reqId)
-    .eq('status', 'pending')
-    .select()
-    .single();
+    const { data: locked, error: lockError } = await (supabase as any)
+      .from('pending_requests')
+      .update({
+        title: updatedData.title,
+        category: updatedData.category,
+        phone: updatedData.phone,
+        whatsapp: updatedData.whatsapp,
+        instapay_vfcash: updatedData.instapay_vfcash,
+        description: updatedData.description,
+        images: updatedData.images,
+        status: 'approved'
+      })
+      .eq('id', reqId)
+      .eq('status', 'pending')
+      .select()
+      .single();
 
-  if (lockError || !locked) {
-    return { success: false, message: 'الطلب تمت معالجته بالفعل أو غير موجود.' };
+    if (lockError || !locked) {
+      return { success: false, message: 'الطلب تمت معالجته بالفعل أو غير موجود.' };
+    }
+
+    const { error: insertError } = await (supabase as any).from('places').insert([
+      {
+        title: updatedData.title,
+        category: updatedData.category,
+        phone: updatedData.phone,
+        whatsapp: updatedData.whatsapp,
+        instapay_vfcash: updatedData.instapay_vfcash,
+        description: updatedData.description,
+        images: updatedData.images,
+        is_featured: updatedData.is_featured || false,
+      },
+    ]);
+
+    if (insertError) {
+      await (supabase as any).from('pending_requests').update({ status: 'pending' }).eq('id', reqId);
+      return { success: false, message: 'فشل في إضافة المكان إلى كيان سيتي سبوت.' };
+    }
+
+    triggerInstantRevalidation();
+    return { success: true };
+  } catch (error) {
+    console.error('serverEditAndApproveRequest error:', error);
+    return { success: false, message: 'تعذر حفظ واعتماد الطلب حالياً. لم يتم فقد الطلب.' };
   }
-
-  const { error: insertError } = await (supabase as any).from('places').insert([
-    {
-      title: updatedData.title,
-      category: updatedData.category,
-      phone: updatedData.phone,
-      whatsapp: updatedData.whatsapp,
-      instapay_vfcash: updatedData.instapay_vfcash,
-      description: updatedData.description,
-      images: updatedData.images,
-      is_featured: updatedData.is_featured || false,
-    },
-  ]);
-
-  if (insertError) {
-    await (supabase as any).from('pending_requests').update({ status: 'pending' }).eq('id', reqId);
-    return { success: false, message: 'فشل في إضافة المكان إلى كيان سيتي سبوت.' };
-  }
-
-  triggerInstantRevalidation();
-  return { success: true };
 }
 
 export async function serverRejectPendingRequest(
   reqId: string
 ): Promise<{ success: boolean; message?: string }> {
-  await requireAdminSession();
-  const supabase = await createClient();
+  try {
+    await requireAdminSession();
+    const supabase = await createClient();
 
-  const { error } = await (supabase as any)
-    .from('pending_requests')
-    .update({ status: 'rejected' })
-    .eq('id', reqId)
-    .eq('status', 'pending');
+    const { error } = await (supabase as any)
+      .from('pending_requests')
+      .update({ status: 'rejected' })
+      .eq('id', reqId)
+      .eq('status', 'pending');
 
-  if (error) {
-    return { success: false, message: 'حدث خطأ أثناء رفض الطلب.' };
+    if (error) {
+      return { success: false, message: 'حدث خطأ أثناء رفض الطلب.' };
+    }
+
+    triggerInstantRevalidation();
+    return { success: true };
+  } catch (error) {
+    console.error('serverRejectPendingRequest error:', error);
+    return { success: false, message: 'تعذر رفض الطلب حالياً. لم يتم حذف الطلب.' };
   }
-
-  triggerInstantRevalidation();
-  return { success: true };
 }
 
 export async function serverInsertPlaceDirectly(
@@ -348,63 +363,78 @@ export async function serverToggleDriverStatus(
   driverId: string,
   currentStatus: boolean
 ): Promise<{ success: boolean; message?: string }> {
-  await requireAdminSession();
-  const supabase = await createClient();
+  try {
+    await requireAdminSession();
+    const supabase = await createClient();
 
-  const { error } = await (supabase as any)
-    .from('drivers')
-    .update({
-      is_active: !currentStatus,
-      active_until: !currentStatus ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null
-    })
-    .eq('id', driverId);
+    const { error } = await (supabase as any)
+      .from('drivers')
+      .update({
+        is_active: !currentStatus,
+        active_until: !currentStatus ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null
+      })
+      .eq('id', driverId);
 
-  if (error) {
-    return { success: false, message: 'حدث خطأ أثناء تغيير حالة السائق.' };
+    if (error) {
+      return { success: false, message: 'حدث خطأ أثناء تغيير حالة السائق.' };
+    }
+
+    triggerInstantRevalidation();
+    return { success: true };
+  } catch (error) {
+    console.error('serverToggleDriverStatus error:', error);
+    return { success: false, message: 'تعذر تغيير حالة الكابتن حالياً.' };
   }
-
-  triggerInstantRevalidation();
-  return { success: true };
 }
 
 export async function serverExtendDriverTime(
   driverId: string
 ): Promise<{ success: boolean; message?: string }> {
-  await requireAdminSession();
-  const supabase = await createClient();
+  try {
+    await requireAdminSession();
+    const supabase = await createClient();
 
-  const newActiveUntil = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const newActiveUntil = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 
-  const { error } = await (supabase as any)
-    .from('drivers')
-    .update({
-      is_active: true,
-      active_until: newActiveUntil,
-    })
-    .eq('id', driverId);
+    const { error } = await (supabase as any)
+      .from('drivers')
+      .update({
+        is_active: true,
+        active_until: newActiveUntil,
+      })
+      .eq('id', driverId);
 
-  if (error) {
-    return { success: false, message: 'حدث خطأ أثناء تمديد وقت الكابتن.' };
+    if (error) {
+      return { success: false, message: 'حدث خطأ أثناء تمديد وقت الكابتن.' };
+    }
+
+    triggerInstantRevalidation();
+    return { success: true };
+  } catch (error) {
+    console.error('serverExtendDriverTime error:', error);
+    return { success: false, message: 'تعذر تمديد وقت الكابتن حالياً.' };
   }
-
-  triggerInstantRevalidation();
-  return { success: true };
 }
 
 export async function serverDeleteDriver(
   driverId: string
 ): Promise<{ success: boolean; message?: string }> {
-  await requireAdminSession();
-  const supabase = await createClient();
+  try {
+    await requireAdminSession();
+    const supabase = await createClient();
 
-  const { error } = await (supabase as any).from('drivers').delete().eq('id', driverId);
+    const { error } = await (supabase as any).from('drivers').delete().eq('id', driverId);
 
-  if (error) {
-    return { success: false, message: 'حدث خطأ أثناء حذف السائق.' };
+    if (error) {
+      return { success: false, message: 'حدث خطأ أثناء حذف السائق.' };
+    }
+
+    triggerInstantRevalidation();
+    return { success: true };
+  } catch (error) {
+    console.error('serverDeleteDriver error:', error);
+    return { success: false, message: 'تعذر حذف الكابتن حالياً.' };
   }
-
-  triggerInstantRevalidation();
-  return { success: true };
 }
 
 export async function serverUpdateDriver(

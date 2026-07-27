@@ -453,7 +453,7 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
     event.preventDefault();
     startTransition(async () => {
       try {
-        const uploadedUrls = await uploadOptimizedImages(
+        const uploadResult = await uploadOptimizedImages(
           files,
           'merchant',
           ({ current, total, stage }) => setMessage(
@@ -468,11 +468,13 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
             ...form,
             existingImages: images,
           },
-          uploadedUrls,
+          uploadResult.urls,
         );
         setMessage(
           result.success
-            ? 'تم إرسال التعديلات للإدارة. ستظهر في كيان سيتي سبوت فور الموافقة عليها.'
+            ? uploadResult.failedFiles.length
+              ? `تم إرسال التعديلات للإدارة، لكن تعذر إرفاق ${uploadResult.failedFiles.length} من الصور. باقي الطلب محفوظ.`
+              : 'تم إرسال التعديلات للإدارة. ستظهر في كيان سيتي سبوت فور الموافقة عليها.'
             : result.message,
         );
         if (result.success) setFiles([]);
