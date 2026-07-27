@@ -32,10 +32,16 @@ test('public account requests use reviewed Auth accounts', () => {
 
 test('selected category text keeps high contrast', () => {
   const categoryBar = read('components/directory/CategoryBar.tsx');
+  const merchantModal = read('components/modals/AddListingModal.tsx');
+  const globalStyles = read('app/globals.css');
   assert.match(
     categoryBar,
     /isSelected \? 'text-white dark:text-zinc-950'/,
   );
+  assert.match(merchantModal, /kayan-account-mode-tab/);
+  assert.match(
+    globalStyles,
+    /\.kayan-account-mode-tab\[aria-selected='true'\]\s*\{[\s\S]*color:\s*#fff\s*!important/,
+  );
   assert.doesNotMatch(categoryBar, /transition-all/);
 });
-

@@ -200,7 +200,7 @@ export function AddListingModal({
                     classNames={{
                       tabList: 'rounded-xl bg-zinc-100 p-1',
                       cursor: 'bg-zinc-950',
-                      tab: 'h-11 font-bold',
+                      tab: 'kayan-account-mode-tab h-11 font-bold',
                       tabContent: 'text-zinc-600 group-data-[selected=true]:text-white',
                     }}
                     aria-label="طريقة تسجيل النشاط"

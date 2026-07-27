@@ -4,6 +4,11 @@
 @import "tailwindcss" source(none);
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+.kayan-account-mode-tab[aria-selected='true'] {
+  color: #fff !important;
+}
+
 @source "./admin/error.tsx";
 @source "./admin/layout.tsx";
 @source "./admin/page.tsx";
