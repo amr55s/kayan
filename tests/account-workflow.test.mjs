@@ -62,6 +62,10 @@ test('public branding uses KAYAN CITY SPOT consistently', () => {
   assert.match(brand, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
   assert.match(manifest, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
   assert.match(serviceWorker, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
+  assert.match(
+    read('components/directory/DirectoryView.tsx'),
+    /للتواصل مع الدعم:[\s\S]*01094552421/,
+  );
 
   for (const file of publicFiles) {
     assert.doesNotMatch(read(file), /خدمات الكيان|كيان هب|Kayan Hub|KayanHub/);

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { Input, Button, Skeleton, Card } from '@heroui/react';
-import { Search, MapPinOff, RefreshCw, Heart } from 'lucide-react';
+import { Search, MapPinOff, RefreshCw, Heart, Phone } from 'lucide-react';
 import { Place, Driver, CategoryType } from '@/types';
 import { Header } from '@/components/layout/Header';
 import { DeliveryBar } from '@/components/delivery/DeliveryBar';
@@ -240,7 +240,17 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
 
       {/* Footer */}
       <footer className="w-full border-t border-zinc-200 bg-white px-4 py-5 text-center text-xs text-zinc-500">
-        <div className="mx-auto max-w-7xl">© {new Date().getFullYear()} KAYAN CITY SPOT | كيان سيتي سبوت</div>
+        <div className="mx-auto flex max-w-7xl flex-col items-center gap-2">
+          <a
+            href="tel:+201094552421"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
+            aria-label="الاتصال بدعم كيان سيتي سبوت على رقم 01094552421"
+          >
+            <Phone className="size-4" aria-hidden="true" />
+            <span>للتواصل مع الدعم: <bdi dir="ltr">01094552421</bdi></span>
+          </a>
+          <div>© {new Date().getFullYear()} KAYAN CITY SPOT | كيان سيتي سبوت</div>
+        </div>
       </footer>
 
     </div>
