@@ -10,11 +10,7 @@ const TARGET_UPLOAD_BYTES = 1_050_000;
 const MAX_WIDTH = 2400;
 const MAX_HEIGHT = 3400;
 const MAX_PIXELS = 8_000_000;
-const SUPPORTED_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-]);
+const SERVER_FALLBACK_BYTES = 3_400_000;
 
 export type ImageProcessingProgress = {
   current: number;
@@ -44,14 +40,21 @@ function canvasToBlob(
   quality: number,
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (blob) resolve(blob);
-        else reject(new Error('تعذر تجهيز الصورة للرفع.'));
-      },
-      'image/webp',
-      quality,
-    );
+    const finish = (blob: Blob | null) => {
+      if (blob?.size) {
+        resolve(blob);
+        return;
+      }
+      canvas.toBlob(
+        (jpegBlob) => {
+          if (jpegBlob?.size) resolve(jpegBlob);
+          else reject(new Error('تعذر تجهيز الصورة للرفع.'));
+        },
+        'image/jpeg',
+        quality,
+      );
+    };
+    canvas.toBlob(finish, 'image/webp', quality);
   });
 }
 
@@ -99,39 +102,46 @@ async function renderWebp(
  * prevents large uploads from exhausting the browser or Vercel request limit.
  */
 export async function optimizeImageForUpload(file: File): Promise<File> {
-  if (!SUPPORTED_TYPES.has(file.type)) {
-    throw new Error('الصور المسموحة هي JPG أو PNG أو WEBP.');
-  }
+  if (!file.size) throw new Error(`الصورة "${file.name}" فارغة.`);
   if (file.size > MAX_SOURCE_BYTES) {
     throw new Error(`الصورة "${file.name}" أكبر من 15 ميجابايت.`);
   }
 
-  const image = await loadImage(file);
-  if (!image.naturalWidth || !image.naturalHeight) {
-    throw new Error(`أبعاد الصورة "${file.name}" غير صالحة.`);
-  }
+  try {
+    const image = await loadImage(file);
+    if (!image.naturalWidth || !image.naturalHeight) {
+      throw new Error('invalid_dimensions');
+    }
 
-  let best: Blob | null = null;
-  for (const reduction of [1, 0.9, 0.8]) {
-    for (const quality of [0.92, 0.88, 0.84, 0.8]) {
-      const blob = await renderWebp(image, reduction, quality);
-      if (!best || blob.size < best.size) best = blob;
-      if (blob.size <= TARGET_UPLOAD_BYTES) {
-        const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
-        return new File([blob], `${baseName}.webp`, {
-          type: 'image/webp',
-          lastModified: Date.now(),
-        });
+    let best: Blob | null = null;
+    for (const reduction of [1, 0.9, 0.8]) {
+      for (const quality of [0.92, 0.88, 0.84, 0.8]) {
+        const blob = await renderWebp(image, reduction, quality);
+        if (!best || blob.size < best.size) best = blob;
+        if (blob.size <= TARGET_UPLOAD_BYTES) {
+          const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+          return new File([blob], `${baseName}.webp`, {
+            type: blob.type || 'image/webp',
+            lastModified: Date.now(),
+          });
+        }
       }
     }
-  }
 
-  if (!best) throw new Error(`تعذر تحسين الصورة "${file.name}".`);
-  const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
-  return new File([best], `${baseName}.webp`, {
-    type: 'image/webp',
-    lastModified: Date.now(),
-  });
+    if (!best) throw new Error('browser_encoding_failed');
+    const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
+    const extension = best.type === 'image/jpeg' ? 'jpg' : 'webp';
+    return new File([best], `${baseName}.${extension}`, {
+      type: best.type || 'image/webp',
+      lastModified: Date.now(),
+    });
+  } catch (error) {
+    console.warn('Browser image optimization failed; using server fallback.', error);
+    if (file.size <= SERVER_FALLBACK_BYTES) return file;
+    throw new Error(
+      `تعذر قراءة الصورة "${file.name}" داخل المتصفح. جرّب إرسالها من تطبيق الصور أو واتساب.`,
+    );
+  }
 }
 
 export async function optimizeImagesForUpload(

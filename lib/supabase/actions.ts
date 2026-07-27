@@ -4,10 +4,10 @@ import { createClient } from './server';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { FeedbackType } from '@/types';
 import { processImageForStorage } from '@/lib/images/server';
+import { validateListingImageUrls } from '@/lib/images/urls';
 
 export type ListingUploadFolder = 'requests' | 'feedback' | 'merchant';
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const MAX_IMAGE_BYTES = 1_500_000;
+const MAX_IMAGE_BYTES = 3_500_000;
 
 /**
  * Helper to check if Supabase is running in demo/placeholder mode
@@ -43,8 +43,8 @@ export async function uploadImageToStorage(
   file: File,
   folder: ListingUploadFolder = 'requests',
 ): Promise<string | null> {
-  if (!ALLOWED_IMAGE_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES) {
-    throw new Error('الصور المسموحة هي JPG أو PNG أو WEBP وبحجم أقصى 5 ميجابايت.');
+  if (!file.size || file.size > MAX_IMAGE_BYTES) {
+    throw new Error('تعذر إرسال الصورة للمعالجة. حاول اختيارها مرة أخرى.');
   }
 
   if (isDemoMode()) {
@@ -92,7 +92,7 @@ export async function submitFeedbackSubmission(
   feedbackType: FeedbackType,
   contactPhone: string,
   notes: string,
-  imageFiles: File[] = [],
+  imageUrls: string[] = [],
   targetPlaceId?: string | null,
   proposedPhone?: string | null,
   rating?: number | null,
@@ -109,19 +109,11 @@ export async function submitFeedbackSubmission(
     if (feedbackType === 'rating' && (!rating || rating < 1 || rating > 5)) {
       throw new Error('اختر تقييماً من نجمة إلى خمس نجوم.');
     }
-    if (imageFiles.length > 3) {
-      throw new Error('يمكن رفع 3 صور كحد أقصى.');
-    }
+    const uploadedUrls = validateListingImageUrls(imageUrls, 3);
 
     if (isDemoMode()) {
       triggerInstantRevalidation();
       return { success: true, message: 'تم استلام طلب التعديل بنجاح! (وضع العرض التجريبي)' };
-    }
-
-    const uploadedUrls: string[] = [];
-    for (const file of imageFiles) {
-      const url = await uploadImageToStorage(file, 'feedback');
-      if (url) uploadedUrls.push(url);
     }
 
     const supabase = await createClient();

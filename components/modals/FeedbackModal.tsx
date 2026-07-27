@@ -16,7 +16,7 @@ import {
 } from '@heroui/react';
 import { MessageSquarePlus, Send, CheckCircle2, Upload, X, Building, Phone, Star } from 'lucide-react';
 import { submitFeedbackSubmission } from '@/lib/supabase/actions';
-import { optimizeImagesForUpload } from '@/lib/images/client';
+import { uploadOptimizedImages } from '@/lib/images/client';
 import { isValidEgyptianPhone } from '@/lib/utils';
 import { FeedbackType, Place } from '@/types';
 import { createClient } from '@/lib/supabase/client';
@@ -89,26 +89,19 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
-    const validImages = filesArray.filter((file) =>
-      ['image/jpeg', 'image/png', 'image/webp'].includes(file.type),
-    );
-    if (validImages.length !== filesArray.length) {
-      setErrorMsg('الصور المسموحة هي JPG أو PNG أو WEBP.');
-      return;
-    }
-    const oversized = validImages.find((file) => file.size > 15 * 1024 * 1024);
+    const oversized = filesArray.find((file) => file.size > 15 * 1024 * 1024);
     if (oversized) {
       setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
       return;
     }
 
-    if (selectedFiles.length + validImages.length > 3) {
+    if (selectedFiles.length + filesArray.length > 3) {
       setErrorMsg('يمكنك رفع حتى 3 صور فقط.');
       return;
     }
 
     setErrorMsg('');
-    const newFiles = [...selectedFiles, ...validImages].slice(0, 3);
+    const newFiles = [...selectedFiles, ...filesArray].slice(0, 3);
     filePreviews.forEach((url) => URL.revokeObjectURL(url));
     setSelectedFiles(newFiles);
     setFilePreviews(newFiles.map((file) => URL.createObjectURL(file)));
@@ -146,13 +139,16 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
     setErrorMsg('');
 
     try {
-      const optimizedFiles = await optimizeImagesForUpload(
+      const uploadedUrls = await uploadOptimizedImages(
         selectedFiles,
-        ({ current, total }) => setProcessingMsg(
-          `جاري تحسين الصورة ${current} من ${total} مع الحفاظ على وضوح المنيو...`,
+        'feedback',
+        ({ current, total, stage }) => setProcessingMsg(
+          stage === 'optimizing'
+            ? `جاري تحسين الصورة ${current} من ${total} مع الحفاظ على وضوح المنيو...`
+            : `جاري رفع الصورة ${current} من ${total}...`,
         ),
       );
-      if (optimizedFiles.length) setProcessingMsg('جاري رفع الصور وإرسال الطلب...');
+      if (uploadedUrls.length) setProcessingMsg('جاري إرسال الطلب...');
       const selectedPlace = fetchedPlaces.find((p) => p.id === targetPlaceId);
       const placeDisplayName = isOpinion
         ? 'رأي عام في كيان سيتي سبوت'
@@ -165,7 +161,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
         feedbackType,
         contactPhone,
         notes,
-        optimizedFiles,
+        uploadedUrls,
         !isOpinion && targetPlaceId !== 'unlisted' ? targetPlaceId : null,
         !isOpinion ? proposedPhone.trim() || null : null,
         feedbackType === 'rating' ? rating : null,
@@ -408,7 +404,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
                     <input
                       type="file"
                       ref={fileInputRef}
-                      accept="image/jpeg,image/png,image/webp"
+                      accept="image/*"
                       multiple
                       onChange={handleFileChange}
                       className="hidden"

@@ -579,7 +579,7 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
               إضافة صور جديدة
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/*"
                 multiple
                 className="sr-only"
                 onChange={(event) => setFiles(Array.from(event.target.files || []).slice(0, 6))}

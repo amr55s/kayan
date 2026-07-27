@@ -81,6 +81,8 @@ test('listing images are optimized before storage without sacrificing menu resol
   assert.match(clientPipeline, /MAX_WIDTH = 2400/);
   assert.match(clientPipeline, /MAX_HEIGHT = 3400/);
   assert.match(clientPipeline, /TARGET_UPLOAD_BYTES = 1_050_000/);
+  assert.match(clientPipeline, /SERVER_FALLBACK_BYTES = 3_400_000/);
+  assert.match(clientPipeline, /using server fallback/);
   assert.match(clientPipeline, /image\/webp/);
   assert.match(clientPipeline, /imageSmoothingQuality = 'high'/);
   assert.match(serverPipeline, /\.rotate\(\)/);
@@ -88,6 +90,7 @@ test('listing images are optimized before storage without sacrificing menu resol
   assert.match(serverPipeline, /\.webp\(\{/);
   assert.match(storageAction, /contentType: processed\.contentType/);
   assert.match(storageAction, /cacheControl: '31536000'/);
+  assert.doesNotMatch(storageAction, /ALLOWED_IMAGE_TYPES/);
   assert.match(nextConfig, /bodySizeLimit: '4mb'/);
 });
 

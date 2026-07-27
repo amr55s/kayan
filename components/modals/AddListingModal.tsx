@@ -25,7 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import { submitAccountRequest } from '@/lib/operations/actions';
-import { optimizeImagesForUpload } from '@/lib/images/client';
+import { uploadOptimizedImages } from '@/lib/images/client';
 import { CATEGORY_OPTIONS } from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
 import type { Place } from '@/types';
@@ -80,7 +80,7 @@ export function AddListingModal({
 
   function handleFiles(files: FileList | null) {
     if (!files) return;
-    const next = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    const next = Array.from(files);
     const oversized = next.find((file) => file.size > 15 * 1024 * 1024);
     if (oversized) {
       setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
@@ -117,15 +117,18 @@ export function AddListingModal({
 
     setIsSubmitting(true);
     try {
-      const optimizedFiles = mode === 'new'
-        ? await optimizeImagesForUpload(
+      const uploadedUrls = mode === 'new'
+        ? await uploadOptimizedImages(
             selectedFiles,
-            ({ current, total }) => setProcessingMsg(
-              `جاري تحسين الصورة ${current} من ${total} مع الحفاظ على وضوح المنيو...`,
-            ),
+            'requests',
+            ({ current, total, stage }) => setProcessingMsg(
+              stage === 'optimizing'
+                ? `جاري تحسين الصورة ${current} من ${total} مع الحفاظ على وضوح المنيو...`
+                : `جاري رفع الصورة ${current} من ${total}...`,
+            )
           )
         : [];
-      setProcessingMsg(optimizedFiles.length ? 'جاري رفع الصور وإرسال الطلب...' : 'جاري إرسال الطلب...');
+      setProcessingMsg('جاري إرسال الطلب...');
       const result = await submitAccountRequest(
         {
           kind: 'merchant',
@@ -141,7 +144,7 @@ export function AddListingModal({
           placePayment: mode === 'new' ? payment : null,
           placeDescription: mode === 'new' ? description : null,
         },
-        optimizedFiles,
+        uploadedUrls,
       );
 
       if (!result.success) {
@@ -297,7 +300,7 @@ export function AddListingModal({
                         <input
                           ref={fileInputRef}
                           type="file"
-                          accept="image/jpeg,image/png,image/webp"
+                          accept="image/*"
                           multiple
                           className="sr-only"
                           onChange={(event) => handleFiles(event.target.files)}

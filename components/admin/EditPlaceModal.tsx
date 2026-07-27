@@ -94,24 +94,17 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
-    const validImages = filesArray.filter((file) =>
-      ['image/jpeg', 'image/png', 'image/webp'].includes(file.type),
-    );
-    if (validImages.length !== filesArray.length) {
-      setErrorMsg('الصور المسموحة هي JPG أو PNG أو WEBP.');
-      return;
-    }
-    const oversized = validImages.find((file) => file.size > 15 * 1024 * 1024);
+    const oversized = filesArray.find((file) => file.size > 15 * 1024 * 1024);
     if (oversized) {
       setErrorMsg(`الصورة "${oversized.name}" أكبر من 15 ميجابايت.`);
       return;
     }
-    if (newImageFiles.length + validImages.length > 6) {
+    if (newImageFiles.length + filesArray.length > 6) {
       setErrorMsg('يمكن رفع 6 صور جديدة كحد أقصى في المرة الواحدة.');
       return;
     }
 
-    const updatedFiles = [...newImageFiles, ...validImages];
+    const updatedFiles = [...newImageFiles, ...filesArray];
     newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
     const updatedPreviews = updatedFiles.map((file) => URL.createObjectURL(file));
 
@@ -373,7 +366,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   <input
                     type="file"
                     ref={fileInputRef}
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/*"
                     multiple
                     onChange={handleFileChange}
                     className="hidden"

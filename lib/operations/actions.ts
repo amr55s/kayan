@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentProfile } from '@/lib/auth/guards';
-import { uploadImageToStorage } from '@/lib/supabase/actions';
+import { validateListingImageUrls } from '@/lib/images/urls';
 import { authEmailForPhone } from '@/lib/auth/phone';
 import {
   branchSchema,
@@ -26,24 +26,6 @@ function actionError(error: unknown): ActionResult {
   if (error instanceof z.ZodError) return { success: false, message: error.issues[0]?.message ?? 'بيانات غير صالحة.' };
   const message = error instanceof Error ? error.message : 'تعذر تنفيذ العملية. حاول مرة أخرى.';
   return { success: false, message: message.replace(/^.*?:\s*/, '') };
-}
-
-function validateListingImageUrls(urls: string[], max: number): string[] {
-  if (urls.length > max) {
-    throw new Error(`يمكن رفع ${max} صور كحد أقصى في المرة الواحدة.`);
-  }
-  const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!projectUrl && urls.length) throw new Error('إعدادات تخزين الصور غير مكتملة.');
-  const allowedOrigin = projectUrl ? new URL(projectUrl).origin : '';
-  const allowedPath = '/storage/v1/object/public/listing-images/';
-
-  return urls.map((value) => {
-    const url = new URL(z.url().parse(value));
-    if (url.origin !== allowedOrigin || !url.pathname.startsWith(allowedPath)) {
-      throw new Error('رابط صورة غير صالح.');
-    }
-    return url.toString();
-  });
 }
 
 async function requireRole(role: 'admin' | 'merchant' | 'driver') {
@@ -167,12 +149,12 @@ export async function updateDriverPublicProfile(input: unknown): Promise<ActionR
 
 export async function submitAccountRequest(
   input: unknown,
-  imageFiles: File[] = [],
+  imageUrls: string[] = [],
 ): Promise<ActionResult<{ requestId: string }>> {
   let authUserId: string | null = null;
   try {
     const data = accountRequestSchema.parse(input);
-    if (imageFiles.length > 3) throw new Error('يمكن رفع 3 صور كحد أقصى.');
+    const uploadedImages = validateListingImageUrls(imageUrls, 3);
 
     const admin = createAdminClient();
     const rateLimitSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -233,14 +215,6 @@ export async function submitAccountRequest(
         .eq('place_id', data.existingPlaceId)
         .maybeSingle();
       if (linkedBranch) throw new Error('هذا المكان مرتبط بالفعل بحساب نشاط.');
-    }
-
-    const uploadedImages: string[] = [];
-    if (data.kind === 'merchant' && data.placeMode === 'new') {
-      for (const file of imageFiles) {
-        const url = await uploadImageToStorage(file, 'requests');
-        if (url) uploadedImages.push(url);
-      }
     }
 
     const { data: authData, error: authError } = await admin.auth.admin.createUser({
