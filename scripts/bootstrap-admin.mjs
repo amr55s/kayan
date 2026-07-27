@@ -4,7 +4,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const phone = process.env.ADMIN_BOOTSTRAP_PHONE?.replace(/\D/g, '').replace(/^20/, '0');
 const password = process.env.ADMIN_BOOTSTRAP_PASSWORD;
-const displayName = process.env.ADMIN_BOOTSTRAP_NAME || 'مدير Kayan Hub';
+const displayName = process.env.ADMIN_BOOTSTRAP_NAME || 'مدير كيان سيتي سبوت';
 const email = `${phone}@users.kayanhub.app`;
 
 if (!url || !serviceRoleKey || !phone || !password) {

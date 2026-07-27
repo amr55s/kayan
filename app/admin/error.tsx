@@ -26,7 +26,7 @@ export default function Error({
           حدث خطأ في لوحة الإدارة
         </h2>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          نعتذر عن هذا الخطأ. يرجى تحديث الصفحة أو العودة إلى خدمات الكيان.
+          نعتذر عن هذا الخطأ. يرجى تحديث الصفحة أو العودة إلى كيان سيتي سبوت.
         </p>
         <div className="flex justify-center gap-4">
           <Button
@@ -44,7 +44,7 @@ export default function Error({
             variant="bordered"
             startContent={<Home className="w-4 h-4" />}
           >
-            العودة لخدمات الكيان
+            العودة إلى كيان سيتي سبوت
           </Button>
         </div>
       </div>

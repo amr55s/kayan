@@ -30,8 +30,8 @@ const FEEDBACK_TYPES: { id: FeedbackType; label: string; description: string }[]
   { id: 'menu_update', label: 'منيو جديد / تحديث صور المكان', description: 'إضافة أو استبدال صور المنيو' },
   { id: 'phone_change', label: 'تغيير رقم الهاتف أو الواتساب', description: 'تحديث أرقام التواصل' },
   { id: 'report_issue', label: 'الإبلاغ عن بيانات غير صحيحة أو مكان مغلق', description: 'التنبيه لمشكلة بالبيانات' },
-  { id: 'general_suggestion', label: 'اقتراح أو ملاحظة عامة', description: 'ملاحظات لتطوير خدمات الكيان' },
-  { id: 'rating', label: 'تقييم تجربتك مع خدمات الكيان', description: 'شاركنا تقييمك من نجمة إلى خمس نجوم' },
+  { id: 'general_suggestion', label: 'اقتراح أو ملاحظة عامة', description: 'ملاحظات لتطوير كيان سيتي سبوت' },
+  { id: 'rating', label: 'تقييم تجربتك مع كيان سيتي سبوت', description: 'شاركنا تقييمك من نجمة إلى خمس نجوم' },
 ];
 
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChange, placesList = [] }) => {
@@ -133,7 +133,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
     try {
       const selectedPlace = fetchedPlaces.find((p) => p.id === targetPlaceId);
       const placeDisplayName = isOpinion
-        ? 'رأي عام في خدمات الكيان'
+        ? 'رأي عام في كيان سيتي سبوت'
         : selectedPlace
           ? selectedPlace.title
           : placeNameOrPhone.trim() || 'مكان غير مدرج';
@@ -189,7 +189,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
               </div>
               <div className="flex flex-col">
                 <span>التعديلات والاقتراحات والتقييم</span>
-                <span className="text-xs text-zinc-500 font-normal">رأيك يصل مباشرة إلى إدارة خدمات الكيان</span>
+                <span className="text-xs text-zinc-500 font-normal">رأيك يصل مباشرة إلى إدارة كيان سيتي سبوت</span>
               </div>
             </ModalHeader>
 
@@ -204,8 +204,8 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
                   </h4>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-xs leading-relaxed font-semibold">
                     {feedbackType === 'rating' || feedbackType === 'general_suggestion'
-                      ? 'شكرًا لمشاركتنا رأيك. وصل مباشرة إلى الإدارة وسيتم مراجعته ضمن تطوير خدمات الكيان.'
-                      : 'شكرًا لتواصلك مع خدمات الكيان. سيتم مراجعة طلبك وتحديث البيانات قريبًا إن شاء الله.'}
+                      ? 'شكرًا لمشاركتنا رأيك. وصل مباشرة إلى الإدارة وسيتم مراجعته ضمن تطوير كيان سيتي سبوت.'
+                      : 'شكرًا لتواصلك مع كيان سيتي سبوت. سيتم مراجعة طلبك وتحديث البيانات قريبًا إن شاء الله.'}
                   </p>
                   <Button
                     onClick={() => {
@@ -275,7 +275,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
                   <div className="space-y-3">
                     <Select
                       labelPlacement="outside"
-                      label="اختر المكان المراد تعديله (من خدمات الكيان)"
+                      label="اختر المكان المراد تعديله (من كيان سيتي سبوت)"
                       selectedKeys={[targetPlaceId]}
                       onChange={(e) => setTargetPlaceId(e.target.value)}
                       variant="bordered"

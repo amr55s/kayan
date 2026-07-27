@@ -41,7 +41,7 @@ async function withTimeout<T>(
 ): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('انتهت مهلة تحميل خدمات الكيان.')), timeoutMs);
+    timeoutId = setTimeout(() => reject(new Error('انتهت مهلة تحميل كيان سيتي سبوت.')), timeoutMs);
   });
 
   try {
@@ -174,7 +174,7 @@ export async function fetchHomePageData(): Promise<{
       registeredResult.status === 'fulfilled' ? registeredResult.value : [],
     ),
     directoryError: errors.length
-      ? `تعذر تحميل بعض بيانات خدمات الكيان (${errors.join('، ')}). يمكنك إعادة المحاولة.`
+      ? `تعذر تحميل بعض بيانات كيان سيتي سبوت (${errors.join('، ')}). يمكنك إعادة المحاولة.`
       : undefined,
   };
 }

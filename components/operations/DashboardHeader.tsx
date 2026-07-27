@@ -48,7 +48,7 @@ export function DashboardHeader({
           <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200 shadow-sm">
             <Image
               src="/kayan-services-logo.png"
-              alt="شعار خدمات الكيان"
+              alt="شعار KAYAN CITY SPOT | كيان سيتي سبوت"
               width={44}
               height={44}
               className="size-11 object-contain"
@@ -67,7 +67,7 @@ export function DashboardHeader({
             className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
           >
             <Home className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">العودة لخدمات الكيان</span>
+            <span className="hidden sm:inline">العودة إلى كيان سيتي سبوت</span>
             <span className="sm:hidden">الخدمات</span>
           </Link>
           <button

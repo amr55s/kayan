@@ -100,7 +100,7 @@ export const EditRequestModal: React.FC<EditRequestModalProps> = ({
           <>
             <ModalHeader className="flex items-center gap-2 text-zinc-900 dark:text-white font-bold text-lg border-b border-zinc-100 dark:border-zinc-800 pb-3">
               <Edit className="w-5 h-5 text-zinc-900 dark:text-white" />
-              <span>تعديل بيانات الطلب ونشره في خدمات الكيان</span>
+              <span>تعديل بيانات الطلب ونشره في كيان سيتي سبوت</span>
             </ModalHeader>
 
             <ModalBody className="py-4 space-y-4">

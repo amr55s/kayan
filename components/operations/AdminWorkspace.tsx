@@ -232,7 +232,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
   function updateBranchLink(branchId: string, placeId: string) {
     startTransition(async () => {
       const result = await linkBranchToPlace(branchId, placeId || null);
-      if (result.success) complete('تم تحديث ارتباط الفرع بخدمات الكيان.');
+      if (result.success) complete('تم تحديث ارتباط الفرع بكيان سيتي سبوت.');
       else setMessage(result.message);
     });
   }
@@ -273,7 +273,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
           لوحة الإدارة
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
-          إدارة خدمات الكيان والحسابات وعمليات التوصيل من مساحة واحدة.
+          إدارة كيان سيتي سبوت والحسابات وعمليات التوصيل من مساحة واحدة.
         </p>
       </section>
 
@@ -384,7 +384,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
           title={`بلاغات التعديل (${directoryReports.length})`}
         >
           <Card className="border border-zinc-200">
-            <CardHeader className="font-black">تعديلات وبلاغات زوار خدمات الكيان</CardHeader>
+            <CardHeader className="font-black">تعديلات وبلاغات زوار كيان سيتي سبوت</CardHeader>
             <CardBody className="gap-3">
               {directoryReports.length ? (
                 directoryReports.map((request) => (
@@ -562,7 +562,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
               </Card>
 
               <Card className="border border-zinc-200 lg:col-span-2">
-                <CardHeader className="font-black">إنشاء فرع وربطه بخدمات الكيان</CardHeader>
+                <CardHeader className="font-black">إنشاء فرع وربطه بكيان سيتي سبوت</CardHeader>
                 <CardBody>
                   <form
                     className="grid gap-3 sm:grid-cols-2"
@@ -969,7 +969,7 @@ function DirectoryTab({
 
   return (
     <>
-      <Tabs aria-label="إدارة خدمات الكيان">
+      <Tabs aria-label="إدارة كيان سيتي سبوت">
         <Tab key="places" title={`الأماكن والخدمات (${places.length})`}>
           <Card className="border border-zinc-200">
             <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">

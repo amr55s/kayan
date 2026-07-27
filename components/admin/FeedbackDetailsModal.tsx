@@ -150,7 +150,7 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-700">
                   {/* Current Data */}
                   <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
-                    <span className="font-extrabold text-zinc-500 dark:text-zinc-400 block border-b pb-1">البيانات الحالية في خدمات الكيان</span>
+                    <span className="font-extrabold text-zinc-500 dark:text-zinc-400 block border-b pb-1">البيانات الحالية في كيان سيتي سبوت</span>
                     <div className="font-bold text-zinc-900 dark:text-white">{targetPlace?.title || feedback.place_name_or_phone}</div>
                     <div className="text-zinc-600 dark:text-zinc-400">{targetPlace?.category}</div>
                     <div className="flex items-center gap-1 text-zinc-600 dark:text-zinc-400">

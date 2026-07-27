@@ -76,7 +76,7 @@ export async function applyFeedbackToPlace(
     return {
       success: true,
       placeId: data,
-      message: 'تم تطبيق التعديل ونشره في خدمات الكيان.',
+      message: 'تم تطبيق التعديل ونشره في كيان سيتي سبوت.',
     };
   } catch (error) {
     return approvalError(error);
@@ -99,7 +99,7 @@ export async function approvePendingPlace(
     return {
       success: true,
       placeId: data,
-      message: 'تمت إضافة المكان ونشره في خدمات الكيان.',
+      message: 'تمت إضافة المكان ونشره في كيان سيتي سبوت.',
     };
   } catch (error) {
     return approvalError(error);
@@ -124,7 +124,7 @@ export async function resolveFeedbackWithoutChanges(
     if (!data) throw new Error('request_already_processed');
 
     refreshDirectory();
-    return { success: true, message: 'تم إغلاق الطلب بدون تعديل خدمات الكيان.' };
+    return { success: true, message: 'تم إغلاق الطلب بدون تعديل كيان سيتي سبوت.' };
   } catch (error) {
     return approvalError(error);
   }

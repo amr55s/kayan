@@ -1,6 +1,6 @@
-# Kayan Hub
+# KAYAN CITY SPOT | كيان سيتي سبوت
 
-Kayan Hub now separates the public directory from authenticated delivery operations.
+KAYAN CITY SPOT separates the public directory from authenticated delivery operations.
 
 ## Required setup
 

@@ -1,7 +1,7 @@
 {
-  "name": "خدمات الكيان",
-  "short_name": "خدمات الكيان",
-  "description": "كل خدمات الكيان في مكان واحد — محلات، مطاعم، صيدليات وتوصيل",
+  "name": "KAYAN CITY SPOT | كيان سيتي سبوت",
+  "short_name": "KAYAN CITY SPOT",
+  "description": "كيان سيتي سبوت: المحلات والمطاعم والصيدليات والخدمات في مكان واحد",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fafafa",

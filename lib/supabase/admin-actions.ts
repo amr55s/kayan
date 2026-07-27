@@ -174,7 +174,7 @@ export async function serverApprovePendingRequest(
 
   if (insertError) {
     await (supabase as any).from('pending_requests').update({ status: 'pending' }).eq('id', reqId);
-    return { success: false, message: 'فشل في إضافة المكان إلى خدمات الكيان.' };
+    return { success: false, message: 'فشل في إضافة المكان إلى كيان سيتي سبوت.' };
   }
 
   triggerInstantRevalidation();
@@ -233,7 +233,7 @@ export async function serverEditAndApproveRequest(
 
   if (insertError) {
     await (supabase as any).from('pending_requests').update({ status: 'pending' }).eq('id', reqId);
-    return { success: false, message: 'فشل في إضافة المكان إلى خدمات الكيان.' };
+    return { success: false, message: 'فشل في إضافة المكان إلى كيان سيتي سبوت.' };
   }
 
   triggerInstantRevalidation();
@@ -291,7 +291,7 @@ export async function serverInsertPlaceDirectly(
     if (error) throw error;
 
     triggerInstantRevalidation();
-    return { success: true, message: 'تمت إضافة المكان بنجاح ونشره في خدمات الكيان!' };
+    return { success: true, message: 'تمت إضافة المكان بنجاح ونشره في كيان سيتي سبوت!' };
   } catch (err: any) {
     console.error('serverInsertPlaceDirectly error:', err);
     return { success: false, message: err.message || 'حدث خطأ أثناء إضافة المكان.' };

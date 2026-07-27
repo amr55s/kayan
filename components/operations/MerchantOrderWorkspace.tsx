@@ -153,7 +153,7 @@ export function MerchantOrderWorkspace({
       <section>
         <h1 className="text-2xl font-black">مساحة المحل</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          إدارة بيانات خدمات الكيان وتشغيل طلبات التوصيل من مكان واحد.
+          إدارة بيانات كيان سيتي سبوت وتشغيل طلبات التوصيل من مكان واحد.
         </p>
       </section>
       {message && (
@@ -394,7 +394,7 @@ function MerchantDirectoryManager({
           <Store className="size-8 text-zinc-400" />
           <p className="font-bold">لا يوجد مكان عام مرتبط بحسابك بعد.</p>
           <p className="text-sm text-zinc-500">
-            اطلب من الإدارة ربط فرع المحل ببطاقة المكان في خدمات الكيان.
+            اطلب من الإدارة ربط فرع المحل ببطاقة المكان في كيان سيتي سبوت.
           </p>
         </CardBody>
       </Card>
@@ -461,7 +461,7 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
       );
       setMessage(
         result.success
-          ? 'تم إرسال التعديلات للإدارة. ستظهر في خدمات الكيان فور الموافقة عليها.'
+          ? 'تم إرسال التعديلات للإدارة. ستظهر في كيان سيتي سبوت فور الموافقة عليها.'
           : result.message,
       );
       if (result.success) setFiles([]);

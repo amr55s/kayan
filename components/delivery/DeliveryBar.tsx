@@ -124,7 +124,7 @@ export function DeliveryBar({
         {drivers.length > 0 ? (
           <div
             className="no-scrollbar grid w-full auto-cols-[100%] grid-flow-col snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1 scroll-px-3 scroll-smooth overscroll-x-contain sm:auto-cols-[calc((100%-1rem)/2)] sm:gap-4 sm:px-4 sm:scroll-px-4 lg:auto-cols-[calc((100%-2rem)/3)] xl:auto-cols-[calc((100%-3rem)/4)]"
-            aria-label="كباتن التوصيل في خدمات الكيان"
+            aria-label="كباتن التوصيل في كيان سيتي سبوت"
             tabIndex={0}
             onScroll={updateActiveDriver}
           >

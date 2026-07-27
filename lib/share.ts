@@ -4,11 +4,11 @@ export async function sharePlace(
   pageUrl?: string
 ): Promise<boolean> {
   const url = pageUrl || (typeof window !== 'undefined' ? window.location.href : '');
-  const text = `${title}\n${phone}\nعبر خدمات الكيان\n${url}`;
+  const text = `${title}\n${phone}\nعبر كيان سيتي سبوت\n${url}`;
 
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
-      await navigator.share({ title: `${title} — خدمات الكيان`, text, url });
+      await navigator.share({ title: `${title} — كيان سيتي سبوت`, text, url });
       return true;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return false;

@@ -1,5 +1,5 @@
 /**
- * Kayan Hub Utility Helpers
+ * KAYAN CITY SPOT Utility Helpers
  */
 
 /**

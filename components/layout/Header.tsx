@@ -17,6 +17,7 @@ import { Bike, Building2, LayoutDashboard, LogIn, MessageSquareText, UserPlus } 
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
+import { SITE_NAME, SITE_NAME_AR } from '@/lib/brand';
 
 interface HeaderProps {
   isJoinOpen: boolean;
@@ -71,11 +72,11 @@ export const Header: React.FC<HeaderProps> = ({
         className="sticky top-0 z-50 h-16 max-w-full border-b border-zinc-200/80 bg-white/90 px-3 backdrop-blur-xl sm:px-5"
       >
         <NavbarBrand className="min-w-0 shrink">
-          <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label="خدمات الكيان - الصفحة الرئيسية">
+          <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={`${SITE_NAME} - الصفحة الرئيسية`}>
             <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200 shadow-sm">
               <Image
                 src="/kayan-services-logo.png"
-                alt="شعار خدمات الكيان"
+                alt={`شعار ${SITE_NAME}`}
                 width={44}
                 height={44}
                 className="size-11 object-contain"
@@ -83,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </span>
             <span className="hidden truncate text-[17px] font-black tracking-tight text-zinc-950 sm:block sm:text-lg">
-              خدمات <span className="font-medium text-zinc-500">الكيان</span>
+              {SITE_NAME}
             </span>
           </Link>
         </NavbarBrand>
@@ -117,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
               startContent={<UserPlus className="size-4" />}
               className="bg-zinc-950 px-3 text-xs font-bold text-white hover:bg-zinc-800 sm:px-4"
             >
-              انضم لخدمات الكيان
+              انضم إلى {SITE_NAME_AR}
             </Button>
           </NavbarItem>
         </NavbarContent>
@@ -129,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
             <>
               <ModalHeader className="border-b border-zinc-100">
                 <div>
-                  <h2 className="text-lg font-black text-zinc-950">انضم إلى خدمات الكيان</h2>
+                  <h2 className="text-lg font-black text-zinc-950">انضم إلى {SITE_NAME_AR}</h2>
                   <p className="mt-1 text-sm font-normal text-zinc-500">اختر نوع التسجيل المناسب.</p>
                 </div>
               </ModalHeader>

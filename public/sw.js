@@ -1,6 +1,6 @@
 self.addEventListener('push', (event) => {
   const payload = event.data ? event.data.json() : {};
-  event.waitUntil(self.registration.showNotification(payload.title || 'خدمات الكيان', {
+  event.waitUntil(self.registration.showNotification(payload.title || 'KAYAN CITY SPOT | كيان سيتي سبوت', {
     body: payload.body || 'لديك تحديث جديد.',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',

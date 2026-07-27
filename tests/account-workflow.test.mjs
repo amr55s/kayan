@@ -45,3 +45,25 @@ test('selected category text keeps high contrast', () => {
   );
   assert.doesNotMatch(categoryBar, /transition-all/);
 });
+
+test('public branding uses KAYAN CITY SPOT consistently', () => {
+  const brand = read('lib/brand.ts');
+  const manifest = read('public/manifest.json');
+  const serviceWorker = read('public/sw.js');
+  const publicFiles = [
+    'app/layout.tsx',
+    'components/layout/Header.tsx',
+    'components/directory/DirectoryView.tsx',
+    'components/auth/LoginForm.tsx',
+    'components/operations/DashboardHeader.tsx',
+    'lib/share.ts',
+  ];
+
+  assert.match(brand, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
+  assert.match(manifest, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
+  assert.match(serviceWorker, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
+
+  for (const file of publicFiles) {
+    assert.doesNotMatch(read(file), /خدمات الكيان|كيان هب|Kayan Hub|KayanHub/);
+  }
+});

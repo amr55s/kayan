@@ -1,5 +1,5 @@
 /**
- * KayanHub (كيان هب) - Shared TypeScript Interfaces & Types
+ * KAYAN CITY SPOT (كيان سيتي سبوت) - Shared TypeScript Interfaces & Types
  * Hyper-Local Directory System Definitions
  */
 

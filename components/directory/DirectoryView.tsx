@@ -103,7 +103,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         <div className="bg-gradient-to-b from-zinc-200/50 via-zinc-100/20 to-transparent dark:from-zinc-900/40 dark:via-zinc-900/10 py-5 sm:py-7 px-4 text-center border-b border-zinc-200/60 dark:border-zinc-800/60">
           <div className="max-w-2xl mx-auto space-y-1">
             <h1 className="text-xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-white">
-              خدمات الكيان… كل اللي تحتاجه في مكان واحد
+              KAYAN CITY SPOT | كيان سيتي سبوت… كل ما تحتاجه في مكان واحد
             </h1>
             <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 font-semibold">
               مطاعم ومحلات وصيدليات وخدمات وتوصيل ومنيوهات، مع تواصل مباشر وسهل.
@@ -216,7 +216,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               <p className="max-w-xs text-xs text-zinc-500">
                 {showFavoritesOnly
                   ? 'استخدم زر المفضلة داخل أي مكان لحفظه هنا.'
-                  : 'تأكد من كتابة الكلمات بشكل صحيح أو تواصل مع إدارة خدمات الكيان لإضافة نشاطك.'}
+                  : 'تأكد من كتابة الكلمات بشكل صحيح أو تواصل مع إدارة كيان سيتي سبوت لإضافة نشاطك.'}
               </p>
             </div>
           )}
@@ -240,7 +240,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
 
       {/* Footer */}
       <footer className="w-full border-t border-zinc-200 bg-white px-4 py-5 text-center text-xs text-zinc-500">
-        <div className="mx-auto max-w-7xl">© {new Date().getFullYear()} خدمات الكيان</div>
+        <div className="mx-auto max-w-7xl">© {new Date().getFullYear()} KAYAN CITY SPOT | كيان سيتي سبوت</div>
       </footer>
 
     </div>

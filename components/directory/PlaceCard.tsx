@@ -19,6 +19,7 @@ import {
 import { Phone, MessageCircle, Copy, Check, Star, CreditCard, Eye, Images, Heart, ExternalLink, X } from 'lucide-react';
 import { Place } from '@/types';
 import { formatWhatsAppUrl, formatPhoneForTel, getCategoryLabel } from '@/lib/utils';
+import { SITE_NAME_AR } from '@/lib/brand';
 import { ShareButton } from './ShareButton';
 import { UpvoteButton } from './UpvoteButton';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -209,7 +210,7 @@ export const PlaceCard: React.FC<PlaceCardProps> = ({ place }) => {
             size="md"
             variant="flat"
             as="a"
-            href={formatWhatsAppUrl(place.whatsapp || place.phone, `مرحباً، استفسار عبر خدمات الكيان عن: ${place.title}`)}
+            href={formatWhatsAppUrl(place.whatsapp || place.phone, `مرحباً، استفسار عبر ${SITE_NAME_AR} عن: ${place.title}`)}
             target="_blank"
             rel="noopener noreferrer"
             startContent={<MessageCircle className="size-4" />}
