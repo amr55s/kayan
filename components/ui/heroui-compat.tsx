@@ -443,6 +443,7 @@ export function Textarea({
 
 type SelectItemProps = Omit<React.OptionHTMLAttributes<HTMLOptionElement>, 'color'> & {
   description?: React.ReactNode;
+  value: string | number;
 };
 export function SelectItem({
   children,

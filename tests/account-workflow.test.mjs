@@ -30,6 +30,55 @@ test('public account requests use reviewed Auth accounts', () => {
   assert.match(adminManager, /موافقة وتفعيل/);
 });
 
+test('native select options submit stable values and legacy labels are normalized', async () => {
+  const merchantModal = read('components/modals/AddListingModal.tsx');
+  const userEditor = read('components/admin/UserEditorModal.tsx');
+  const compatibilityLayer = read('components/ui/heroui-compat.tsx');
+  const operations = read('lib/operations/actions.ts');
+  const { accountRequestSchema, listingCategorySchema } = await import(
+    '../lib/operations/validation.ts'
+  );
+
+  assert.match(
+    merchantModal,
+    /<SelectItem key=\{item\.id\} value=\{item\.id\}>/,
+  );
+  assert.match(
+    merchantModal,
+    /<SelectItem key=\{place\.id\} value=\{place\.id\}>/,
+  );
+  assert.match(userEditor, /key="admin" value="admin"/);
+  assert.match(
+    userEditor,
+    /key=\{merchant\.id\} value=\{merchant\.id\}/,
+  );
+  assert.match(compatibilityLayer, /value: string \| number/);
+  assert.match(operations, /Server action validation failed/);
+
+  assert.equal(listingCategorySchema.parse('pharmacy'), 'pharmacy');
+  assert.equal(listingCategorySchema.parse('صيدليات وطب'), 'pharmacy');
+  assert.equal(listingCategorySchema.parse('💊 صيدليات وطب'), 'pharmacy');
+  assert.throws(
+    () => listingCategorySchema.parse('تصنيف غير موجود'),
+    /اختر تصنيفاً صحيحاً من القائمة/,
+  );
+  const request = accountRequestSchema.parse({
+    kind: 'merchant',
+    displayName: 'اسم مسؤول الصيدلية',
+    phone: '01008747011',
+    whatsapp: '01008747011',
+    password: 'strong-password-123',
+    placeMode: 'new',
+    existingPlaceId: null,
+    placeTitle: 'صيدلية دكتورة نور هاشم',
+    placeCategory: '💊 صيدليات وطب',
+    placeWhatsapp: '01008747011',
+    placePayment: '01008747011',
+    placeDescription: '',
+  });
+  assert.equal(request.placeCategory, 'pharmacy');
+});
+
 test('selected category text keeps high contrast', () => {
   const categoryBar = read('components/directory/CategoryBar.tsx');
   const merchantModal = read('components/modals/AddListingModal.tsx');

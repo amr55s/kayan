@@ -134,7 +134,13 @@ export function AddListingModal({
           whatsapp: whatsapp || phone,
           password,
           placeMode: mode,
-          existingPlaceId: mode === 'existing' ? existingPlaceId : null,
+          existingPlaceId: mode === 'existing'
+            ? placesList.find(
+                (place) =>
+                  place.id === existingPlaceId
+                  || `${place.title} — ${place.phone}` === existingPlaceId,
+              )?.id || existingPlaceId
+            : null,
           placeTitle: mode === 'new' ? title : null,
           placeCategory: mode === 'new' ? category : null,
           placeWhatsapp: mode === 'new' ? whatsapp || phone : null,
@@ -267,7 +273,7 @@ export function AddListingModal({
                       onSelectionChange={(keys) => setExistingPlaceId(String(Array.from(keys)[0] ?? ''))}
                     >
                       {placesList.map((place) => (
-                        <SelectItem key={place.id}>
+                        <SelectItem key={place.id} value={place.id}>
                           {place.title} — {place.phone}
                         </SelectItem>
                       ))}
@@ -288,7 +294,9 @@ export function AddListingModal({
                         onSelectionChange={(keys) => setCategory(String(Array.from(keys)[0] ?? 'restaurants'))}
                       >
                         {CATEGORY_OPTIONS.filter((item) => item.id !== 'all').map((item) => (
-                          <SelectItem key={item.id}>{item.label}</SelectItem>
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.label}
+                          </SelectItem>
                         ))}
                       </Select>
                       <Input

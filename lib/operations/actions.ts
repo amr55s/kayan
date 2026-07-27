@@ -23,9 +23,40 @@ import {
 type ActionResult<T = undefined> = { success: true; data?: T } | { success: false; message: string };
 
 function actionError(error: unknown): ActionResult {
-  if (error instanceof z.ZodError) return { success: false, message: error.issues[0]?.message ?? 'بيانات غير صالحة.' };
-  const message = error instanceof Error ? error.message : 'تعذر تنفيذ العملية. حاول مرة أخرى.';
-  return { success: false, message: message.replace(/^.*?:\s*/, '') };
+  if (error instanceof z.ZodError) {
+    const issue = error.issues[0];
+    const issueMessage = issue?.message ?? '';
+    if (/[\u0600-\u06ff]/.test(issueMessage)) {
+      return { success: false, message: issueMessage };
+    }
+
+    const field = String(issue?.path.at(-1) ?? '');
+    const fieldMessages: Record<string, string> = {
+      category: 'اختر تصنيفاً صحيحاً من القائمة.',
+      placeCategory: 'اختر تصنيفاً صحيحاً من القائمة.',
+      existingPlaceId: 'اختر المكان المطلوب ربطه من القائمة.',
+      role: 'اختر نوع الحساب بصورة صحيحة.',
+      merchantId: 'اختر النشاط المرتبط بالحساب.',
+      phone: 'رقم الهاتف المصري غير صحيح.',
+      whatsapp: 'رقم واتساب غير صحيح.',
+      password: 'راجع كلمة المرور وحاول مرة أخرى.',
+    };
+    console.error('Server action validation failed:', error.issues);
+    return {
+      success: false,
+      message: fieldMessages[field] ?? 'راجع البيانات المدخلة ثم حاول مرة أخرى.',
+    };
+  }
+
+  const message = error instanceof Error
+    ? error.message
+    : 'تعذر تنفيذ العملية. حاول مرة أخرى.';
+  if (/[\u0600-\u06ff]/.test(message)) {
+    return { success: false, message: message.replace(/^.*?:\s*/, '') };
+  }
+
+  console.error('Server action failed:', error);
+  return { success: false, message: 'تعذر تنفيذ العملية حالياً. حاول مرة أخرى.' };
 }
 
 async function requireRole(role: 'admin' | 'merchant' | 'driver') {

@@ -7,6 +7,46 @@ const egyptianPhone = z
 
 const money = z.coerce.number().min(0).max(9_999_999).optional().nullable();
 
+const LISTING_CATEGORY_IDS = [
+  'restaurants',
+  'home_made',
+  'market',
+  'veggies',
+  'pharmacy',
+  'crafts',
+  'services',
+] as const;
+
+const CATEGORY_ALIASES: Record<string, (typeof LISTING_CATEGORY_IDS)[number]> = {
+  'مطاعم وكافيهات': 'restaurants',
+  'صنع يدي وأكل بيتي': 'home_made',
+  'سوبر ماركت': 'market',
+  'خضار وفاكهة': 'veggies',
+  'صيدليات وطب': 'pharmacy',
+  'حرف وصيانة': 'crafts',
+  'خدمات ومكاتب': 'services',
+};
+
+function normalizeListingCategory(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if ((LISTING_CATEGORY_IDS as readonly string[]).includes(trimmed)) {
+    return trimmed;
+  }
+
+  const labelWithoutEmoji = trimmed
+    .replace(/^[^\p{L}\p{N}]+/u, '')
+    .trim();
+  return CATEGORY_ALIASES[labelWithoutEmoji] ?? trimmed;
+}
+
+export const listingCategorySchema = z.preprocess(
+  normalizeListingCategory,
+  z.enum(LISTING_CATEGORY_IDS, {
+    error: 'اختر تصنيفاً صحيحاً من القائمة.',
+  }),
+);
+
 export const createOrderSchema = z.object({
   branchId: z.uuid(),
   recipientName: z.string().trim().min(2).max(120),
@@ -56,15 +96,7 @@ export const branchSchema = z.object({
 export const merchantPlaceSchema = z.object({
   placeId: z.uuid(),
   title: z.string().trim().min(2).max(150),
-  category: z.enum([
-    'restaurants',
-    'home_made',
-    'market',
-    'veggies',
-    'pharmacy',
-    'crafts',
-    'services',
-  ]),
+  category: listingCategorySchema,
   phone: egyptianPhone,
   whatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
   instapayVfcash: z.string().trim().max(30).optional().nullable(),
@@ -92,18 +124,7 @@ export const accountRequestSchema = z
     placeMode: z.enum(['existing', 'new']).optional().nullable(),
     existingPlaceId: z.uuid().optional().nullable(),
     placeTitle: z.string().trim().max(150).optional().nullable(),
-    placeCategory: z
-      .enum([
-        'restaurants',
-        'home_made',
-        'market',
-        'veggies',
-        'pharmacy',
-        'crafts',
-        'services',
-      ])
-      .optional()
-      .nullable(),
+    placeCategory: listingCategorySchema.optional().nullable(),
     placeWhatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
     placePayment: z.string().trim().max(30).optional().nullable(),
     placeDescription: z.string().trim().max(2000).optional().nullable(),

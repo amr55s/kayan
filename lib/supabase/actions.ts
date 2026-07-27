@@ -22,6 +22,14 @@ function isDemoMode(): boolean {
   return !url || url.includes('placeholder');
 }
 
+function safeArabicMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : '';
+  if (/[\u0600-\u06ff]/.test(message)) {
+    return message.replace(/^.*?:\s*/, '');
+  }
+  return fallback;
+}
+
 /**
  * Helper to trigger instant cache revalidation across public and admin pages with tag revalidation
  */
@@ -174,7 +182,10 @@ export async function submitFeedbackSubmission(
     console.error('Error submitting feedback:', err);
     return {
       success: false,
-      message: err.message || 'تعذر إرسال طلب التعديل. حاول مرة أخرى.',
+      message: safeArabicMessage(
+        err,
+        'تعذر إرسال طلب التعديل حالياً. بياناتك ما زالت في النموذج، حاول مرة أخرى.',
+      ),
     };
   }
 }
@@ -216,6 +227,9 @@ export async function upvotePlace(
     return { success: true, message: 'شكراً لتوصيتك! 👍' };
   } catch (err: any) {
     console.error('Error upvoting place:', err);
-    return { success: false, message: err.message || 'حدث خطأ أثناء التصويت.' };
+    return {
+      success: false,
+      message: safeArabicMessage(err, 'حدث خطأ أثناء التصويت. حاول مرة أخرى.'),
+    };
   }
 }

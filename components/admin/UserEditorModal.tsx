@@ -135,9 +135,9 @@ export function UserEditorModal({
                     })
                   }
                 >
-                  <SelectItem key="admin">أدمن</SelectItem>
-                  <SelectItem key="merchant">محل / مطعم</SelectItem>
-                  <SelectItem key="driver">كابتن</SelectItem>
+                  <SelectItem key="admin" value="admin">أدمن</SelectItem>
+                  <SelectItem key="merchant" value="merchant">محل / مطعم</SelectItem>
+                  <SelectItem key="driver" value="driver">كابتن</SelectItem>
                 </Select>
                 {form.role === 'merchant' && (
                   <Select
@@ -152,7 +152,9 @@ export function UserEditorModal({
                     }
                   >
                     {merchants.map((merchant) => (
-                      <SelectItem key={merchant.id}>{merchant.display_name}</SelectItem>
+                      <SelectItem key={merchant.id} value={merchant.id}>
+                        {merchant.display_name}
+                      </SelectItem>
                     ))}
                   </Select>
                 )}

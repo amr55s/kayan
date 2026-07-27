@@ -13,6 +13,13 @@ async function requireAdminSession() {
   return profile;
 }
 
+function safeAdminMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : '';
+  return /[\u0600-\u06ff]/.test(message)
+    ? message.replace(/^.*?:\s*/, '')
+    : fallback;
+}
+
 export async function validateAdminPasscode(passcode: string): Promise<{ success: boolean }> {
   // The legacy passcode gate is retired. Access is enforced by Supabase Auth + RLS.
   void passcode;
@@ -309,7 +316,10 @@ export async function serverInsertPlaceDirectly(
     return { success: true, message: 'تمت إضافة المكان بنجاح ونشره في كيان سيتي سبوت!' };
   } catch (err: any) {
     console.error('serverInsertPlaceDirectly error:', err);
-    return { success: false, message: err.message || 'حدث خطأ أثناء إضافة المكان.' };
+    return {
+      success: false,
+      message: safeAdminMessage(err, 'حدث خطأ أثناء إضافة المكان. حاول مرة أخرى.'),
+    };
   }
 }
 
@@ -339,7 +349,10 @@ export async function serverUpdateActivePlace(
     return { success: true };
   } catch (err: any) {
     console.error('serverUpdateActivePlace error:', err);
-    return { success: false, message: err.message || 'حدث خطأ أثناء تحديث المكان.' };
+    return {
+      success: false,
+      message: safeAdminMessage(err, 'حدث خطأ أثناء تحديث المكان. حاول مرة أخرى.'),
+    };
   }
 }
 
@@ -355,7 +368,10 @@ export async function serverDeleteActivePlace(
     return { success: true };
   } catch (err: any) {
     console.error('serverDeleteActivePlace error:', err);
-    return { success: false, message: err.message || 'حدث خطأ أثناء حذف المكان.' };
+    return {
+      success: false,
+      message: safeAdminMessage(err, 'حدث خطأ أثناء حذف المكان. حاول مرة أخرى.'),
+    };
   }
 }
 
@@ -474,7 +490,7 @@ export async function serverUpdateDriver(
   } catch (error) {
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'تعذر تحديث بيانات الكابتن.',
+      message: safeAdminMessage(error, 'تعذر تحديث بيانات الكابتن. حاول مرة أخرى.'),
     };
   }
 }
