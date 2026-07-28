@@ -61,7 +61,7 @@ test('database migration keeps diagnostics private and storage writes server-onl
     'supabase/migrations/202607280001_place_details_reliability.sql',
   );
   const postDeploy = read(
-    'supabase/post-deploy/202607280002_revoke_legacy_privileges.sql',
+    'supabase/migrations/202607280002_revoke_legacy_privileges.sql',
   );
   assert.match(migration, /alter table public\.client_error_reports enable row level security/);
   assert.match(migration, /revoke all on public\.client_error_reports from anon, authenticated/);

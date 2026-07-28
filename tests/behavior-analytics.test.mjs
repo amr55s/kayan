@@ -48,7 +48,7 @@ test('admin receives a simple analytics dashboard without exposing visitor hashe
 test('public writes are mediated by the server while admin retains full control', () => {
   const actions = read('lib/supabase/actions.ts');
   const adminActions = read('lib/supabase/admin-actions.ts');
-  const postDeploy = read('supabase/post-deploy/202607280002_revoke_legacy_privileges.sql');
+  const postDeploy = read('supabase/migrations/202607280002_revoke_legacy_privileges.sql');
 
   assert.match(actions, /consume_public_submission_rate_limit/);
   assert.match(actions, /record_place_upvote/);

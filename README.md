@@ -39,7 +39,8 @@ npm run build
 
 Use the staged order below so existing users and uploads stay available:
 
-1. Back up Supabase, then apply only the normal migration:
+1. Back up Supabase, then apply the additive reliability migration before
+   promoting the post-deploy security migration:
 
    ```bash
    npx supabase db push --linked
@@ -52,10 +53,11 @@ Use the staged order below so existing users and uploads stay available:
    `SUPABASE_SERVICE_ROLE_KEY` temporarily as a compatibility fallback.
 3. Merge through GitHub `main` and verify the Production deployment, image
    uploads, admin moderation, login refresh, and public driver list.
-4. Run
-   `supabase/post-deploy/202607280002_revoke_legacy_privileges.sql` in the
-   Supabase SQL editor. This is the post-deploy step that removes public
-   Storage listing/uploads and limits RPC execution to the intended roles.
+4. After Production passes its health checks, promote and apply
+   `supabase/migrations/202607280002_revoke_legacy_privileges.sql`. This
+   post-deploy migration removes public Storage listing/uploads and limits RPC
+   execution to the intended roles. It is already promoted in this repository
+   because the matching Production release was verified successfully.
 5. Re-run the Supabase Security Advisor and monitor Vercel Web Analytics,
    Speed Insights, logs, and the aggregated admin error summary for 24–48
    hours.

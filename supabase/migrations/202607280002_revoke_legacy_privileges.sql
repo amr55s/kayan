@@ -1,4 +1,5 @@
--- POST-DEPLOY SECURITY STEP
+-- POST-DEPLOY SECURITY STEP (promoted after the matching application passed
+-- Production health checks)
 --
 -- Run only after:
 -- 1. 202607280001_place_details_reliability.sql is applied.
@@ -6,8 +7,8 @@
 --    may remain temporarily).
 -- 3. The matching application version is healthy in Production.
 --
--- This file intentionally lives outside supabase/migrations so a normal
--- `supabase db push` cannot remove legacy access before the new code is live.
+-- This migration was intentionally promoted only after the matching
+-- server-only application code was confirmed healthy in Production.
 
 begin;
 
