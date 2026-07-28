@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Analytics } from '@vercel/analytics/next';
 import { SITE_NAME, SITE_NAME_AR, SITE_TAGLINE } from '@/lib/brand';
 import { WhatsAppGroupButton } from '@/components/layout/WhatsAppGroupButton';
 import { Providers } from './providers';
@@ -40,6 +41,7 @@ export default function RootLayout({
           {children}
           <WhatsAppGroupButton />
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
