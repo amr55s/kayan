@@ -29,7 +29,11 @@ export function useFavorites() {
   const toggleFavorite = useCallback((id: string) => {
     setFavorites((prev) => {
       const next = prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Favorites remain available for the current session.
+      }
       return next;
     });
   }, []);

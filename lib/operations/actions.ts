@@ -188,7 +188,9 @@ export async function submitAccountRequest(
     const uploadedImages = validateListingImageUrls(imageUrls, 3);
 
     const admin = createAdminClient();
-    const rateLimitSecret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const rateLimitSecret =
+      process.env.SUPABASE_SECRET_KEY
+      || process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!rateLimitSecret) throw new Error('إعدادات الخادم غير مكتملة.');
     const requestHeaders = await headers();
     const forwardedIp = requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim();
@@ -304,6 +306,22 @@ export async function submitAccountRequest(
           data.kind === 'merchant' && data.placeMode === 'new'
             ? data.placeDescription || null
             : null,
+        place_whatsapp_group_url:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placeWhatsappGroupUrl
+            : null,
+        place_telegram_url:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placeTelegramUrl
+            : null,
+        place_address:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placeAddress || null
+            : null,
+        place_map_url:
+          data.kind === 'merchant' && data.placeMode === 'new'
+            ? data.placeMapUrl
+            : null,
         place_images: uploadedImages,
         status: 'pending',
       })
@@ -331,14 +349,13 @@ export async function approveAccountRequest(
   try {
     await requireRole('admin');
     const id = z.uuid().parse(requestId);
-    const supabase = await createClient();
-    const { data: authUserId, error } = await (supabase as any).rpc(
+    const admin = createAdminClient();
+    const { data: authUserId, error } = await (admin as any).rpc(
       'approve_account_request',
       { p_request_id: id },
     );
     if (error) throw error;
 
-    const admin = createAdminClient();
     await admin.auth.admin.updateUserById(authUserId, {
       user_metadata: { account_status: 'approved' },
     });
@@ -358,14 +375,13 @@ export async function rejectAccountRequest(
     await requireRole('admin');
     const id = z.uuid().parse(requestId);
     const rejectionReason = z.string().trim().max(500).optional().parse(reason);
-    const supabase = await createClient();
-    const { data: authUserId, error } = await (supabase as any).rpc(
+    const admin = createAdminClient();
+    const { data: authUserId, error } = await (admin as any).rpc(
       'reject_account_request',
       { p_request_id: id, p_reason: rejectionReason || null },
     );
     if (error) throw error;
 
-    const admin = createAdminClient();
     const { error: deleteError } = await admin.auth.admin.deleteUser(authUserId);
     if (deleteError) {
       console.error('Rejected account Auth cleanup failed:', deleteError.message);
@@ -449,50 +465,36 @@ export async function updateMerchantPlace(
     const finalImages = Array.from(new Set([...data.existingImages, ...uploadedImages]));
 
     const admin = createAdminClient();
-    const requestData = {
-      target_place_id: data.placeId,
-      place_name_or_phone: currentPlace.title,
-      feedback_type: 'merchant_update',
-      source: 'merchant',
-      submitted_by: profile.id,
-      contact_phone: profile.phone,
-      proposed_title: data.title,
-      proposed_category: data.category,
-      proposed_phone: data.phone,
-      proposed_whatsapp: data.whatsapp || '',
-      proposed_instapay_vfcash: data.instapayVfcash || '',
-      proposed_description: data.description || '',
-      proposed_images: finalImages,
-      notes: `طلب تحديث بطاقة ${currentPlace.title} مقدم من حساب المحل.`,
-      status: 'pending',
-    };
-
-    const { data: existingRequest } = await (admin as any)
-      .from('feedback_requests')
-      .select('id')
-      .eq('target_place_id', data.placeId)
-      .eq('submitted_by', profile.id)
-      .eq('feedback_type', 'merchant_update')
-      .eq('status', 'pending')
-      .maybeSingle();
-
-    const requestQuery = existingRequest
-      ? (admin as any)
-          .from('feedback_requests')
-          .update(requestData)
-          .eq('id', existingRequest.id)
-      : (admin as any).from('feedback_requests').insert(requestData);
-    const { error } = await requestQuery;
+    const { error } = await (admin as any)
+      .from('places')
+      .update({
+        title: data.title,
+        category: data.category,
+        phone: data.phone,
+        whatsapp: data.whatsapp || null,
+        instapay_vfcash: data.instapayVfcash || null,
+        description: data.description || null,
+        whatsapp_group_url: data.whatsappGroupUrl,
+        telegram_url: data.telegramUrl,
+        address: data.address || null,
+        map_url: data.mapUrl,
+        images: finalImages,
+      })
+      .eq('id', data.placeId);
     if (error) throw error;
 
     await (admin as any).from('audit_log').insert({
       actor_id: profile.id,
-      action: existingRequest ? 'merchant_change_request_updated' : 'merchant_change_request_created',
+      action: 'merchant_place_updated',
       entity_type: 'place',
       entity_id: data.placeId,
-      metadata: { feedback_id: existingRequest?.id ?? null },
+      metadata: {
+        previous_title: currentPlace.title,
+        image_count: finalImages.length,
+      },
     });
 
+    revalidatePath('/', 'page');
     revalidatePath('/merchant');
     revalidatePath('/admin');
     return {

@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import {
+  mapUrlSchema,
+  telegramUrlSchema,
+  whatsappGroupUrlSchema,
+} from '../place-details.ts';
 
 const egyptianPhone = z
   .string()
@@ -101,6 +106,10 @@ export const merchantPlaceSchema = z.object({
   whatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
   instapayVfcash: z.string().trim().max(30).optional().nullable(),
   description: z.string().trim().max(2000).optional().nullable(),
+  whatsappGroupUrl: whatsappGroupUrlSchema,
+  telegramUrl: telegramUrlSchema,
+  address: z.string().trim().max(500).optional().nullable(),
+  mapUrl: mapUrlSchema,
   existingImages: z.array(z.url()).max(12).default([]),
 });
 
@@ -128,6 +137,10 @@ export const accountRequestSchema = z
     placeWhatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
     placePayment: z.string().trim().max(30).optional().nullable(),
     placeDescription: z.string().trim().max(2000).optional().nullable(),
+    placeWhatsappGroupUrl: whatsappGroupUrlSchema,
+    placeTelegramUrl: telegramUrlSchema,
+    placeAddress: z.string().trim().max(500).optional().nullable(),
+    placeMapUrl: mapUrlSchema,
   })
   .superRefine((value, context) => {
     if (value.kind === 'driver') return;

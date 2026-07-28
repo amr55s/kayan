@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { FeedbackImageMode } from '@/types';
 import { getCurrentProfile } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 type ApprovalResult =
   | { success: true; message: string; placeId?: string }
@@ -65,8 +66,8 @@ export async function applyFeedbackToPlace(
   try {
     await requireAdmin();
     const input = feedbackApprovalSchema.parse({ feedbackId, imageMode });
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc('apply_feedback_to_place', {
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc('apply_feedback_to_place', {
       p_feedback_id: input.feedbackId,
       p_image_mode: input.imageMode,
     });
@@ -89,8 +90,8 @@ export async function approvePendingPlace(
   try {
     await requireAdmin();
     const id = z.uuid().parse(requestId);
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc('approve_pending_place', {
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc('approve_pending_place', {
       p_request_id: id,
     });
     if (error) throw error;

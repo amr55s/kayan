@@ -47,6 +47,7 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
     targetPlace
       && (
         feedback.feedback_type === 'merchant_update'
+        || feedback.feedback_type === 'details_update'
         || feedback.proposed_phone
         || imagesToPreview.length
       ),
@@ -202,6 +203,33 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
                           <p className="whitespace-pre-wrap font-normal">
                             {feedback.proposed_description || 'بدون وصف'}
                           </p>
+                          <p className="break-all font-normal">
+                            جروب WhatsApp: {feedback.proposed_whatsapp_group_url || 'بدون'}
+                          </p>
+                          <p className="break-all font-normal">
+                            Telegram: {feedback.proposed_telegram_url || 'بدون'}
+                          </p>
+                          <p className="whitespace-pre-wrap font-normal">
+                            العنوان: {feedback.proposed_address || 'بدون'}
+                          </p>
+                          <p className="break-all font-normal">
+                            الخريطة: {feedback.proposed_map_url || 'بدون'}
+                          </p>
+                        </div>
+                      ) : feedback.feedback_type === 'details_update' ? (
+                        <div className="space-y-1.5">
+                          {feedback.proposed_whatsapp_group_url && (
+                            <p className="break-all">WhatsApp: {feedback.proposed_whatsapp_group_url}</p>
+                          )}
+                          {feedback.proposed_telegram_url && (
+                            <p className="break-all">Telegram: {feedback.proposed_telegram_url}</p>
+                          )}
+                          {feedback.proposed_address && (
+                            <p className="whitespace-pre-wrap">العنوان: {feedback.proposed_address}</p>
+                          )}
+                          {feedback.proposed_map_url && (
+                            <p className="break-all">الخريطة: {feedback.proposed_map_url}</p>
+                          )}
                         </div>
                       ) : feedback.proposed_phone ? (
                         <div className="flex items-center gap-2">

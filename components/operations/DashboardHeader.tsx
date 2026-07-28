@@ -48,7 +48,7 @@ export function DashboardHeader({
           <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200 shadow-sm">
             <Image
               src="/kayan-services-logo.png"
-              alt="شعار KAYAN CITY SPOT | كيان سيتي سبوت"
+              alt="شعار KAYAN CITY SPOT"
               width={44}
               height={44}
               className="size-11 object-contain"

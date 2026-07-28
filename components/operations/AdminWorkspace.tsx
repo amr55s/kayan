@@ -17,16 +17,21 @@ import {
 } from '@heroui/react';
 import {
   Building2,
+  BarChart3,
   ClipboardCheck,
+  Eye,
   History,
   Lightbulb,
   Link2,
   MessageSquareText,
+  MousePointerClick,
   Pencil,
   Plus,
+  Search,
   ShieldCheck,
   Star,
   Store,
+  TrendingUp,
   Utensils,
   UserCog,
   Users,
@@ -51,6 +56,7 @@ import { AccountRequestManager } from '@/components/admin/AccountRequestManager'
 import { UserEditorModal } from '@/components/admin/UserEditorModal';
 import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
 import type { AccountRequest, FeedbackRequest, PendingRequest, Place } from '@/types';
+import type { BehaviorAnalyticsSummary } from '@/lib/analytics/admin';
 
 type Merchant = { id: string; display_name: string; is_active: boolean };
 type Profile = {
@@ -99,6 +105,18 @@ type AuditEntry = {
   metadata: Record<string, unknown>;
   created_at: string;
 };
+type ClientErrorSummary = {
+  id: number;
+  fingerprint: string;
+  event_type: string;
+  route: string;
+  browser_family: string;
+  os_family: string;
+  release: string;
+  occurrences: number;
+  first_seen_at: string;
+  last_seen_at: string;
+};
 
 type AdminWorkspaceProps = {
   merchants: Merchant[];
@@ -111,6 +129,8 @@ type AdminWorkspaceProps = {
   drivers: DirectoryDriver[];
   auditLog: AuditEntry[];
   accountRequests: AccountRequest[];
+  clientErrors: ClientErrorSummary[];
+  behaviorAnalytics: BehaviorAnalyticsSummary;
 };
 
 export function AdminWorkspace(props: AdminWorkspaceProps) {
@@ -145,7 +165,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
     (request) => request.feedback_type === 'merchant_update',
   );
   const directoryReports = pendingFeedback.filter((request) =>
-    ['menu_update', 'phone_change', 'report_issue'].includes(request.feedback_type),
+    ['menu_update', 'phone_change', 'details_update', 'report_issue'].includes(request.feedback_type),
   );
   const suggestions = pendingFeedback.filter((request) =>
     ['general_suggestion', 'rating'].includes(request.feedback_type),
@@ -336,6 +356,48 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
           icon={<Lightbulb className="size-5" />}
         />
       </div>
+
+      <BehaviorAnalyticsOverview
+        analytics={props.behaviorAnalytics}
+        places={props.places}
+      />
+
+      {props.clientErrors.length > 0 && (
+        <Card className="border border-amber-200 bg-amber-50/50">
+          <CardHeader className="flex items-center justify-between gap-3">
+            <span className="font-black">تقارير الأعطال المجهولة — آخر 30 يومًا</span>
+            <Chip className="bg-amber-100 text-amber-900">
+              {props.clientErrors.reduce((total, item) => total + item.occurrences, 0)} حدث
+            </Chip>
+          </CardHeader>
+          <CardBody className="gap-2">
+            {props.clientErrors.slice(0, 10).map((item) => (
+              <article
+                key={item.id}
+                className="grid gap-2 rounded-xl border border-amber-200 bg-white p-3 text-xs sm:grid-cols-[1fr_auto]"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-black">
+                    {item.event_type} · {item.route}
+                  </p>
+                  <p className="mt-1 text-zinc-500">
+                    {item.browser_family} / {item.os_family} · بصمة {item.fingerprint.slice(0, 10)}
+                  </p>
+                </div>
+                <div className="text-start font-bold tabular-nums sm:text-end">
+                  <p>{item.occurrences} مرة</p>
+                  <time dateTime={item.last_seen_at}>
+                    {new Intl.DateTimeFormat('ar-EG', {
+                      dateStyle: 'short',
+                      timeStyle: 'short',
+                    }).format(new Date(item.last_seen_at))}
+                  </time>
+                </div>
+              </article>
+            ))}
+          </CardBody>
+        </Card>
+      )}
 
       <Tabs aria-label="إدارة المنصة">
         <Tab
@@ -918,6 +980,213 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
   );
 }
 
+const analyticsActionLabels: Record<string, string> = {
+  place_open: 'فتح تفاصيل مكان',
+  phone_click: 'ضغط اتصال',
+  whatsapp_click: 'ضغط WhatsApp',
+  group_click: 'فتح جروب WhatsApp',
+  telegram_click: 'فتح Telegram',
+  map_click: 'فتح الخريطة',
+  share_click: 'مشاركة مكان',
+  favorite_click: 'إضافة للمفضلة',
+  upvote_click: 'توصية بمكان',
+  search_use: 'استخدام البحث',
+  category_select: 'اختيار تصنيف',
+  join_open: 'فتح الانضمام',
+  feedback_open: 'فتح الاقتراحات',
+  add_listing_open: 'بدء إضافة مكان',
+  driver_signup_open: 'بدء تسجيل كابتن',
+  support_click: 'التواصل مع الدعم',
+};
+
+function BehaviorAnalyticsOverview({
+  analytics,
+  places,
+}: {
+  analytics: BehaviorAnalyticsSummary;
+  places: Place[];
+}) {
+  const maxDaily = Math.max(
+    1,
+    ...analytics.daily.map((item) => Math.max(item.views, item.visitors)),
+  );
+  const topAction = analytics.topActions[0];
+  const topPlace = analytics.topPlaces[0];
+  const placeTitle = (placeId: string) =>
+    places.find((place) => place.id === placeId)?.title ?? 'مكان محذوف أو غير منشور';
+
+  return (
+    <Card className="overflow-hidden border border-zinc-200">
+      <CardHeader className="flex flex-col items-stretch gap-3 border-b border-zinc-100 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 font-black">
+            <BarChart3 className="size-5" aria-hidden="true" />
+            تفاعل الزوار — آخر {analytics.periodDays} يومًا
+          </h2>
+          <p className="mt-1 text-xs font-semibold text-zinc-500">
+            أرقام مجمّعة ومجهولة؛ لا يتم حفظ أرقام هواتف أو كلمات البحث أو IP.
+          </p>
+        </div>
+        <Chip className={analytics.available ? 'bg-emerald-50 text-emerald-800' : 'bg-zinc-100 text-zinc-600'}>
+          {analytics.available ? 'التتبع يعمل' : 'في انتظار تفعيل الترحيل'}
+        </Chip>
+      </CardHeader>
+      <CardBody className="gap-5 p-4 sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <AnalyticsMetric
+            label="زوار مختلفون"
+            value={analytics.totalVisitors}
+            detail={`${analytics.visitorsToday} اليوم`}
+            icon={<Users className="size-5" aria-hidden="true" />}
+          />
+          <AnalyticsMetric
+            label="مشاهدات الصفحات"
+            value={analytics.pageViews}
+            detail="بدون معاملات الرابط"
+            icon={<Eye className="size-5" aria-hidden="true" />}
+          />
+          <AnalyticsMetric
+            label="فتح التفاصيل"
+            value={analytics.placeOpens}
+            detail="كل البطاقات"
+            icon={<MousePointerClick className="size-5" aria-hidden="true" />}
+          />
+          <AnalyticsMetric
+            label="إجراءات التواصل"
+            value={analytics.actionClicks}
+            detail={`${analytics.actionRate}% من فتح التفاصيل`}
+            icon={<TrendingUp className="size-5" aria-hidden="true" />}
+          />
+          <AnalyticsMetric
+            label="استخدام البحث"
+            value={analytics.searchUses}
+            detail="لا نحفظ كلمات البحث"
+            icon={<Search className="size-5" aria-hidden="true" />}
+          />
+        </div>
+
+        {analytics.daily.length > 0 && (
+          <section aria-labelledby="traffic-chart-title">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 id="traffic-chart-title" className="text-sm font-black">
+                الحركة اليومية — آخر 14 يومًا
+              </h3>
+              <div className="flex gap-3 text-[11px] font-bold text-zinc-500">
+                <span className="flex items-center gap-1">
+                  <i className="size-2 rounded-full bg-zinc-950" aria-hidden="true" />
+                  مشاهدة
+                </span>
+                <span className="flex items-center gap-1">
+                  <i className="size-2 rounded-full bg-emerald-500" aria-hidden="true" />
+                  زائر
+                </span>
+              </div>
+            </div>
+            <div className="max-w-full overflow-x-auto rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+              <div className="grid min-w-[620px] grid-cols-14 items-end gap-2" aria-label="رسم الحركة اليومية">
+                {analytics.daily.map((day) => (
+                  <div key={day.date} className="flex min-w-0 flex-col items-center gap-1.5">
+                    <div className="flex h-28 w-full items-end justify-center gap-1">
+                      <div
+                        className="w-2.5 rounded-t bg-zinc-950"
+                        style={{ height: `${Math.max(3, (day.views / maxDaily) * 100)}%` }}
+                        title={`${day.views} مشاهدة`}
+                      />
+                      <div
+                        className="w-2.5 rounded-t bg-emerald-500"
+                        style={{ height: `${Math.max(3, (day.visitors / maxDaily) * 100)}%` }}
+                        title={`${day.visitors} زائر`}
+                      />
+                    </div>
+                    <time
+                      dateTime={day.date}
+                      className="text-[9px] font-bold text-zinc-500"
+                    >
+                      {new Intl.DateTimeFormat('ar-EG', {
+                        day: 'numeric',
+                        month: 'numeric',
+                        timeZone: 'UTC',
+                      }).format(new Date(`${day.date}T00:00:00Z`))}
+                    </time>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <section className="rounded-2xl border border-zinc-200 p-4">
+            <h3 className="text-sm font-black">أكثر ما يضغط عليه الزوار</h3>
+            <div className="mt-3 space-y-2">
+              {analytics.topActions.length ? analytics.topActions.slice(0, 6).map((item, index) => (
+                <div key={item.name} className="flex items-center justify-between gap-3 rounded-xl bg-zinc-50 px-3 py-2 text-sm">
+                  <span className="min-w-0 truncate font-bold">
+                    {index + 1}. {analyticsActionLabels[item.name] ?? item.name}
+                  </span>
+                  <bdi dir="ltr" className="shrink-0 font-black tabular-nums">{item.count}</bdi>
+                </div>
+              )) : <EmptyState text="ستظهر التفاعلات هنا بعد بدء جمع البيانات." />}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-zinc-200 p-4">
+            <h3 className="text-sm font-black">أكثر الأماكن تفاعلاً</h3>
+            <div className="mt-3 space-y-2">
+              {analytics.topPlaces.length ? analytics.topPlaces.slice(0, 6).map((item, index) => (
+                <div key={item.placeId} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-xl bg-zinc-50 px-3 py-2 text-sm">
+                  <span className="truncate font-bold">
+                    {index + 1}. {placeTitle(item.placeId)}
+                  </span>
+                  <span className="shrink-0 text-xs font-bold text-zinc-500">
+                    {item.opens} فتح · {item.actions} إجراء
+                  </span>
+                </div>
+              )) : <EmptyState text="ستظهر البطاقات الأعلى تفاعلاً هنا." />}
+            </div>
+          </section>
+        </div>
+
+        {(topAction || topPlace) && (
+          <p className="rounded-2xl bg-zinc-950 px-4 py-3 text-sm font-semibold leading-7 text-white">
+            تحليل سريع: {topAction
+              ? `أكثر تفاعل هو «${analyticsActionLabels[topAction.name] ?? topAction.name}» بعدد ${topAction.count}.`
+              : ''}
+            {topPlace
+              ? ` والبطاقة الأعلى تفاعلاً هي «${placeTitle(topPlace.placeId)}».`
+              : ''}
+          </p>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+function AnalyticsMetric({
+  label,
+  value,
+  detail,
+  icon,
+}: {
+  label: string;
+  value: number;
+  detail: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+      <div className="min-w-0">
+        <p className="truncate text-xs font-bold text-zinc-500">{label}</p>
+        <p className="mt-1 text-2xl font-black tabular-nums">{value}</p>
+        <p className="truncate text-[10px] font-semibold text-zinc-400">{detail}</p>
+      </div>
+      <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-white text-zinc-900 shadow-sm">
+        {icon}
+      </div>
+    </div>
+  );
+}
+
 function Metric({
   label,
   value,
@@ -1063,6 +1332,7 @@ function feedbackTypeLabel(type: FeedbackRequest['feedback_type']) {
     merchant_update: 'تعديل من محل',
     menu_update: 'صور أو منيو',
     phone_change: 'تغيير هاتف',
+    details_update: 'جروب أو عنوان',
     report_issue: 'بلاغ بيانات',
     general_suggestion: 'اقتراح',
     rating: 'تقييم',

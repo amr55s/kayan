@@ -1,4 +1,4 @@
-# KAYAN CITY SPOT | كيان سيتي سبوت
+# KAYAN CITY SPOT
 
 KAYAN CITY SPOT separates the public directory from authenticated delivery operations.
 
@@ -34,4 +34,37 @@ npm run lint
 npx tsc --noEmit
 npm run build
 ```
+
+## Place-details reliability rollout
+
+Use the staged order below so existing users and uploads stay available:
+
+1. Back up Supabase, then apply only the normal migration:
+
+   ```bash
+   npx supabase db push --linked
+   ```
+
+   This adds optional place-detail fields, private aggregated diagnostics,
+   upload throttling, and fixed function search paths without withdrawing the
+   legacy access used by the currently deployed application.
+2. Add `SUPABASE_SECRET_KEY` and `CLIENT_ERROR_HASH_SALT` to Vercel. Keep
+   `SUPABASE_SERVICE_ROLE_KEY` temporarily as a compatibility fallback.
+3. Merge through GitHub `main` and verify the Production deployment, image
+   uploads, admin moderation, login refresh, and public driver list.
+4. Run
+   `supabase/post-deploy/202607280002_revoke_legacy_privileges.sql` in the
+   Supabase SQL editor. This is the post-deploy step that removes public
+   Storage listing/uploads and limits RPC execution to the intended roles.
+5. Re-run the Supabase Security Advisor and monitor Vercel Web Analytics,
+   Speed Insights, logs, and the aggregated admin error summary for 24–48
+   hours.
+
+Supabase leaked-password protection is intentionally documented as an
+unresolved paid-plan advisor item. The application still enforces its existing
+12-character minimum and does not force current users to rotate passwords.
+
+Do not use `vercel --prod` for this project; GitHub `main` is the only
+Production deployment source. Pull requests continue to create Preview
+deployments.
 # kayan

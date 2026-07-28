@@ -1,4 +1,5 @@
 import { createPublicClient } from './public';
+import { createAdminClient } from './admin';
 import type { Driver, Place } from '@/types';
 
 type QueryOutcome<T> =
@@ -114,9 +115,7 @@ async function fetchPlaces(): Promise<Place[]> {
   const result: any = await withTimeout(
     supabase
       .from('places')
-      .select(
-        'id, title, category, phone, whatsapp, instapay_vfcash, description, images, is_featured, created_at',
-      )
+      .select('*')
       .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false }),
   );
@@ -126,7 +125,7 @@ async function fetchPlaces(): Promise<Place[]> {
 }
 
 async function fetchLegacyDrivers(): Promise<LegacyDriverRow[]> {
-  const supabase = createPublicClient();
+  const supabase = createAdminClient();
   const result: any = await withTimeout(
     (supabase as any).rpc('list_public_legacy_drivers'),
   );
@@ -136,7 +135,7 @@ async function fetchLegacyDrivers(): Promise<LegacyDriverRow[]> {
 }
 
 async function fetchRegisteredDrivers(): Promise<RegisteredDriverRow[]> {
-  const supabase = createPublicClient();
+  const supabase = createAdminClient();
   const result = await withTimeout(supabase.rpc('list_public_registered_drivers'));
   if (result.error) throw new Error(result.error.message);
   return (result.data ?? []) as RegisteredDriverRow[];
@@ -146,6 +145,7 @@ export async function fetchHomePageData(): Promise<{
   places: Place[];
   drivers: Driver[];
   directoryError?: string;
+  renderedAt: number;
 }> {
   const [placesResult, legacyResult, registeredResult] = await Promise.all([
     settle(fetchPlaces()),
@@ -168,6 +168,7 @@ export async function fetchHomePageData(): Promise<{
   }
 
   return {
+    renderedAt: Date.now(),
     places: placesResult.status === 'fulfilled' ? placesResult.value : [],
     drivers: mergePublicDrivers(
       legacyResult.status === 'fulfilled' ? legacyResult.value : [],

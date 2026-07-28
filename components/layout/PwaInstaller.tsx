@@ -19,7 +19,12 @@ export const PwaInstaller: React.FC = () => {
         // The application remains usable when PWA registration is unavailable.
       });
     }
-    const dismissed = localStorage.getItem('kayan_pwa_dismissed');
+    let dismissed: string | null = null;
+    try {
+      dismissed = window.localStorage.getItem('kayan_pwa_dismissed');
+    } catch {
+      // Storage can be disabled by privacy settings; installation stays optional.
+    }
     if (dismissed) return;
 
     const handler = (e: Event) => {
@@ -34,9 +39,13 @@ export const PwaInstaller: React.FC = () => {
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowBanner(false);
+      }
+    } catch {
       setShowBanner(false);
     }
     setDeferredPrompt(null);
@@ -44,13 +53,17 @@ export const PwaInstaller: React.FC = () => {
 
   const handleDismiss = () => {
     setShowBanner(false);
-    localStorage.setItem('kayan_pwa_dismissed', 'true');
+    try {
+      window.localStorage.setItem('kayan_pwa_dismissed', 'true');
+    } catch {
+      // The banner still closes when persistent storage is unavailable.
+    }
   };
 
   if (!showBanner) return null;
 
   return (
-    <div className="fixed bottom-24 sm:bottom-4 left-3 right-3 z-50 bg-zinc-900 text-white rounded-2xl p-3 flex items-center justify-between gap-3 shadow-xl border border-zinc-800 max-w-md mx-auto">
+    <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-3 right-3 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3 text-white shadow-xl sm:bottom-4">
       <div className="flex items-center gap-2.5 min-w-0">
         <div className="w-9 h-9 rounded-xl bg-zinc-800 text-white flex items-center justify-center shrink-0 border border-zinc-700">
           <Download className="w-4 h-4" />
@@ -73,6 +86,7 @@ export const PwaInstaller: React.FC = () => {
           size="sm"
           variant="light"
           onClick={handleDismiss}
+          aria-label="إغلاق اقتراح تثبيت التطبيق"
           className="text-zinc-400 min-w-7 w-7 h-7"
         >
           <X className="w-3.5 h-3.5" />

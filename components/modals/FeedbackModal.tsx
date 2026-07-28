@@ -20,27 +20,45 @@ import { uploadOptimizedImages } from '@/lib/images/client';
 import { isValidEgyptianPhone } from '@/lib/utils';
 import { FeedbackType, Place } from '@/types';
 import { createClient } from '@/lib/supabase/client';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
 interface FeedbackModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   placesList?: Place[];
+  initialPlaceId?: string;
+  initialFeedbackType?: FeedbackType;
 }
 
 const FEEDBACK_TYPES: { id: FeedbackType; label: string; description: string }[] = [
   { id: 'menu_update', label: 'منيو جديد / تحديث صور المكان', description: 'إضافة أو استبدال صور المنيو' },
   { id: 'phone_change', label: 'تغيير رقم الهاتف أو الواتساب', description: 'تحديث أرقام التواصل' },
+  { id: 'details_update', label: 'إضافة جروب أو عنوان أو خريطة', description: 'اقتراح روابط التواصل والموقع' },
   { id: 'report_issue', label: 'الإبلاغ عن بيانات غير صحيحة أو مكان مغلق', description: 'التنبيه لمشكلة بالبيانات' },
   { id: 'general_suggestion', label: 'اقتراح أو ملاحظة عامة', description: 'ملاحظات لتطوير كيان سيتي سبوت' },
   { id: 'rating', label: 'تقييم تجربتك مع كيان سيتي سبوت', description: 'شاركنا تقييمك من نجمة إلى خمس نجوم' },
 ];
 
-export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChange, placesList = [] }) => {
-  const [feedbackType, setFeedbackType] = useState<FeedbackType>('menu_update');
-  const [targetPlaceId, setTargetPlaceId] = useState<string>('unlisted');
+export const FeedbackModal: React.FC<FeedbackModalProps> = ({
+  isOpen,
+  onOpenChange,
+  placesList = [],
+  initialPlaceId,
+  initialFeedbackType,
+}) => {
+  const [feedbackType, setFeedbackType] = useState<FeedbackType>(
+    initialFeedbackType ?? 'menu_update',
+  );
+  const [targetPlaceId, setTargetPlaceId] = useState<string>(
+    initialPlaceId ?? 'unlisted',
+  );
   const [placeNameOrPhone, setPlaceNameOrPhone] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [proposedPhone, setProposedPhone] = useState('');
+  const [whatsappGroupUrl, setWhatsappGroupUrl] = useState('');
+  const [telegramUrl, setTelegramUrl] = useState('');
+  const [address, setAddress] = useState('');
+  const [mapUrl, setMapUrl] = useState('');
   const [notes, setNotes] = useState('');
   const [rating, setRating] = useState(5);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -52,6 +70,20 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
   const [successWarning, setSuccessWarning] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [processingMsg, setProcessingMsg] = useState('');
+  const hasUnsavedChanges = Boolean(
+    placeNameOrPhone
+    || contactPhone
+    || proposedPhone
+    || notes
+    || whatsappGroupUrl
+    || telegramUrl
+    || address
+    || mapUrl
+    || selectedFiles.length,
+  );
+  const confirmDiscard = useUnsavedChanges(
+    isOpen && hasUnsavedChanges && !isSubmitting && !isSuccess,
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -78,6 +110,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
     setPlaceNameOrPhone('');
     setContactPhone('');
     setProposedPhone('');
+    setWhatsappGroupUrl('');
+    setTelegramUrl('');
+    setAddress('');
+    setMapUrl('');
     setNotes('');
     setRating(5);
     setSelectedFiles([]);
@@ -162,6 +198,9 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
         !isOpinion && targetPlaceId !== 'unlisted' ? targetPlaceId : null,
         !isOpinion ? proposedPhone.trim() || null : null,
         feedbackType === 'rating' ? rating : null,
+        feedbackType === 'details_update'
+          ? { whatsappGroupUrl, telegramUrl, address, mapUrl }
+          : undefined,
       );
 
       if (!res.success) {
@@ -187,6 +226,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
     <Modal
       isOpen={isOpen}
       onOpenChange={(open) => {
+        if (!open && !confirmDiscard()) return;
         if (!open) resetForm();
         onOpenChange(open);
       }}
@@ -385,6 +425,48 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onOpenChan
                       />
                     )}
                   </div>
+
+                  {feedbackType === 'details_update' && (
+                    <div className="grid gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-2">
+                      <Input
+                        name="whatsappGroupUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        label="رابط جروب أو قناة WhatsApp"
+                        placeholder="https://chat.whatsapp.com/…"
+                        value={whatsappGroupUrl}
+                        onValueChange={setWhatsappGroupUrl}
+                      />
+                      <Input
+                        name="telegramUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        label="رابط Telegram"
+                        placeholder="https://t.me/…"
+                        value={telegramUrl}
+                        onValueChange={setTelegramUrl}
+                      />
+                      <Textarea
+                        name="address"
+                        autoComplete="street-address"
+                        label="العنوان المقترح"
+                        value={address}
+                        onValueChange={setAddress}
+                      />
+                      <Input
+                        name="mapUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        label="رابط الخريطة"
+                        placeholder="https://maps.app.goo.gl/…"
+                        value={mapUrl}
+                        onValueChange={setMapUrl}
+                      />
+                    </div>
+                  )}
 
                   <Textarea
                     isRequired

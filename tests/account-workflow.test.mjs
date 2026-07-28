@@ -108,9 +108,9 @@ test('public branding uses KAYAN CITY SPOT consistently', () => {
     'lib/share.ts',
   ];
 
-  assert.match(brand, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
-  assert.match(manifest, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
-  assert.match(serviceWorker, /KAYAN CITY SPOT \| كيان سيتي سبوت/);
+  assert.match(brand, /export const SITE_NAME = 'KAYAN CITY SPOT';/);
+  assert.match(manifest, /"name": "KAYAN CITY SPOT",/);
+  assert.match(serviceWorker, /KAYAN CITY SPOT/);
   assert.match(
     read('components/directory/DirectoryView.tsx'),
     /للتواصل مع الدعم:[\s\S]*01094552421/,
@@ -137,7 +137,10 @@ test('WhatsApp support link stays visible across the whole site', () => {
   assert.doesNotMatch(groupButton, /chat\.whatsapp\.com/);
   assert.match(groupButton, /target="_blank"/);
   assert.match(groupButton, /rel="noopener noreferrer"/);
-  assert.match(installer, /bottom-24 sm:bottom-4/);
+  assert.match(
+    installer,
+    /bottom-\[calc\(5\.5rem\+env\(safe-area-inset-bottom\)\)\][\s\S]*sm:bottom-4/,
+  );
 });
 
 test('listing images are optimized before storage without sacrificing menu resolution', () => {
@@ -152,8 +155,9 @@ test('listing images are optimized before storage without sacrificing menu resol
     'components/operations/MerchantOrderWorkspace.tsx',
   ];
 
-  assert.match(clientPipeline, /MAX_WIDTH = 2400/);
-  assert.match(clientPipeline, /MAX_HEIGHT = 3400/);
+  assert.match(clientPipeline, /MAX_WIDTH = 2200/);
+  assert.match(clientPipeline, /MAX_HEIGHT = 3000/);
+  assert.match(clientPipeline, /MAX_PIXELS = 5_000_000/);
   assert.match(clientPipeline, /TARGET_UPLOAD_BYTES = 1_050_000/);
   assert.match(clientPipeline, /SERVER_FALLBACK_BYTES = 3_400_000/);
   assert.match(clientPipeline, /using server fallback/);
@@ -168,7 +172,8 @@ test('listing images are optimized before storage without sacrificing menu resol
   assert.match(storageAction, /cacheControl: '31536000'/);
   assert.match(storageAction, /toPlainArrayBuffer\(processed\.buffer\)/);
   assert.match(storageAction, /STORAGE_UPLOAD_ATTEMPTS = 2/);
-  assert.doesNotMatch(storageAction, /ALLOWED_IMAGE_TYPES/);
+  assert.match(storageAction, /ALLOWED_IMAGE_TYPES/);
+  assert.match(storageAction, /صيغة الصورة غير مدعومة/);
   assert.match(nextConfig, /bodySizeLimit: '4mb'/);
   for (const form of imageForms) {
     assert.match(read(form), /uploadOptimizedImages/);
@@ -215,7 +220,8 @@ test('image and admin server actions return safe results instead of crashing RSC
     /Storage upload exception:[\s\S]*success: false/,
   );
   assert.match(clientPipeline, /failedFiles: string\[\]/);
-  assert.match(clientPipeline, /continue;/);
+  assert.match(clientPipeline, /failedFiles\.push\(originalFile\.name\)/);
+  assert.match(clientPipeline, /await yieldToBrowser\(\)/);
   assert.match(
     adminActions,
     /serverApprovePendingRequest[\s\S]*catch \(error\)/,

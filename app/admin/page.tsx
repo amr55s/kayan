@@ -2,8 +2,11 @@ import { AdminWorkspace } from '@/components/operations/AdminWorkspace';
 import { DashboardHeader } from '@/components/operations/DashboardHeader';
 import { requireProfile } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { loadBehaviorAnalytics } from '@/lib/analytics/admin';
 
 export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 async function safeAdminQuery(
   label: string,
@@ -22,6 +25,24 @@ async function safeAdminQuery(
   }
 }
 
+async function loadClientErrors() {
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000).toISOString();
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from('client_error_reports')
+      .select('id, fingerprint, event_type, route, browser_family, os_family, release, occurrences, first_seen_at, last_seen_at')
+      .gte('last_seen_at', since)
+      .order('last_seen_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return data ?? [];
+  } catch (error) {
+    console.warn('Anonymous client diagnostics are not available yet:', error);
+    return [];
+  }
+}
+
 export default async function AdminDashboard() {
   const profile = await requireProfile(['admin']);
   const supabase = await createClient();
@@ -37,6 +58,8 @@ export default async function AdminDashboard() {
     { data: drivers },
     { data: auditLog },
     { data: accountRequests },
+    clientErrors,
+    behaviorAnalytics,
   ] = await Promise.all([
     safeAdminQuery('merchants', (supabase as any)
       .from('merchants')
@@ -57,15 +80,15 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: false })),
     safeAdminQuery('places', (supabase as any)
       .from('places')
-      .select('id, title, category, phone, whatsapp, instapay_vfcash, description, images, is_featured, created_at')
+      .select('*')
       .order('created_at', { ascending: false })),
     safeAdminQuery('pending_requests', (supabase as any)
       .from('pending_requests')
-      .select('id, title, category, phone, whatsapp, instapay_vfcash, description, images, status, created_at')
+      .select('*')
       .order('created_at', { ascending: false })),
     safeAdminQuery('feedback_requests', (supabase as any)
       .from('feedback_requests')
-      .select('id, target_place_id, place_name_or_phone, feedback_type, source, submitted_by, rating, contact_phone, proposed_phone, proposed_title, proposed_category, proposed_whatsapp, proposed_instapay_vfcash, proposed_description, notes, images, proposed_images, status, created_at')
+      .select('*')
       .order('created_at', { ascending: false })),
     safeAdminQuery('drivers', (supabase as any)
       .from('drivers')
@@ -78,8 +101,10 @@ export default async function AdminDashboard() {
       .limit(100)),
     safeAdminQuery('account_requests', (supabase as any)
       .from('account_requests')
-      .select('id, kind, status, auth_user_id, display_name, phone, whatsapp, vehicle_type, legacy_driver_id, place_mode, existing_place_id, place_title, place_category, rejection_reason, created_at')
+      .select('*')
       .order('created_at', { ascending: false })),
+    loadClientErrors(),
+    loadBehaviorAnalytics(),
   ]);
 
   return (
@@ -96,6 +121,8 @@ export default async function AdminDashboard() {
         drivers={drivers ?? []}
         auditLog={auditLog ?? []}
         accountRequests={accountRequests ?? []}
+        clientErrors={clientErrors}
+        behaviorAnalytics={behaviorAnalytics}
       />
     </>
   );

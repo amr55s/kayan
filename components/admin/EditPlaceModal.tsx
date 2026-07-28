@@ -43,6 +43,10 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
   const [whatsapp, setWhatsapp] = useState('');
   const [instapayVfcash, setInstapayVfcash] = useState('');
   const [description, setDescription] = useState('');
+  const [whatsappGroupUrl, setWhatsappGroupUrl] = useState('');
+  const [telegramUrl, setTelegramUrl] = useState('');
+  const [address, setAddress] = useState('');
+  const [mapUrl, setMapUrl] = useState('');
   const [isFeatured, setIsFeatured] = useState(false);
 
   // Images state
@@ -64,6 +68,10 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
       setWhatsapp(mode === 'edit' && place ? place.whatsapp || '' : '');
       setInstapayVfcash(mode === 'edit' && place ? place.instapay_vfcash || '' : '');
       setDescription(mode === 'edit' && place ? place.description || '' : '');
+      setWhatsappGroupUrl(mode === 'edit' && place ? place.whatsapp_group_url || '' : '');
+      setTelegramUrl(mode === 'edit' && place ? place.telegram_url || '' : '');
+      setAddress(mode === 'edit' && place ? place.address || '' : '');
+      setMapUrl(mode === 'edit' && place ? place.map_url || '' : '');
       setIsFeatured(mode === 'edit' && place ? place.is_featured || false : false);
       setExistingImages(mode === 'edit' && place ? place.images || [] : []);
       setNewImageFiles([]);
@@ -83,6 +91,10 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
     setWhatsapp('');
     setInstapayVfcash('');
     setDescription('');
+    setWhatsappGroupUrl('');
+    setTelegramUrl('');
+    setAddress('');
+    setMapUrl('');
     setIsFeatured(false);
     setExistingImages([]);
     setNewImageFiles([]);
@@ -161,6 +173,10 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
           whatsapp: whatsapp.trim() || undefined,
           instapay_vfcash: instapayVfcash.trim() || undefined,
           description: description.trim() || undefined,
+          whatsapp_group_url: whatsappGroupUrl.trim() || undefined,
+          telegram_url: telegramUrl.trim() || undefined,
+          address: address.trim() || undefined,
+          map_url: mapUrl.trim() || undefined,
           images: finalImages,
           is_featured: isFeatured,
         });
@@ -174,6 +190,10 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
           whatsapp: whatsapp.trim() || undefined,
           instapay_vfcash: instapayVfcash.trim() || undefined,
           description: description.trim() || undefined,
+          whatsapp_group_url: whatsappGroupUrl.trim() || null,
+          telegram_url: telegramUrl.trim() || null,
+          address: address.trim() || null,
+          map_url: mapUrl.trim() || null,
           images: finalImages,
           is_featured: isFeatured,
         });
@@ -341,6 +361,46 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                     inputWrapper: "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
                   }}
                 />
+
+                <div className="grid grid-cols-1 gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-2">
+                  <Input
+                    name="whatsappGroupUrl"
+                    type="url"
+                    inputMode="url"
+                    autoComplete="off"
+                    label="رابط جروب أو قناة WhatsApp"
+                    placeholder="https://chat.whatsapp.com/…"
+                    value={whatsappGroupUrl}
+                    onValueChange={setWhatsappGroupUrl}
+                  />
+                  <Input
+                    name="telegramUrl"
+                    type="url"
+                    inputMode="url"
+                    autoComplete="off"
+                    label="رابط Telegram"
+                    placeholder="https://t.me/…"
+                    value={telegramUrl}
+                    onValueChange={setTelegramUrl}
+                  />
+                  <Textarea
+                    name="address"
+                    autoComplete="street-address"
+                    label="العنوان"
+                    value={address}
+                    onValueChange={setAddress}
+                  />
+                  <Input
+                    name="mapUrl"
+                    type="url"
+                    inputMode="url"
+                    autoComplete="off"
+                    label="رابط الخريطة"
+                    placeholder="https://maps.app.goo.gl/…"
+                    value={mapUrl}
+                    onValueChange={setMapUrl}
+                  />
+                </div>
 
                 {/* Featured Switch */}
                 <div className="flex items-center justify-between p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40">

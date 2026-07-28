@@ -1,9 +1,10 @@
 'use server';
 
-import { createClient } from './server';
+import { createAdminClient } from './admin';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { PendingRequest, Place, Driver, FeedbackRequest } from '@/types';
 import { getCurrentProfile } from '@/lib/auth/guards';
+import { validatePlaceDetails } from '@/lib/place-details';
 
 async function requireAdminSession() {
   const profile = await getCurrentProfile();
@@ -72,7 +73,7 @@ export async function serverFetchAdminMetrics(): Promise<{
 }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const rpcRes: any = await fetchWithTimeout((supabase as any).rpc('get_admin_metrics'), 2000);
 
@@ -117,7 +118,7 @@ export async function serverFetchAdminData(): Promise<{
 }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const [pendingRes, placesRes, driversRes, feedbackRes]: any = await Promise.all([
       fetchWithTimeout(supabase.from('pending_requests').select('*').order('created_at', { ascending: false })),
@@ -153,7 +154,7 @@ export async function serverApprovePendingRequest(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: locked, error: lockError } = await (supabase as any)
       .from('pending_requests')
@@ -208,7 +209,7 @@ export async function serverEditAndApproveRequest(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: locked, error: lockError } = await (supabase as any)
       .from('pending_requests')
@@ -262,7 +263,7 @@ export async function serverRejectPendingRequest(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { error } = await (supabase as any)
       .from('pending_requests')
@@ -290,13 +291,23 @@ export async function serverInsertPlaceDirectly(
     whatsapp?: string;
     instapay_vfcash?: string;
     description?: string;
+    whatsapp_group_url?: string;
+    telegram_url?: string;
+    address?: string;
+    map_url?: string;
     images?: string[];
     is_featured?: boolean;
   }
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const details = validatePlaceDetails({
+      whatsappGroupUrl: placeData.whatsapp_group_url,
+      telegramUrl: placeData.telegram_url,
+      address: placeData.address,
+      mapUrl: placeData.map_url,
+    });
+    const supabase = createAdminClient();
     const { error } = await (supabase as any).from('places').insert([
       {
         title: placeData.title.trim(),
@@ -305,6 +316,10 @@ export async function serverInsertPlaceDirectly(
         whatsapp: placeData.whatsapp?.trim() || null,
         instapay_vfcash: placeData.instapay_vfcash?.trim() || null,
         description: placeData.description?.trim() || null,
+        whatsapp_group_url: details.whatsappGroupUrl,
+        telegram_url: details.telegramUrl,
+        address: details.address,
+        map_url: details.mapUrl,
         images: placeData.images || [],
         is_featured: placeData.is_featured || false,
       },
@@ -329,7 +344,13 @@ export async function serverUpdateActivePlace(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const details = validatePlaceDetails({
+      whatsappGroupUrl: updatedData.whatsapp_group_url,
+      telegramUrl: updatedData.telegram_url,
+      address: updatedData.address,
+      mapUrl: updatedData.map_url,
+    });
+    const supabase = createAdminClient();
     const { error } = await (supabase as any)
       .from('places')
       .update({
@@ -339,6 +360,10 @@ export async function serverUpdateActivePlace(
         whatsapp: updatedData.whatsapp,
         instapay_vfcash: updatedData.instapay_vfcash,
         description: updatedData.description,
+        whatsapp_group_url: details.whatsappGroupUrl,
+        telegram_url: details.telegramUrl,
+        address: details.address,
+        map_url: details.mapUrl,
         images: updatedData.images,
         is_featured: updatedData.is_featured,
       })
@@ -361,7 +386,7 @@ export async function serverDeleteActivePlace(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await (supabase as any).from('places').delete().eq('id', placeId);
     if (error) throw error;
     triggerInstantRevalidation();
@@ -381,7 +406,7 @@ export async function serverToggleDriverStatus(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { error } = await (supabase as any)
       .from('drivers')
@@ -408,7 +433,7 @@ export async function serverExtendDriverTime(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const newActiveUntil = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 
@@ -437,7 +462,7 @@ export async function serverDeleteDriver(
 ): Promise<{ success: boolean; message?: string }> {
   try {
     await requireAdminSession();
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { error } = await (supabase as any).from('drivers').delete().eq('id', driverId);
 
@@ -474,7 +499,7 @@ export async function serverUpdateDriver(
       throw new Error('اسم الكابتن غير صحيح.');
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await (supabase as any)
       .from('drivers')
       .update({

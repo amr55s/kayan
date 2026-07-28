@@ -53,7 +53,9 @@ export const Header: React.FC<HeaderProps> = ({
       }
     }
 
-    void loadDashboardPath();
+    void loadDashboardPath().catch((error) => {
+      console.warn('Dashboard link could not be loaded:', error);
+    });
     return () => {
       mounted = false;
     };
@@ -69,9 +71,9 @@ export const Header: React.FC<HeaderProps> = ({
       <Navbar
         isBordered
         maxWidth="full"
-        className="sticky top-0 z-50 h-16 max-w-full border-b border-zinc-200/80 bg-white/90 px-3 backdrop-blur-xl sm:px-5"
+        className="sticky top-0 z-50 h-16 max-w-full gap-1 overflow-hidden border-b border-zinc-200/80 bg-white/90 px-2 backdrop-blur-xl sm:px-5"
       >
-        <NavbarBrand className="min-w-0 shrink">
+        <NavbarBrand className="w-11 min-w-11 shrink-0 sm:w-auto">
           <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={`${SITE_NAME} - الصفحة الرئيسية`}>
             <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200 shadow-sm">
               <Image
@@ -89,27 +91,29 @@ export const Header: React.FC<HeaderProps> = ({
           </Link>
         </NavbarBrand>
 
-        <NavbarContent justify="end" className="shrink-0 gap-1.5 sm:gap-2">
+        <NavbarContent justify="end" className="min-w-0 shrink gap-0.5 sm:shrink-0 sm:gap-2">
           {onOpenFeedbackModal && (
             <NavbarItem>
               <button
                 type="button"
                 onClick={onOpenFeedbackModal}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 sm:px-3"
+                className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 sm:px-3"
               >
                 <MessageSquareText className="size-4" />
                 <span className="hidden sm:inline">اقتراح أو تقييم</span>
-                <span className="sm:hidden">رأيك</span>
+                <span className="max-[359px]:sr-only sm:hidden">رأيك</span>
               </button>
             </NavbarItem>
           )}
           <NavbarItem>
             <Link
               href={dashboardPath ?? '/login'}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 sm:px-3"
+              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 sm:px-3"
             >
               {dashboardPath ? <LayoutDashboard className="size-4" /> : <LogIn className="size-4" />}
-              {dashboardPath ? 'لوحة التحكم' : 'دخول'}
+              <span className="max-[359px]:sr-only">
+                {dashboardPath ? 'لوحة التحكم' : 'دخول'}
+              </span>
             </Link>
           </NavbarItem>
           <NavbarItem>
@@ -118,7 +122,8 @@ export const Header: React.FC<HeaderProps> = ({
               startContent={<UserPlus className="size-4" />}
               className="bg-zinc-950 px-3 text-xs font-bold text-white hover:bg-zinc-800 sm:px-4"
             >
-              انضم إلى {SITE_NAME_AR}
+              <span className="sm:hidden">انضم</span>
+              <span className="hidden sm:inline">انضم إلى {SITE_NAME_AR}</span>
             </Button>
           </NavbarItem>
         </NavbarContent>

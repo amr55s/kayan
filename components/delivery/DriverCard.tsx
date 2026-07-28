@@ -16,12 +16,22 @@ function availabilityLabel(activeUntil: string | null | undefined, now: number):
   return `متاح ${hours}س${minutes ? ` ${minutes}د` : ''}`;
 }
 
-export function DriverCard({ driver }: { driver: Driver }) {
-  const [now, setNow] = useState(() => Date.now());
+export function DriverCard({
+  driver,
+  renderedAt,
+}: {
+  driver: Driver;
+  renderedAt: number;
+}) {
+  const [now, setNow] = useState(renderedAt);
 
   useEffect(() => {
+    const initialUpdate = window.setTimeout(() => setNow(Date.now()), 0);
     const interval = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialUpdate);
+      window.clearInterval(interval);
+    };
   }, []);
 
   const isAvailable = useMemo(

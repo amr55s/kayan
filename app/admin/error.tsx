@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Button } from '@heroui/react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
+import { reportClientError } from '@/lib/observability/client-errors';
 
 export default function Error({
   error,
@@ -14,10 +15,20 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error('Application error:', error);
+    void reportClientError(error, 'react_boundary');
     const retryKey = `admin-error-retry:${error.digest || error.message}`;
-    const lastRetry = Number(sessionStorage.getItem(retryKey) || 0);
+    let lastRetry = 0;
+    try {
+      lastRetry = Number(window.sessionStorage.getItem(retryKey) || 0);
+    } catch {
+      return;
+    }
     if (Date.now() - lastRetry > 30_000) {
-      sessionStorage.setItem(retryKey, String(Date.now()));
+      try {
+        window.sessionStorage.setItem(retryKey, String(Date.now()));
+      } catch {
+        return;
+      }
       const timer = window.setTimeout(reset, 1200);
       return () => window.clearTimeout(timer);
     }

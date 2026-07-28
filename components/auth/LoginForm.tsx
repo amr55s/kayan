@@ -105,7 +105,7 @@ export function LoginForm() {
           <div className="flex size-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg">
             <Image
               src="/kayan-services-logo.png"
-              alt="شعار KAYAN CITY SPOT | كيان سيتي سبوت"
+              alt="شعار KAYAN CITY SPOT"
               width={80}
               height={80}
               className="size-20 object-contain"
@@ -113,7 +113,7 @@ export function LoginForm() {
             />
           </div>
           <div>
-            <h1 className="text-xl font-black">دخول KAYAN CITY SPOT | كيان سيتي سبوت</h1>
+            <h1 className="text-xl font-black">دخول KAYAN CITY SPOT</h1>
             <p className="mt-1 text-sm text-zinc-400">للكباتن وأصحاب الأنشطة والإدارة</p>
           </div>
         </CardHeader>

@@ -29,6 +29,7 @@ import { uploadOptimizedImages } from '@/lib/images/client';
 import { CATEGORY_OPTIONS } from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
 import type { Place } from '@/types';
+import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
 
 interface AddListingModalProps {
   isOpen: boolean;
@@ -53,12 +54,33 @@ export function AddListingModal({
   const [category, setCategory] = useState('restaurants');
   const [payment, setPayment] = useState('');
   const [description, setDescription] = useState('');
+  const [whatsappGroupUrl, setWhatsappGroupUrl] = useState('');
+  const [telegramUrl, setTelegramUrl] = useState('');
+  const [address, setAddress] = useState('');
+  const [mapUrl, setMapUrl] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [successWarning, setSuccessWarning] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [processingMsg, setProcessingMsg] = useState('');
+  const hasUnsavedChanges = Boolean(
+    displayName
+    || phone
+    || whatsapp
+    || password
+    || title
+    || payment
+    || description
+    || whatsappGroupUrl
+    || telegramUrl
+    || address
+    || mapUrl
+    || selectedFiles.length,
+  );
+  const confirmDiscard = useUnsavedChanges(
+    isOpen && hasUnsavedChanges && !isSubmitting && !isSuccess,
+  );
 
   function resetForm() {
     setMode('existing');
@@ -72,6 +94,10 @@ export function AddListingModal({
     setCategory('restaurants');
     setPayment('');
     setDescription('');
+    setWhatsappGroupUrl('');
+    setTelegramUrl('');
+    setAddress('');
+    setMapUrl('');
     setSelectedFiles([]);
     setIsSubmitting(false);
     setIsSuccess(false);
@@ -146,6 +172,10 @@ export function AddListingModal({
           placeWhatsapp: mode === 'new' ? whatsapp || phone : null,
           placePayment: mode === 'new' ? payment : null,
           placeDescription: mode === 'new' ? description : null,
+          placeWhatsappGroupUrl: mode === 'new' ? whatsappGroupUrl : null,
+          placeTelegramUrl: mode === 'new' ? telegramUrl : null,
+          placeAddress: mode === 'new' ? address : null,
+          placeMapUrl: mode === 'new' ? mapUrl : null,
         },
         uploadResult.urls,
       );
@@ -173,6 +203,7 @@ export function AddListingModal({
     <Modal
       isOpen={isOpen}
       onOpenChange={(open) => {
+        if (!open && !confirmDiscard()) return;
         if (!open) resetForm();
         onOpenChange(open);
       }}
@@ -310,6 +341,43 @@ export function AddListingModal({
                         label="وصف مختصر أو مواعيد العمل"
                         value={description}
                         onValueChange={setDescription}
+                      />
+                      <Input
+                        name="whatsappGroupUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        label="رابط جروب أو قناة WhatsApp (اختياري)"
+                        placeholder="https://chat.whatsapp.com/…"
+                        value={whatsappGroupUrl}
+                        onValueChange={setWhatsappGroupUrl}
+                      />
+                      <Input
+                        name="telegramUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        label="رابط Telegram (اختياري)"
+                        placeholder="https://t.me/…"
+                        value={telegramUrl}
+                        onValueChange={setTelegramUrl}
+                      />
+                      <Textarea
+                        name="address"
+                        autoComplete="street-address"
+                        label="العنوان (اختياري)"
+                        value={address}
+                        onValueChange={setAddress}
+                      />
+                      <Input
+                        name="mapUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="off"
+                        label="رابط الخريطة (اختياري)"
+                        placeholder="https://maps.app.goo.gl/…"
+                        value={mapUrl}
+                        onValueChange={setMapUrl}
                       />
                       <div className="space-y-2 sm:col-span-2">
                         <input

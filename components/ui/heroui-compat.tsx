@@ -3,9 +3,12 @@
 import React, {
   Children,
   createContext,
+  useCallback,
+  useEffect,
   isValidElement,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -567,10 +570,11 @@ export function Tabs({
               role="tab"
               aria-selected={selected}
               className={cx(
-                'min-h-[44px] flex-1 whitespace-nowrap rounded-lg px-3 text-sm font-bold text-zinc-600',
-                selected && 'bg-zinc-900 text-white',
+                'min-h-[44px] flex-1 whitespace-nowrap rounded-lg px-3 text-sm font-bold',
+                selected ? 'bg-zinc-900 text-white' : 'text-zinc-600',
                 classNames?.tab,
               )}
+              style={{ color: selected ? '#ffffff' : undefined }}
               onClick={() => {
                 setInternalKey(tabKey);
                 onSelectionChange?.(tabKey);
@@ -626,8 +630,11 @@ const ModalContext = createContext<{
   close: () => void;
   classNames?: Record<string, string>;
 }>({ close: () => undefined });
+let activeModalCount = 0;
+let bodyOverflowBeforeModals = '';
 
 type LegacyModalProps = LegacyStyleProps & {
+  'aria-label'?: string;
   backdrop?: string;
   children: React.ReactNode;
   isOpen: boolean;
@@ -641,26 +648,117 @@ export function Modal({
   children,
   onOpenChange,
   classNames,
+  'aria-label': ariaLabel = 'نافذة منبثقة',
 }: LegacyModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const onOpenChangeRef = useRef(onOpenChange);
+  const closeTimerRef = useRef<number | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+
+  const close = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
+    closeTimerRef.current = window.setTimeout(() => {
+      onOpenChangeRef.current?.(false);
+      setIsClosing(false);
+      closeTimerRef.current = null;
+    }, 160);
+  }, [isClosing]);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    if (activeModalCount === 0) {
+      bodyOverflowBeforeModals = document.body.style.overflow;
+    }
+    activeModalCount += 1;
+    document.body.style.overflow = 'hidden';
+
+    const frame = window.requestAnimationFrame(() => {
+      const focusable = dialogRef.current?.querySelector<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      (focusable || dialogRef.current)?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => !element.hasAttribute('aria-hidden'));
+      if (!focusable.length) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleKeyDown);
+      activeModalCount = Math.max(0, activeModalCount - 1);
+      if (activeModalCount === 0) {
+        document.body.style.overflow = bodyOverflowBeforeModals;
+        restoreFocusRef.current?.focus({ preventScroll: true });
+      }
+    };
+  }, [close, isOpen]);
+
   if (!isOpen) return null;
-  const close = () => onOpenChange?.(false);
   return (
     <ModalContext.Provider value={{ close, classNames }}>
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="نافذة منبثقة"
-        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6"
+        aria-label={ariaLabel}
+        data-modal-closing={isClosing || undefined}
+        className={cx(
+          'kayan-modal-wrapper fixed inset-0 z-[100] flex items-center justify-center overscroll-contain p-3 sm:p-6',
+          classNames?.wrapper,
+        )}
       >
         <button
           type="button"
           aria-label="إغلاق النافذة"
-          className="absolute inset-0 cursor-default bg-zinc-950/50 backdrop-blur-sm"
+          aria-hidden="true"
+          tabIndex={-1}
+          disabled={isClosing}
+          className="kayan-modal-backdrop absolute inset-0 cursor-default bg-zinc-950/50 backdrop-blur-sm"
           onClick={close}
         />
         <div
+          ref={dialogRef}
+          tabIndex={-1}
           className={cx(
-            'relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl',
+            'kayan-modal-panel relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl',
             classNames?.base,
           )}
         >

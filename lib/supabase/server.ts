@@ -10,7 +10,9 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const rawKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const rawKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   const supabaseUrl = rawUrl && rawUrl.trim() ? rawUrl : 'https://placeholder.supabase.co';
   const supabaseAnonKey = rawKey && rawKey.trim() ? rawKey : 'placeholder-anon-key';

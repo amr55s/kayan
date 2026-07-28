@@ -60,6 +60,66 @@ export type Database = {
         }
         Relationships: []
       }
+      client_error_rate_limits: {
+        Row: {
+          attempts: number
+          request_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          request_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          request_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
+      client_error_reports: {
+        Row: {
+          browser_family: string
+          event_type: string
+          fingerprint: string
+          first_seen_at: string
+          id: number
+          last_seen_at: string
+          occurrences: number
+          os_family: string
+          release: string
+          route: string
+        }
+        Insert: {
+          browser_family: string
+          event_type: string
+          fingerprint: string
+          first_seen_at?: string
+          id?: never
+          last_seen_at?: string
+          occurrences?: number
+          os_family: string
+          release: string
+          route: string
+        }
+        Update: {
+          browser_family?: string
+          event_type?: string
+          fingerprint?: string
+          first_seen_at?: string
+          id?: never
+          last_seen_at?: string
+          occurrences?: number
+          os_family?: string
+          release?: string
+          route?: string
+        }
+        Relationships: []
+      }
       account_requests: {
         Row: {
           auth_user_id: string
@@ -71,12 +131,16 @@ export type Database = {
           legacy_driver_id: string | null
           phone: string
           place_category: string | null
+          place_address: string | null
           place_description: string | null
           place_images: string[]
+          place_map_url: string | null
           place_mode: string | null
           place_payment: string | null
+          place_telegram_url: string | null
           place_title: string | null
           place_whatsapp: string | null
+          place_whatsapp_group_url: string | null
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -95,12 +159,16 @@ export type Database = {
           legacy_driver_id?: string | null
           phone: string
           place_category?: string | null
+          place_address?: string | null
           place_description?: string | null
           place_images?: string[]
+          place_map_url?: string | null
           place_mode?: string | null
           place_payment?: string | null
+          place_telegram_url?: string | null
           place_title?: string | null
           place_whatsapp?: string | null
+          place_whatsapp_group_url?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -119,12 +187,16 @@ export type Database = {
           legacy_driver_id?: string | null
           phone?: string
           place_category?: string | null
+          place_address?: string | null
           place_description?: string | null
           place_images?: string[]
+          place_map_url?: string | null
           place_mode?: string | null
           place_payment?: string | null
+          place_telegram_url?: string | null
           place_title?: string | null
           place_whatsapp?: string | null
+          place_whatsapp_group_url?: string | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -396,12 +468,16 @@ export type Database = {
           notes: string
           place_name_or_phone: string
           proposed_category: string | null
+          proposed_address: string | null
           proposed_description: string | null
           proposed_images: string[]
           proposed_instapay_vfcash: string | null
+          proposed_map_url: string | null
           proposed_phone: string | null
+          proposed_telegram_url: string | null
           proposed_title: string | null
           proposed_whatsapp: string | null
+          proposed_whatsapp_group_url: string | null
           rating: number | null
           source: string
           status: string | null
@@ -417,12 +493,16 @@ export type Database = {
           notes: string
           place_name_or_phone: string
           proposed_category?: string | null
+          proposed_address?: string | null
           proposed_description?: string | null
           proposed_images?: string[]
           proposed_instapay_vfcash?: string | null
+          proposed_map_url?: string | null
           proposed_phone?: string | null
+          proposed_telegram_url?: string | null
           proposed_title?: string | null
           proposed_whatsapp?: string | null
+          proposed_whatsapp_group_url?: string | null
           rating?: number | null
           source?: string
           status?: string | null
@@ -438,12 +518,16 @@ export type Database = {
           notes?: string
           place_name_or_phone?: string
           proposed_category?: string | null
+          proposed_address?: string | null
           proposed_description?: string | null
           proposed_images?: string[]
           proposed_instapay_vfcash?: string | null
+          proposed_map_url?: string | null
           proposed_phone?: string | null
+          proposed_telegram_url?: string | null
           proposed_title?: string | null
           proposed_whatsapp?: string | null
+          proposed_whatsapp_group_url?: string | null
           rating?: number | null
           source?: string
           status?: string | null
@@ -638,47 +722,81 @@ export type Database = {
           },
         ]
       }
+      listing_upload_rate_limits: {
+        Row: {
+          attempts: number
+          request_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          request_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          request_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       pending_requests: {
         Row: {
+          address: string | null
           category: string
           created_at: string | null
           description: string | null
           id: string
           images: string[] | null
           instapay_vfcash: string | null
+          map_url: string | null
           phone: string
           status: string | null
           title: string
+          telegram_url: string | null
           whatsapp: string | null
+          whatsapp_group_url: string | null
         }
         Insert: {
+          address?: string | null
           category: string
           created_at?: string | null
           description?: string | null
           id?: string
           images?: string[] | null
           instapay_vfcash?: string | null
+          map_url?: string | null
           phone: string
           status?: string | null
           title: string
+          telegram_url?: string | null
           whatsapp?: string | null
+          whatsapp_group_url?: string | null
         }
         Update: {
+          address?: string | null
           category?: string
           created_at?: string | null
           description?: string | null
           id?: string
           images?: string[] | null
           instapay_vfcash?: string | null
+          map_url?: string | null
           phone?: string
           status?: string | null
           title?: string
+          telegram_url?: string | null
           whatsapp?: string | null
+          whatsapp_group_url?: string | null
         }
         Relationships: []
       }
       places: {
         Row: {
+          address: string | null
           category: string
           created_at: string | null
           description: string | null
@@ -686,11 +804,15 @@ export type Database = {
           images: string[] | null
           instapay_vfcash: string | null
           is_featured: boolean | null
+          map_url: string | null
           phone: string
+          telegram_url: string | null
           title: string
           whatsapp: string | null
+          whatsapp_group_url: string | null
         }
         Insert: {
+          address?: string | null
           category: string
           created_at?: string | null
           description?: string | null
@@ -698,11 +820,15 @@ export type Database = {
           images?: string[] | null
           instapay_vfcash?: string | null
           is_featured?: boolean | null
+          map_url?: string | null
           phone: string
+          telegram_url?: string | null
           title: string
           whatsapp?: string | null
+          whatsapp_group_url?: string | null
         }
         Update: {
+          address?: string | null
           category?: string
           created_at?: string | null
           description?: string | null
@@ -710,9 +836,12 @@ export type Database = {
           images?: string[] | null
           instapay_vfcash?: string | null
           is_featured?: boolean | null
+          map_url?: string | null
           phone?: string
+          telegram_url?: string | null
           title?: string
           whatsapp?: string | null
+          whatsapp_group_url?: string | null
         }
         Relationships: []
       }
@@ -850,6 +979,10 @@ export type Database = {
         }
       }
       consume_account_request_rate_limit: {
+        Args: { p_limit?: number; p_request_key: string }
+        Returns: boolean
+      }
+      consume_listing_upload_rate_limit: {
         Args: { p_limit?: number; p_request_key: string }
         Returns: boolean
       }
@@ -992,6 +1125,19 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      record_client_error: {
+        Args: {
+          p_browser_family: string
+          p_event_type: string
+          p_fingerprint: string
+          p_limit?: number
+          p_os_family: string
+          p_release: string
+          p_request_key: string
+          p_route: string
+        }
+        Returns: boolean
       }
       reject_account_request: {
         Args: { p_reason?: string; p_request_id: string }

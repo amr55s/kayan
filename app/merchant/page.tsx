@@ -4,6 +4,7 @@ import { requireProfile } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
 
 export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function MerchantPage() {
   const profile = await requireProfile(['merchant']);
@@ -22,7 +23,7 @@ export default async function MerchantPage() {
     placeIds.length
       ? (supabase as any)
           .from('places')
-          .select('id, title, category, phone, whatsapp, instapay_vfcash, description, images, is_featured, created_at')
+          .select('*')
           .in('id', placeIds)
       : Promise.resolve({ data: [] }),
     (supabase as any).from('driver_profiles').select('profile_id, active_until, profiles!driver_profiles_profile_id_fkey(display_name, phone)').eq('is_available', true).gt('active_until', new Date().toISOString()),

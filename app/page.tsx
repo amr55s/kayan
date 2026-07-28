@@ -7,7 +7,7 @@ export const revalidate = 60;
 export const maxDuration = 60;
 
 export default async function HomePage() {
-  const { places, drivers, directoryError } = await fetchHomePageData();
+  const { places, drivers, directoryError, renderedAt } = await fetchHomePageData();
 
   return (
     <Suspense fallback={<Loading />}>
@@ -15,6 +15,7 @@ export default async function HomePage() {
         initialPlaces={places}
         initialDrivers={drivers}
         directoryError={directoryError}
+        renderedAt={renderedAt}
       />
     </Suspense>
   );

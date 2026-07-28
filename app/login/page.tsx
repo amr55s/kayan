@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { LoginForm } from '@/components/auth/LoginForm';
+
+export const dynamic = 'force-dynamic';
 import { getCurrentProfile } from '@/lib/auth/guards';
 import { dashboardPathForRole } from '@/lib/auth/routes';
 

@@ -23,5 +23,9 @@ export async function sharePlace(
 
 function fallbackWhatsApp(text: string): void {
   const encoded = encodeURIComponent(text);
-  window.open(`https://wa.me/?text=${encoded}`, '_blank');
+  try {
+    window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener,noreferrer');
+  } catch {
+    // Sharing is optional and must never interrupt the directory.
+  }
 }

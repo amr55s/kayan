@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@heroui/react';
 import { ThumbsUp } from 'lucide-react';
+import { trackSiteEvent } from '@/lib/analytics/client';
 
 const VOTED_KEY = 'kayan_voted_places';
 
@@ -45,12 +46,22 @@ export const UpvoteButton: React.FC<UpvoteButtonProps> = ({ placeId, initialCoun
     // Save to localStorage
     const voted = getVotedPlaces();
     voted.push(placeId);
-    localStorage.setItem(VOTED_KEY, JSON.stringify(voted));
+    try {
+      window.localStorage.setItem(VOTED_KEY, JSON.stringify(voted));
+    } catch {
+      // The optimistic vote still works when browser storage is restricted.
+    }
 
     // Fire server action
     try {
       const { upvotePlace } = await import('@/lib/supabase/actions');
-      await upvotePlace(placeId);
+      const result = await upvotePlace(placeId);
+      if (result.success) {
+        trackSiteEvent('upvote_click', { targetType: 'place', targetKey: placeId });
+      } else {
+        setCount((current) => Math.max(initialCount, current - 1));
+        setHasVoted(false);
+      }
     } catch (err) {
       console.error('Upvote failed:', err);
     }

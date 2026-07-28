@@ -11,9 +11,11 @@ import { DriverCard } from './DriverCard';
 
 export function DeliveryBar({
   drivers,
+  renderedAt,
   onOpenRegistration,
 }: {
   drivers: Driver[];
+  renderedAt: number;
   onOpenRegistration: () => void;
 }) {
   const availableCount = drivers.filter((driver) => driver.is_available).length;
@@ -26,22 +28,26 @@ export function DeliveryBar({
   useEffect(() => {
     let mounted = true;
     const supabase = createClient();
-    void supabase.auth.getUser().then(async ({ data }) => {
-      if (!data.user) return;
-      const { data: profile } = await (supabase as any)
-        .from('profiles')
-        .select('role, is_active, must_change_password')
-        .eq('id', data.user.id)
-        .maybeSingle();
-      if (
-        mounted
-        && profile?.role === 'driver'
-        && profile.is_active
-        && !profile.must_change_password
-      ) {
-        setIsDriverAccount(true);
-      }
-    });
+    void supabase.auth.getUser()
+      .then(async ({ data }) => {
+        if (!data.user) return;
+        const { data: profile } = await (supabase as any)
+          .from('profiles')
+          .select('role, is_active, must_change_password')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        if (
+          mounted
+          && profile?.role === 'driver'
+          && profile.is_active
+          && !profile.must_change_password
+        ) {
+          setIsDriverAccount(true);
+        }
+      })
+      .catch((error) => {
+        console.warn('Driver account state could not be loaded:', error);
+      });
     return () => {
       mounted = false;
     };
@@ -129,7 +135,11 @@ export function DeliveryBar({
             onScroll={updateActiveDriver}
           >
             {drivers.map((driver) => (
-              <DriverCard key={`${driver.source}:${driver.id}`} driver={driver} />
+              <DriverCard
+                key={`${driver.source}:${driver.id}`}
+                driver={driver}
+                renderedAt={renderedAt}
+              />
             ))}
           </div>
         ) : (

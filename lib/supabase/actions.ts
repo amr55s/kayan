@@ -1,11 +1,18 @@
 'use server';
 
 import { createClient } from './server';
+import { createAdminClient } from './admin';
 import { revalidatePath, revalidateTag } from 'next/cache';
+import { headers } from 'next/headers';
+import { createHash } from 'node:crypto';
 import { FeedbackType } from '@/types';
 import { processImageForStorage } from '@/lib/images/server';
 import { toPlainArrayBuffer } from '@/lib/images/buffer';
 import { validateListingImageUrls } from '@/lib/images/urls';
+import {
+  validatePlaceDetails,
+  type PlaceDetailsInput,
+} from '@/lib/place-details';
 
 export type ListingUploadFolder = 'requests' | 'feedback' | 'merchant';
 export type ImageUploadResult =
@@ -13,6 +20,7 @@ export type ImageUploadResult =
   | { success: false; message: string };
 const MAX_IMAGE_BYTES = 3_500_000;
 const STORAGE_UPLOAD_ATTEMPTS = 2;
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 /**
  * Helper to check if Supabase is running in demo/placeholder mode
@@ -28,6 +36,23 @@ function safeArabicMessage(error: unknown, fallback: string): string {
     return message.replace(/^.*?:\s*/, '');
   }
   return fallback;
+}
+
+async function getAnonymousRequestKey(purpose: string): Promise<string> {
+  const requestHeaders = await headers();
+  const requestIp =
+    requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || requestHeaders.get('x-real-ip')
+    || 'local';
+  const userAgent = requestHeaders.get('user-agent') || 'unknown';
+  const secret =
+    process.env.CLIENT_ERROR_HASH_SALT
+    || process.env.SUPABASE_SECRET_KEY
+    || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) throw new Error('إعدادات الخادم غير مكتملة.');
+  return createHash('sha256')
+    .update(`${purpose}:${requestIp}:${userAgent}:${secret}`)
+    .digest('hex');
 }
 
 /**
@@ -63,13 +88,46 @@ export async function uploadImageToStorage(
         message: 'تعذر إرسال الصورة للمعالجة. حاول اختيارها مرة أخرى.',
       };
     }
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      return {
+        success: false,
+        message: 'صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WebP.',
+      };
+    }
 
     if (isDemoMode()) {
       console.warn('Supabase in demo mode: Skipping file storage upload.');
       return { success: true, url: null };
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
+    const requestHeaders = await headers();
+    const requestIp =
+      requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || requestHeaders.get('x-real-ip')
+      || 'local';
+    const rateSecret =
+      process.env.CLIENT_ERROR_HASH_SALT
+      || process.env.SUPABASE_SECRET_KEY
+      || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!rateSecret) {
+      return { success: false, message: 'إعدادات رفع الصور غير مكتملة.' };
+    }
+    const requestKey = createHash('sha256')
+      .update(`${requestIp}:listing-upload:${rateSecret}`)
+      .digest('hex');
+    const { data: allowed, error: limitError } = await (supabase as any).rpc(
+      'consume_listing_upload_rate_limit',
+      { p_request_key: requestKey, p_limit: 12 },
+    );
+    if (limitError || !allowed) {
+      return {
+        success: false,
+        message: limitError
+          ? 'تعذر التحقق من رفع الصورة حالياً.'
+          : 'تم رفع صور كثيرة من هذا الاتصال. حاول مرة أخرى بعد ساعة.',
+      };
+    }
     const processed = await processImageForStorage(
       Buffer.from(await file.arrayBuffer()),
     );
@@ -135,6 +193,7 @@ export async function submitFeedbackSubmission(
   targetPlaceId?: string | null,
   proposedPhone?: string | null,
   rating?: number | null,
+  proposedDetails?: Partial<PlaceDetailsInput>,
 ): Promise<{ success: boolean; message?: string }> {
   try {
     const isOpinion = feedbackType === 'general_suggestion' || feedbackType === 'rating';
@@ -149,24 +208,49 @@ export async function submitFeedbackSubmission(
       throw new Error('اختر تقييماً من نجمة إلى خمس نجوم.');
     }
     const uploadedUrls = validateListingImageUrls(imageUrls, 3);
+    const details = validatePlaceDetails(proposedDetails ?? {});
+    if (
+      feedbackType === 'details_update'
+      && !details.whatsappGroupUrl
+      && !details.telegramUrl
+      && !details.address
+      && !details.mapUrl
+    ) {
+      throw new Error('أضف جروباً أو عنواناً أو رابط خريطة واحداً على الأقل.');
+    }
 
     if (isDemoMode()) {
       triggerInstantRevalidation();
       return { success: true, message: 'تم استلام طلب التعديل بنجاح! (وضع العرض التجريبي)' };
     }
 
-    const supabase = await createClient();
-    const { data: authData } = await supabase.auth.getUser();
-    const { error } = await (supabase as any).from('feedback_requests').insert([
+    const sessionClient = await createClient();
+    const authData = await sessionClient.auth.getUser().catch(() => ({
+      data: { user: null },
+    }));
+    const admin = createAdminClient();
+    const requestKey = await getAnonymousRequestKey('public-feedback');
+    const { data: allowed, error: rateError } = await (admin as any).rpc(
+      'consume_public_submission_rate_limit',
+      { p_request_key: requestKey, p_limit: 12 },
+    );
+    if (rateError) throw new Error('تعذر التحقق من الطلب. حاول مرة أخرى.');
+    if (!allowed) throw new Error('تم إرسال طلبات كثيرة. حاول مرة أخرى بعد ساعة.');
+
+    const { error } = await (admin as any).from('feedback_requests').insert([
       {
         target_place_id: targetPlaceId || null,
         place_name_or_phone: placeNameOrPhone.trim() || 'عام',
         feedback_type: feedbackType,
         source: 'public',
-        submitted_by: authData.user?.id ?? null,
+        submitted_by: authData.data.user?.id ?? null,
         rating: feedbackType === 'rating' ? rating : null,
         contact_phone: normalizedContact || 'بدون رقم',
         proposed_phone: proposedPhone?.trim() || null,
+        proposed_whatsapp_group_url: details.whatsappGroupUrl,
+        proposed_telegram_url: details.telegramUrl,
+        proposed_address: details.address,
+        proposed_map_url: details.mapUrl,
         notes: notes.trim(),
         images: uploadedUrls,
         proposed_images: uploadedUrls,
@@ -202,29 +286,23 @@ export async function upvotePlace(
       return { success: true, message: 'تم التصويت بنجاح! (وضع تجريبي)' };
     }
 
-    const supabase = await createClient();
-
-    // Try RPC first, fallback to manual increment
-    const { data: place, error: fetchErr } = await (supabase as any)
-      .from('places')
-      .select('recommend_count')
-      .eq('id', placeId)
-      .maybeSingle();
-
-    if (fetchErr || !place) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(placeId)) {
       return { success: false, message: 'المكان غير موجود.' };
     }
-
-    const currentCount = (place as any).recommend_count || 0;
-
-    const { error: updateErr } = await (supabase as any)
-      .from('places')
-      .update({ recommend_count: currentCount + 1 })
-      .eq('id', placeId);
-
-    if (updateErr) throw updateErr;
-
-    return { success: true, message: 'شكراً لتوصيتك! 👍' };
+    const admin = createAdminClient();
+    const requestKey = await getAnonymousRequestKey('place-upvote');
+    const { data: recorded, error } = await (admin as any).rpc(
+      'record_place_upvote',
+      {
+        p_request_key: requestKey,
+        p_place_id: placeId,
+      },
+    );
+    if (error) throw error;
+    return {
+      success: true,
+      message: recorded ? 'شكراً لتوصيتك! 👍' : 'تم تسجيل توصيتك من قبل.',
+    };
   } catch (err: any) {
     console.error('Error upvoting place:', err);
     return {

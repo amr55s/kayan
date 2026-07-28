@@ -447,6 +447,10 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
     whatsapp: place.whatsapp || '',
     instapayVfcash: place.instapay_vfcash || '',
     description: place.description || '',
+    whatsappGroupUrl: place.whatsapp_group_url || '',
+    telegramUrl: place.telegram_url || '',
+    address: place.address || '',
+    mapUrl: place.map_url || '',
   });
 
   function submit(event: FormEvent) {
@@ -473,8 +477,8 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
         setMessage(
           result.success
             ? uploadResult.failedFiles.length
-              ? `تم إرسال التعديلات للإدارة، لكن تعذر إرفاق ${uploadResult.failedFiles.length} من الصور. باقي الطلب محفوظ.`
-              : 'تم إرسال التعديلات للإدارة. ستظهر في كيان سيتي سبوت فور الموافقة عليها.'
+              ? `تم حفظ التعديلات، لكن تعذر إرفاق ${uploadResult.failedFiles.length} من الصور. يمكنك إعادة محاولة الصور الفاشلة.`
+              : 'تم حفظ التعديلات وظهرت في كيان سيتي سبوت.'
             : result.message,
         );
         if (result.success) setFiles([]);
@@ -548,6 +552,39 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
             minRows={3}
             value={form.description}
             onValueChange={(description) => setForm({ ...form, description })}
+          />
+          <Input
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            label="رابط جروب أو قناة WhatsApp"
+            placeholder="https://chat.whatsapp.com/…"
+            value={form.whatsappGroupUrl}
+            onValueChange={(whatsappGroupUrl) => setForm({ ...form, whatsappGroupUrl })}
+          />
+          <Input
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            label="رابط Telegram"
+            placeholder="https://t.me/…"
+            value={form.telegramUrl}
+            onValueChange={(telegramUrl) => setForm({ ...form, telegramUrl })}
+          />
+          <Textarea
+            autoComplete="street-address"
+            label="العنوان"
+            value={form.address}
+            onValueChange={(address) => setForm({ ...form, address })}
+          />
+          <Input
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            label="رابط الخريطة"
+            placeholder="https://maps.app.goo.gl/…"
+            value={form.mapUrl}
+            onValueChange={(mapUrl) => setForm({ ...form, mapUrl })}
           />
 
           <div className="space-y-3 sm:col-span-2">

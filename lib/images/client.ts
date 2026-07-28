@@ -5,12 +5,13 @@ import {
   type ListingUploadFolder,
 } from '@/lib/supabase/actions';
 
-const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
+const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const TARGET_UPLOAD_BYTES = 1_050_000;
-const MAX_WIDTH = 2400;
-const MAX_HEIGHT = 3400;
-const MAX_PIXELS = 8_000_000;
+const MAX_WIDTH = 2200;
+const MAX_HEIGHT = 3000;
+const MAX_PIXELS = 5_000_000;
 const SERVER_FALLBACK_BYTES = 3_400_000;
+const ALLOWED_SOURCE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export type ImageProcessingProgress = {
   current: number;
@@ -24,13 +25,25 @@ export type ImageBatchUploadResult = {
   failedFiles: string[];
 };
 
-function loadImage(file: File): Promise<HTMLImageElement> {
+type DecodedImage = {
+  height: number;
+  release: () => void;
+  source: CanvasImageSource;
+  width: number;
+};
+
+function loadHtmlImage(file: File): Promise<DecodedImage> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const image = new Image();
     image.onload = () => {
       URL.revokeObjectURL(objectUrl);
-      resolve(image);
+      resolve({
+        source: image,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        release: () => undefined,
+      });
     };
     image.onerror = () => {
       URL.revokeObjectURL(objectUrl);
@@ -40,26 +53,37 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-function canvasToBlob(
-  canvas: HTMLCanvasElement,
-  quality: number,
-): Promise<Blob> {
+async function decodeImage(file: File): Promise<DecodedImage> {
+  if ('createImageBitmap' in window) {
+    try {
+      const bitmap = await createImageBitmap(file, {
+        imageOrientation: 'from-image',
+      });
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        release: () => bitmap.close(),
+      };
+    } catch {
+      // Some mobile engines expose createImageBitmap but cannot decode every format.
+    }
+  }
+  return loadHtmlImage(file);
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    const finish = (blob: Blob | null) => {
-      if (blob?.size) {
-        resolve(blob);
+    canvas.toBlob((webpBlob) => {
+      if (webpBlob?.size) {
+        resolve(webpBlob);
         return;
       }
-      canvas.toBlob(
-        (jpegBlob) => {
-          if (jpegBlob?.size) resolve(jpegBlob);
-          else reject(new Error('تعذر تجهيز الصورة للرفع.'));
-        },
-        'image/jpeg',
-        quality,
-      );
-    };
-    canvas.toBlob(finish, 'image/webp', quality);
+      canvas.toBlob((jpegBlob) => {
+        if (jpegBlob?.size) resolve(jpegBlob);
+        else reject(new Error('تعذر تجهيز الصورة للرفع.'));
+      }, 'image/jpeg', quality);
+    }, 'image/webp', quality);
   });
 }
 
@@ -77,17 +101,13 @@ function calculateSize(width: number, height: number, reduction = 1) {
   };
 }
 
-async function renderWebp(
-  image: HTMLImageElement,
+async function renderImage(
+  image: DecodedImage,
+  canvas: HTMLCanvasElement,
   reduction: number,
   quality: number,
 ): Promise<Blob> {
-  const size = calculateSize(
-    image.naturalWidth,
-    image.naturalHeight,
-    reduction,
-  );
-  const canvas = document.createElement('canvas');
+  const size = calculateSize(image.width, image.height, reduction);
   canvas.width = size.width;
   canvas.height = size.height;
   const context = canvas.getContext('2d', { alpha: false });
@@ -97,40 +117,51 @@ async function renderWebp(
   context.imageSmoothingQuality = 'high';
   context.fillStyle = '#ffffff';
   context.fillRect(0, 0, size.width, size.height);
-  context.drawImage(image, 0, 0, size.width, size.height);
+  context.drawImage(image.source, 0, 0, size.width, size.height);
   return canvasToBlob(canvas, quality);
 }
 
+function yieldToBrowser(): Promise<void> {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
 /**
- * Resizes and converts user images before they enter a Server Action.
- * The generous 8MP working size keeps menu text legible while the byte target
- * prevents large uploads from exhausting the browser or Vercel request limit.
+ * Decodes once, reuses one canvas, and performs at most three encodes. This
+ * keeps low-memory phones responsive while preserving readable menu text.
  */
 export async function optimizeImageForUpload(file: File): Promise<File> {
   if (!file.size) throw new Error(`الصورة "${file.name}" فارغة.`);
+  if (!ALLOWED_SOURCE_TYPES.has(file.type)) {
+    throw new Error(`صيغة الصورة "${file.name}" غير مدعومة.`);
+  }
   if (file.size > MAX_SOURCE_BYTES) {
-    throw new Error(`الصورة "${file.name}" أكبر من 50 ميجابايت.`);
+    throw new Error(`الصورة "${file.name}" أكبر من 20 ميجابايت.`);
   }
 
+  let image: DecodedImage | null = null;
   try {
-    const image = await loadImage(file);
-    if (!image.naturalWidth || !image.naturalHeight) {
-      throw new Error('invalid_dimensions');
-    }
+    image = await decodeImage(file);
+    if (!image.width || !image.height) throw new Error('invalid_dimensions');
 
+    const canvas = document.createElement('canvas');
+    const attempts = [
+      { reduction: 1, quality: 0.88 },
+      { reduction: 1, quality: 0.8 },
+      { reduction: 0.82, quality: 0.8 },
+    ];
     let best: Blob | null = null;
-    for (const reduction of [1, 0.9, 0.8]) {
-      for (const quality of [0.92, 0.88, 0.84, 0.8]) {
-        const blob = await renderWebp(image, reduction, quality);
-        if (!best || blob.size < best.size) best = blob;
-        if (blob.size <= TARGET_UPLOAD_BYTES) {
-          const baseName = file.name.replace(/\.[^.]+$/, '') || 'image';
-          return new File([blob], `${baseName}.webp`, {
-            type: blob.type || 'image/webp',
-            lastModified: Date.now(),
-          });
-        }
-      }
+
+    for (const attempt of attempts) {
+      const blob = await renderImage(
+        image,
+        canvas,
+        attempt.reduction,
+        attempt.quality,
+      );
+      if (!best || blob.size < best.size) best = blob;
+      if (blob.size <= TARGET_UPLOAD_BYTES) break;
     }
 
     if (!best) throw new Error('browser_encoding_failed');
@@ -146,6 +177,8 @@ export async function optimizeImageForUpload(file: File): Promise<File> {
     throw new Error(
       `تعذر قراءة الصورة "${file.name}" داخل المتصفح. جرّب إرسالها من تطبيق الصور أو واتساب.`,
     );
+  } finally {
+    image?.release();
   }
 }
 
@@ -163,6 +196,7 @@ export async function optimizeImagesForUpload(
       stage: 'optimizing',
     });
     optimized.push(await optimizeImageForUpload(file));
+    await yieldToBrowser();
   }
   return optimized;
 }
@@ -194,13 +228,14 @@ export async function uploadOptimizedImages(
       const result = await uploadImageToStorage(optimizedFile, folder);
       if (!result.success || !result.url) {
         failedFiles.push(originalFile.name);
-        continue;
+      } else {
+        urls.push(result.url);
       }
-      urls.push(result.url);
     } catch (error) {
       console.error(`Image upload failed for "${originalFile.name}":`, error);
       failedFiles.push(originalFile.name);
     }
+    await yieldToBrowser();
   }
 
   return { urls, failedFiles };

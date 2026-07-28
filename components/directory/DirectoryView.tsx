@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input, Button, Skeleton, Card } from '@heroui/react';
 import { Search, MapPinOff, RefreshCw, Heart, Phone } from 'lucide-react';
 import { Place, Driver, CategoryType } from '@/types';
@@ -8,18 +8,22 @@ import { Header } from '@/components/layout/Header';
 import { DeliveryBar } from '@/components/delivery/DeliveryBar';
 import { CategoryTabs } from './CategoryTabs';
 import { PlaceCard } from './PlaceCard';
+import { PlaceDetailsModal } from './PlaceDetailsModal';
 import { PwaInstaller } from '@/components/layout/PwaInstaller';
 import { useFavorites } from '@/hooks/useFavorites';
 import { AddListingModal } from '@/components/modals/AddListingModal';
 import { FeedbackModal } from '@/components/modals/FeedbackModal';
 import { DriverModal } from '@/components/delivery/DriverModal';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import type { FeedbackType } from '@/types';
+import { trackSiteEvent } from '@/lib/analytics/client';
 
 interface DirectoryViewProps {
   initialPlaces: Place[];
   initialDrivers: Driver[];
   isLoadingData?: boolean;
   directoryError?: string;
+  renderedAt: number;
 }
 
 export const DirectoryView: React.FC<DirectoryViewProps> = ({
@@ -27,8 +31,11 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   initialDrivers,
   isLoadingData = false,
   directoryError,
+  renderedAt,
 }) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const detailOpenedFromDirectory = useRef(false);
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,6 +44,9 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isDriverOpen, setIsDriverOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
+  const [invalidDetail, setInvalidDetail] = useState(false);
+  const [feedbackInitialPlaceId, setFeedbackInitialPlaceId] = useState<string>();
+  const [feedbackInitialType, setFeedbackInitialType] = useState<FeedbackType>();
 
   useEffect(() => {
     const registration = new URLSearchParams(window.location.search).get('register');
@@ -45,12 +55,71 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
       if (registration === 'driver') setIsDriverOpen(true);
       else if (registration === 'place') setIsAddOpen(true);
       else setIsJoinOpen(true);
-      window.history.replaceState({}, '', window.location.pathname);
+      const params = new URLSearchParams(window.location.search);
+      params.delete('register');
+      const nextUrl = params.size
+        ? `${window.location.pathname}?${params.toString()}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', nextUrl);
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const { favorites, favoritesCount } = useFavorites();
+  const selectedPlaceId = searchParams.get('place');
+  const selectedPlace = selectedPlaceId
+    ? initialPlaces.find((place) => place.id === selectedPlaceId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) return;
+    const timer = window.setTimeout(() => {
+      trackSiteEvent('search_use', {
+        targetType: 'feature',
+        targetKey: 'directory_search',
+      });
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  const removePlaceFromUrl = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('place');
+    return params.size ? `/?${params.toString()}` : '/';
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!selectedPlaceId || selectedPlace) return;
+    const frame = window.requestAnimationFrame(() => {
+      setInvalidDetail(true);
+      detailOpenedFromDirectory.current = false;
+      router.replace(removePlaceFromUrl(), { scroll: false });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [removePlaceFromUrl, router, selectedPlace, selectedPlaceId]);
+
+  function detailHref(placeId: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('place', placeId);
+    return `/?${params.toString()}`;
+  }
+
+  function closeDetails(open: boolean) {
+    if (open) return;
+    if (detailOpenedFromDirectory.current && window.history.length > 1) {
+      detailOpenedFromDirectory.current = false;
+      router.back();
+      return;
+    }
+    router.replace(removePlaceFromUrl(), { scroll: false });
+  }
+
+  function suggestDetails(placeId: string) {
+    setFeedbackInitialPlaceId(placeId);
+    setFeedbackInitialType('details_update');
+    setIsFeedbackOpen(true);
+    closeDetails(false);
+  }
 
   // Calculate counts per category
   const categoryCounts = useMemo(() => {
@@ -88,22 +157,49 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
       {/* Navbar Header */}
       <Header
         isJoinOpen={isJoinOpen}
-        onJoinOpenChange={setIsJoinOpen}
-        onOpenAddModal={() => setIsAddOpen(true)}
-        onOpenDriverModal={() => setIsDriverOpen(true)}
-        onOpenFeedbackModal={() => setIsFeedbackOpen(true)}
+        onJoinOpenChange={(open) => {
+          setIsJoinOpen(open);
+          if (open) {
+            trackSiteEvent('join_open', { targetType: 'feature', targetKey: 'join_menu' });
+          }
+        }}
+        onOpenAddModal={() => {
+          trackSiteEvent('add_listing_open', {
+            targetType: 'feature',
+            targetKey: 'add_listing',
+          });
+          setIsAddOpen(true);
+        }}
+        onOpenDriverModal={() => {
+          trackSiteEvent('driver_signup_open', {
+            targetType: 'feature',
+            targetKey: 'driver_signup',
+          });
+          setIsDriverOpen(true);
+        }}
+        onOpenFeedbackModal={() => {
+          trackSiteEvent('feedback_open', {
+            targetType: 'feature',
+            targetKey: 'feedback',
+          });
+          setIsFeedbackOpen(true);
+        }}
       />
 
       {/* Live Active Delivery Drivers Bar */}
-      <DeliveryBar drivers={initialDrivers} onOpenRegistration={() => setIsDriverOpen(true)} />
+      <DeliveryBar
+        drivers={initialDrivers}
+        renderedAt={renderedAt}
+        onOpenRegistration={() => setIsDriverOpen(true)}
+      />
 
       {/* Main Directory Body */}
-      <main className="flex-1 pb-12">
+      <main id="main-content" className="flex-1 pb-12">
         {/* Compact Hero Banner */}
         <div className="bg-gradient-to-b from-zinc-200/50 via-zinc-100/20 to-transparent dark:from-zinc-900/40 dark:via-zinc-900/10 py-5 sm:py-7 px-4 text-center border-b border-zinc-200/60 dark:border-zinc-800/60">
           <div className="max-w-2xl mx-auto space-y-1">
             <h1 className="text-xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-white">
-              KAYAN CITY SPOT | كيان سيتي سبوت… كل ما تحتاجه في مكان واحد
+              KAYAN CITY SPOT… كل ما تحتاجه في مكان واحد
             </h1>
             <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 font-semibold">
               مطاعم ومحلات وصيدليات وخدمات وتوصيل ومنيوهات، مع تواصل مباشر وسهل.
@@ -119,6 +215,9 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               size="lg"
               radius="lg"
               placeholder="ابحث عن اسم مكان، محل، صيدلية، أو هاتف..."
+              aria-label="البحث في الأماكن والخدمات"
+              name="directorySearch"
+              autoComplete="off"
               value={searchQuery}
               onValueChange={setSearchQuery}
               startContent={<Search className="w-5 h-5 text-zinc-400 shrink-0" />}
@@ -135,6 +234,10 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 onCategoryChange={(cat) => {
                   setSelectedCategory(cat);
                   setShowFavoritesOnly(false);
+                  trackSiteEvent('category_select', {
+                    targetType: 'category',
+                    targetKey: cat,
+                  });
                 }}
                 counts={categoryCounts}
               />
@@ -184,6 +287,23 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
             </div>
           )}
 
+          {invalidDetail && (
+            <div
+              role="status"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700"
+            >
+              <span>البطاقة المطلوبة غير موجودة أو تم حذفها، وتم إبقاؤك في دليل الأماكن.</span>
+              <Button
+                isIconOnly
+                variant="light"
+                aria-label="إغلاق التنبيه"
+                onClick={() => setInvalidDetail(false)}
+              >
+                ×
+              </Button>
+            </div>
+          )}
+
           {/* Async Loading Skeleton State */}
           {isLoadingData ? (
             <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
@@ -199,7 +319,14 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
             /* Places Grid */
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {filteredPlaces.map((place) => (
-                <PlaceCard key={place.id} place={place} />
+                <PlaceCard
+                  key={place.id}
+                  place={place}
+                  detailsHref={detailHref(place.id)}
+                  onOpenDetails={() => {
+                    detailOpenedFromDirectory.current = true;
+                  }}
+                />
               ))}
             </div>
           ) : (
@@ -231,7 +358,20 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         onOpenChange={setIsAddOpen}
         placesList={initialPlaces}
       />
-      <FeedbackModal isOpen={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} placesList={initialPlaces} />
+      <FeedbackModal
+        key={`${feedbackInitialPlaceId ?? 'general'}:${feedbackInitialType ?? 'default'}`}
+        isOpen={isFeedbackOpen}
+        onOpenChange={(open) => {
+          setIsFeedbackOpen(open);
+          if (!open) {
+            setFeedbackInitialPlaceId(undefined);
+            setFeedbackInitialType(undefined);
+          }
+        }}
+        placesList={initialPlaces}
+        initialPlaceId={feedbackInitialPlaceId}
+        initialFeedbackType={feedbackInitialType}
+      />
       <DriverModal
         isOpen={isDriverOpen}
         onOpenChange={setIsDriverOpen}
@@ -249,10 +389,17 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
             <Phone className="size-4" aria-hidden="true" />
             <span>للتواصل مع الدعم: <bdi dir="ltr">01094552421</bdi></span>
           </a>
-          <div>© {new Date().getFullYear()} KAYAN CITY SPOT | كيان سيتي سبوت</div>
+          <div>© {new Date(renderedAt).getFullYear()} KAYAN CITY SPOT</div>
         </div>
       </footer>
 
+      <PlaceDetailsModal
+        key={selectedPlace?.id ?? 'closed'}
+        isOpen={Boolean(selectedPlace)}
+        onOpenChange={closeDetails}
+        onSuggestDetails={suggestDetails}
+        place={selectedPlace}
+      />
     </div>
   );
 };

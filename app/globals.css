@@ -14,11 +14,13 @@
 @source "./admin/page.tsx";
 @source "./driver/page.tsx";
 @source "./error.tsx";
+@source "./global-error.tsx";
 @source "./layout.tsx";
 @source "./loading.tsx";
 @source "./login/page.tsx";
 @source "./merchant/page.tsx";
 @source "./page.tsx";
+@source "./not-found.tsx";
 @source "./providers.tsx";
 @source "../components/admin/DriverManager.tsx";
 @source "../components/admin/EditPlaceModal.tsx";
@@ -32,6 +34,7 @@
 @source "../components/directory/CategoryTabs.tsx";
 @source "../components/directory/DirectoryView.tsx";
 @source "../components/directory/PlaceCard.tsx";
+@source "../components/directory/PlaceDetailsModal.tsx";
 @source "../components/directory/ShareButton.tsx";
 @source "../components/directory/UpvoteButton.tsx";
 @source "../components/layout/Header.tsx";
@@ -42,6 +45,7 @@
 @source "../components/operations/DriverWorkspace.tsx";
 @source "../components/operations/MerchantOrderWorkspace.tsx";
 @source "../components/operations/PushSubscriptionButton.tsx";
+@source "../components/observability/ClientErrorReporter.tsx";
 @source "../components/ui/heroui-compat.tsx";
 
 @layer base {
@@ -66,6 +70,7 @@
     color: var(--kayan-black);
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    overflow-wrap: anywhere;
   }
   button,
   input,
@@ -98,7 +103,10 @@
   border: 1px solid rgba(228, 228, 231, 0.7);
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
   border-radius: 1.25rem; /* 20px */
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition:
+    border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .soft-card:hover {
@@ -179,4 +187,75 @@ footer,
 
 .dark * {
   scrollbar-color: #27272a transparent;
+}
+
+body.place-details-open .kayan-support-fab {
+  display: none;
+}
+
+@keyframes kayan-modal-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes kayan-modal-panel-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+}
+
+@keyframes kayan-modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes kayan-modal-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.kayan-modal-panel {
+  animation: kayan-modal-panel-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kayan-modal-backdrop {
+  animation: kayan-modal-backdrop-in 180ms ease-out;
+}
+
+.kayan-modal-wrapper[data-modal-closing='true'] {
+  pointer-events: none;
+}
+
+.kayan-modal-wrapper[data-modal-closing='true'] .kayan-modal-panel {
+  animation: kayan-modal-panel-out 160ms ease-in forwards;
+}
+
+.kayan-modal-wrapper[data-modal-closing='true'] .kayan-modal-backdrop {
+  animation: kayan-modal-backdrop-out 160ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .soft-card:hover {
+    transform: none;
+  }
 }

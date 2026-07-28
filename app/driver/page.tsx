@@ -3,6 +3,8 @@ import { DashboardHeader } from '@/components/operations/DashboardHeader';
 import { requireProfile } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DriverPage() {
   const profile = await requireProfile(['driver']);
   const supabase = await createClient();

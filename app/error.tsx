@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Button } from '@heroui/react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
+import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
+import { reportClientError } from '@/lib/observability/client-errors';
 
 export default function Error({
   error,
@@ -14,51 +14,43 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error('Application error:', error);
+    void reportClientError(error, 'react_boundary');
   }, [error]);
 
-  const isNetworkOrTimeout =
-    error?.message?.includes('fetch') ||
-    error?.message?.includes('timeout') ||
-    error?.message?.includes('Network');
+  const isNetworkOrTimeout = /fetch|timeout|network/i.test(error?.message || '');
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 dir-rtl">
-      <div className="text-center space-y-5 max-w-md w-full bg-white dark:bg-zinc-900 p-6 sm:p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-xl">
-        <div className="w-16 h-16 mx-auto rounded-2xl bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shadow-inner">
-          <AlertTriangle className="w-8 h-8" />
-        </div>
-
+    <main id="main-content" className="dir-rtl flex min-h-screen items-center justify-center bg-zinc-50 p-4 text-zinc-900">
+      <section className="w-full max-w-md space-y-5 rounded-3xl border border-zinc-200 bg-white p-6 text-center shadow-xl sm:p-8">
+        <span className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
+          <AlertTriangle className="size-8" aria-hidden="true" />
+        </span>
         <div className="space-y-2">
-          <h2 className="text-xl sm:text-2xl font-black text-zinc-900 dark:text-white">
-            {isNetworkOrTimeout ? 'تعثر الاتصال بالشبكة' : 'حدث خطأ غير متوقع'}
-          </h2>
-          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed font-medium">
-            {isNetworkOrTimeout
-              ? 'يبدو أن الاتصال بطيء أو انقطع مؤقتاً. جاري استرجاع البيانات المحفوظة.'
-              : 'نعتذر عن هذا الخلل المؤقت. يمكنك المحاولة مرة أخرى أو العودة للرئيسية.'}
+          <h1 className="text-balance text-xl font-black sm:text-2xl">
+            {isNetworkOrTimeout ? 'تعثر الاتصال بالشبكة' : 'حدث خطأ مؤقت'}
+          </h1>
+          <p className="text-pretty text-sm leading-7 text-zinc-600">
+            أعد المحاولة أولًا. إذا كنت تملأ نموذجًا، تجنّب تحديث الصفحة حتى تحافظ على البيانات المكتوبة.
           </p>
         </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <Button
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
             onClick={reset}
-            startContent={<RefreshCw className="w-4 h-4" />}
-            className="flex-1 font-extrabold text-xs text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 h-11 rounded-xl shadow-sm"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-950 px-4 text-sm font-black text-white hover:bg-zinc-800"
           >
+            <RefreshCw className="size-4" aria-hidden="true" />
             إعادة المحاولة
-          </Button>
-
-          <Button
-            as={Link}
+          </button>
+          <Link
             href="/"
-            variant="flat"
-            startContent={<Home className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />}
-            className="flex-1 font-bold text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 h-11 rounded-xl"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-zinc-100 px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-200"
           >
+            <Home className="size-4" aria-hidden="true" />
             الرئيسية
-          </Button>
+          </Link>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
