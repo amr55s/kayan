@@ -113,7 +113,7 @@ test('public branding uses KAYAN CITY SPOT consistently', () => {
   assert.match(serviceWorker, /KAYAN CITY SPOT/);
   assert.match(
     read('components/directory/DirectoryView.tsx'),
-    /للتواصل مع الدعم:[\s\S]*01094552421/,
+    /انضم لجروب KAYAN CITY SPOT على واتساب/,
   );
 
   for (const file of publicFiles) {
@@ -129,12 +129,13 @@ test('WhatsApp support link stays visible across the whole site', () => {
   assert.match(layout, /<WhatsAppGroupButton \/>/);
   assert.match(
     groupButton,
-    /https:\/\/wa\.me\/201094552421/,
+    /https:\/\/chat\.whatsapp\.com\/JTuPs9xv0CZAZhpzxttU3R\?s=cl&p=i&ilr=0/,
   );
   assert.match(groupButton, /fixed bottom-/);
-  assert.match(groupButton, /التواصل مع الدعم/);
-  assert.match(groupButton, /01094552421/);
-  assert.doesNotMatch(groupButton, /chat\.whatsapp\.com/);
+  assert.match(groupButton, /جروب KAYAN CITY SPOT/);
+  assert.match(groupButton, /انضم عبر واتساب/);
+  assert.doesNotMatch(groupButton, /01094552421/);
+  assert.match(groupButton, /chat\.whatsapp\.com/);
   assert.match(groupButton, /target="_blank"/);
   assert.match(groupButton, /rel="noopener noreferrer"/);
   assert.match(
@@ -227,4 +228,38 @@ test('image and admin server actions return safe results instead of crashing RSC
     /serverApprovePendingRequest[\s\S]*catch \(error\)/,
   );
   assert.match(adminPage, /safeAdminQuery/);
+});
+
+test('new places wait for verified images and retry only failed files', () => {
+  const clientPipeline = read('lib/images/client.ts');
+  const storageAction = read('lib/supabase/actions.ts');
+  const adminActions = read('lib/supabase/admin-actions.ts');
+  const accountActions = read('lib/operations/actions.ts');
+  const adminModal = read('components/admin/EditPlaceModal.tsx');
+  const publicModal = read('components/modals/AddListingModal.tsx');
+
+  assert.match(clientPipeline, /CLIENT_UPLOAD_ATTEMPTS = 2/);
+  assert.match(clientPipeline, /image\/heic/);
+  assert.match(clientPipeline, /sourceMimeType\(file\)/);
+  assert.match(clientPipeline, /failures: Array/);
+  assert.match(storageAction, /\.info\(data\.path\)/);
+  assert.match(storageAction, /p_limit: 24/);
+  assert.match(read('next.config.ts'), /img-src 'self' data: blob:/);
+
+  const adminSubmit = adminModal.slice(adminModal.indexOf('const handleSubmit'));
+  assert.ok(
+    adminSubmit.indexOf('if (uploadResult.failedFiles.length)') <
+      adminSubmit.indexOf('serverInsertPlaceDirectly({'),
+  );
+  assert.match(adminSubmit, /failedKeys\.has\(imageFileKey\(file\)\)/);
+  assert.match(adminSubmit, /لم يتم حفظ المكان بدونها/);
+
+  const publicSubmit = publicModal.slice(publicModal.indexOf('async function handleSubmit'));
+  assert.ok(
+    publicSubmit.indexOf('if (uploadResult.failedFiles.length)') <
+      publicSubmit.indexOf('submitAccountRequest('),
+  );
+  assert.match(publicSubmit, /إعادة محاولة الصور الفاشلة فقط/);
+  assert.match(adminActions, /uploadedImages\.length[\s\S]*أضف صورة واحدة على الأقل/);
+  assert.match(accountActions, /data\.placeMode === 'new'[\s\S]*uploadedImages\.length === 0/);
 });

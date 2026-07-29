@@ -13,10 +13,14 @@ export function DeliveryBar({
   drivers,
   renderedAt,
   onOpenRegistration,
+  driverHref,
+  onOpenDriverDetails,
 }: {
   drivers: Driver[];
   renderedAt: number;
   onOpenRegistration: () => void;
+  driverHref: (driverId: string) => string;
+  onOpenDriverDetails: () => void;
 }) {
   const availableCount = drivers.filter((driver) => driver.is_available).length;
   const [activeDriver, setActiveDriver] = useState(0);
@@ -139,6 +143,8 @@ export function DeliveryBar({
                 key={`${driver.source}:${driver.id}`}
                 driver={driver}
                 renderedAt={renderedAt}
+                detailsHref={driverHref(driver.id)}
+                onOpenDetails={onOpenDriverDetails}
               />
             ))}
           </div>

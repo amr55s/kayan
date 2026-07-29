@@ -4,6 +4,7 @@ import { requireProfile } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadBehaviorAnalytics } from '@/lib/analytics/admin';
+import { fetchHomePageData } from '@/lib/supabase/queries';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,7 @@ async function loadClientErrors() {
 export default async function AdminDashboard() {
   const profile = await requireProfile(['admin']);
   const supabase = await createClient();
+  const adminData = createAdminClient();
 
   const [
     { data: merchants },
@@ -60,6 +62,10 @@ export default async function AdminDashboard() {
     { data: accountRequests },
     clientErrors,
     behaviorAnalytics,
+    { data: marketingChannels },
+    { data: marketingCampaigns },
+    { data: marketingPublications },
+    marketingHomeData,
   ] = await Promise.all([
     safeAdminQuery('merchants', (supabase as any)
       .from('merchants')
@@ -105,7 +111,45 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: false })),
     loadClientErrors(),
     loadBehaviorAnalytics(),
+    safeAdminQuery('marketing_channels', (adminData as any)
+      .from('marketing_channels')
+      .select('*')
+      .order('created_at', { ascending: true })),
+    safeAdminQuery('marketing_campaigns', (adminData as any)
+      .from('marketing_campaigns')
+      .select('*')
+      .order('updated_at', { ascending: false })),
+    safeAdminQuery('marketing_publications', (adminData as any)
+      .from('marketing_publications')
+      .select('campaign_id, published_at')
+      .order('published_at', { ascending: false })
+      .limit(5_000)),
+    fetchHomePageData().catch((error) => {
+      console.warn('Marketing driver queue could not be loaded:', error);
+      return { places: [], drivers: [], renderedAt: 0 };
+    }),
   ]);
+
+  const publicationCounts = new Map<string, number>();
+  for (const publication of marketingPublications ?? []) {
+    publicationCounts.set(
+      publication.campaign_id,
+      (publicationCounts.get(publication.campaign_id) ?? 0) + 1,
+    );
+  }
+  const campaignEvents = new Map(
+    behaviorAnalytics.campaignEvents.map((item) => [item.campaignKey, item]),
+  );
+  const enrichedCampaigns = (marketingCampaigns ?? []).map((campaign: any) => ({
+    ...campaign,
+    publication_count: publicationCounts.get(campaign.id) ?? 0,
+    ...(campaignEvents.get(campaign.campaign_code) ?? {
+      visits: 0,
+      opens: 0,
+      actions: 0,
+      shares: 0,
+    }),
+  }));
 
   return (
     <>
@@ -123,6 +167,9 @@ export default async function AdminDashboard() {
         accountRequests={accountRequests ?? []}
         clientErrors={clientErrors}
         behaviorAnalytics={behaviorAnalytics}
+        marketingChannels={marketingChannels ?? []}
+        marketingCampaigns={enrichedCampaigns}
+        marketingDrivers={marketingHomeData.drivers}
       />
     </>
   );

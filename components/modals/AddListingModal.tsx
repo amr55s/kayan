@@ -25,7 +25,11 @@ import {
   X,
 } from 'lucide-react';
 import { submitAccountRequest } from '@/lib/operations/actions';
-import { uploadOptimizedImages } from '@/lib/images/client';
+import {
+  imageFileKey,
+  LISTING_IMAGE_ACCEPT,
+  uploadOptimizedImages,
+} from '@/lib/images/client';
 import { CATEGORY_OPTIONS } from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
 import type { Place } from '@/types';
@@ -59,6 +63,7 @@ export function AddListingModal({
   const [address, setAddress] = useState('');
   const [mapUrl, setMapUrl] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [successWarning, setSuccessWarning] = useState('');
@@ -76,7 +81,8 @@ export function AddListingModal({
     || telegramUrl
     || address
     || mapUrl
-    || selectedFiles.length,
+    || selectedFiles.length
+    || uploadedImageUrls.length,
   );
   const confirmDiscard = useUnsavedChanges(
     isOpen && hasUnsavedChanges && !isSubmitting && !isSuccess,
@@ -99,6 +105,7 @@ export function AddListingModal({
     setAddress('');
     setMapUrl('');
     setSelectedFiles([]);
+    setUploadedImageUrls([]);
     setIsSubmitting(false);
     setIsSuccess(false);
     setSuccessWarning('');
@@ -109,7 +116,7 @@ export function AddListingModal({
   function handleFiles(files: FileList | null) {
     if (!files) return;
     const next = Array.from(files);
-    if (selectedFiles.length + next.length > 3) {
+    if (selectedFiles.length + uploadedImageUrls.length + next.length > 3) {
       setErrorMsg('يمكن رفع 3 صور كحد أقصى.');
       return;
     }
@@ -137,6 +144,10 @@ export function AddListingModal({
       setErrorMsg('كلمتا المرور غير متطابقتين.');
       return;
     }
+    if (mode === 'new' && selectedFiles.length + uploadedImageUrls.length === 0) {
+      setErrorMsg('أضف صورة واحدة على الأقل للمكان أو المنيو قبل إرسال الطلب.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -150,7 +161,25 @@ export function AddListingModal({
                 : `جاري رفع الصورة ${current} من ${total}...`,
             )
           )
-        : { urls: [], failedFiles: [] };
+        : { urls: [], failedFiles: [], failures: [] };
+      const nextUploadedUrls = Array.from(new Set([
+        ...uploadedImageUrls,
+        ...uploadResult.urls,
+      ]));
+      setUploadedImageUrls(nextUploadedUrls);
+
+      if (uploadResult.failedFiles.length) {
+        const failedKeys = new Set(uploadResult.failures.map((failure) => failure.fileKey));
+        setSelectedFiles((current) =>
+          current.filter((file) => failedKeys.has(imageFileKey(file))),
+        );
+        const firstFailure = uploadResult.failures[0]?.message;
+        setErrorMsg(
+          `تعذر رفع ${uploadResult.failedFiles.length} من الصور${firstFailure ? `: ${firstFailure}` : '.'} بياناتك محفوظة؛ اضغط إرسال مرة أخرى لإعادة محاولة الصور الفاشلة فقط.`,
+        );
+        return;
+      }
+      setSelectedFiles([]);
       setProcessingMsg('جاري إرسال الطلب...');
       const result = await submitAccountRequest(
         {
@@ -177,18 +206,14 @@ export function AddListingModal({
           placeAddress: mode === 'new' ? address : null,
           placeMapUrl: mode === 'new' ? mapUrl : null,
         },
-        uploadResult.urls,
+        nextUploadedUrls,
       );
 
       if (!result.success) {
         setErrorMsg(result.message);
         return;
       }
-      setSuccessWarning(
-        uploadResult.failedFiles.length
-          ? `تم تسجيل الطلب، لكن تعذر إرفاق ${uploadResult.failedFiles.length} من الصور. يمكنك إرسالها لاحقاً من طلب تعديل.`
-          : '',
-      );
+      setSuccessWarning('');
       setIsSuccess(true);
     } catch (error) {
       console.error('Account request submission failed:', error);
@@ -247,9 +272,14 @@ export function AddListingModal({
                       {successWarning}
                     </p>
                   )}
-                  <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
-                    تم
-                  </Button>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button as="a" href="/share" variant="flat" className="font-bold">
+                      ساعدنا في نشر كيان
+                    </Button>
+                    <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
+                      تم
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <form id="merchant-account-form" onSubmit={handleSubmit} className="space-y-5">
@@ -383,20 +413,28 @@ export function AddListingModal({
                         <input
                           ref={fileInputRef}
                           type="file"
-                          accept="image/*"
+                          accept={LISTING_IMAGE_ACCEPT}
                           multiple
                           className="sr-only"
-                          onChange={(event) => handleFiles(event.target.files)}
+                          onChange={(event) => {
+                            handleFiles(event.target.files);
+                            event.currentTarget.value = '';
+                          }}
                         />
                         <Button
                           type="button"
                           variant="flat"
                           startContent={<Upload className="size-4" />}
                           onPress={() => fileInputRef.current?.click()}
-                          isDisabled={selectedFiles.length >= 3}
+                          isDisabled={selectedFiles.length + uploadedImageUrls.length >= 3}
                         >
-                          رفع صور المكان أو المنيو ({selectedFiles.length}/3)
+                          رفع صور المكان أو المنيو ({selectedFiles.length + uploadedImageUrls.length}/3)
                         </Button>
+                        {uploadedImageUrls.length > 0 && (
+                          <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                            تم رفع {uploadedImageUrls.length} صورة بنجاح وستُرفق بالطلب.
+                          </p>
+                        )}
                         {selectedFiles.map((file, index) => (
                           <div key={`${file.name}-${file.lastModified}`} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs">
                             <span className="truncate">{file.name}</span>

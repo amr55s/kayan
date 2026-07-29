@@ -60,6 +60,225 @@ export type Database = {
         }
         Relationships: []
       }
+      account_requests: {
+        Row: {
+          auth_user_id: string
+          created_at: string
+          display_name: string
+          existing_place_id: string | null
+          id: string
+          kind: string
+          legacy_driver_id: string | null
+          phone: string
+          place_address: string | null
+          place_category: string | null
+          place_description: string | null
+          place_images: string[]
+          place_map_url: string | null
+          place_mode: string | null
+          place_payment: string | null
+          place_telegram_url: string | null
+          place_title: string | null
+          place_whatsapp: string | null
+          place_whatsapp_group_url: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          vehicle_type: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          auth_user_id: string
+          created_at?: string
+          display_name: string
+          existing_place_id?: string | null
+          id?: string
+          kind: string
+          legacy_driver_id?: string | null
+          phone: string
+          place_address?: string | null
+          place_category?: string | null
+          place_description?: string | null
+          place_images?: string[]
+          place_map_url?: string | null
+          place_mode?: string | null
+          place_payment?: string | null
+          place_telegram_url?: string | null
+          place_title?: string | null
+          place_whatsapp?: string | null
+          place_whatsapp_group_url?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_type?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          auth_user_id?: string
+          created_at?: string
+          display_name?: string
+          existing_place_id?: string | null
+          id?: string
+          kind?: string
+          legacy_driver_id?: string | null
+          phone?: string
+          place_address?: string | null
+          place_category?: string | null
+          place_description?: string | null
+          place_images?: string[]
+          place_map_url?: string | null
+          place_mode?: string | null
+          place_payment?: string | null
+          place_telegram_url?: string | null
+          place_title?: string | null
+          place_whatsapp?: string | null
+          place_whatsapp_group_url?: string | null
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_type?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_requests_existing_place_id_fkey"
+            columns: ["existing_place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_requests_legacy_driver_id_fkey"
+            columns: ["legacy_driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      analytics_daily_events: {
+        Row: {
+          campaign_key: string
+          event_date: string
+          event_name: string
+          events: number
+          route: string
+          target_key: string
+          target_type: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_key?: string
+          event_date?: string
+          event_name: string
+          events?: number
+          route: string
+          target_key?: string
+          target_type: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_key?: string
+          event_date?: string
+          event_name?: string
+          events?: number
+          route?: string
+          target_key?: string
+          target_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      analytics_daily_visitors: {
+        Row: {
+          event_date: string
+          last_seen_at: string
+          visitor_hash: string
+        }
+        Insert: {
+          event_date?: string
+          last_seen_at?: string
+          visitor_hash: string
+        }
+        Update: {
+          event_date?: string
+          last_seen_at?: string
+          visitor_hash?: string
+        }
+        Relationships: []
+      }
+      analytics_rate_limits: {
+        Row: {
+          attempts: number
+          updated_at: string
+          visitor_hash: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          updated_at?: string
+          visitor_hash: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          updated_at?: string
+          visitor_hash?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
+      audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: number
+          metadata: Json
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: never
+          metadata?: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: never
+          metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_error_rate_limits: {
         Row: {
           attempts: number
@@ -119,153 +338,6 @@ export type Database = {
           route?: string
         }
         Relationships: []
-      }
-      account_requests: {
-        Row: {
-          auth_user_id: string
-          created_at: string
-          display_name: string
-          existing_place_id: string | null
-          id: string
-          kind: string
-          legacy_driver_id: string | null
-          phone: string
-          place_category: string | null
-          place_address: string | null
-          place_description: string | null
-          place_images: string[]
-          place_map_url: string | null
-          place_mode: string | null
-          place_payment: string | null
-          place_telegram_url: string | null
-          place_title: string | null
-          place_whatsapp: string | null
-          place_whatsapp_group_url: string | null
-          rejection_reason: string | null
-          reviewed_at: string | null
-          reviewed_by: string | null
-          status: string
-          updated_at: string
-          vehicle_type: string | null
-          whatsapp: string | null
-        }
-        Insert: {
-          auth_user_id: string
-          created_at?: string
-          display_name: string
-          existing_place_id?: string | null
-          id?: string
-          kind: string
-          legacy_driver_id?: string | null
-          phone: string
-          place_category?: string | null
-          place_address?: string | null
-          place_description?: string | null
-          place_images?: string[]
-          place_map_url?: string | null
-          place_mode?: string | null
-          place_payment?: string | null
-          place_telegram_url?: string | null
-          place_title?: string | null
-          place_whatsapp?: string | null
-          place_whatsapp_group_url?: string | null
-          rejection_reason?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          updated_at?: string
-          vehicle_type?: string | null
-          whatsapp?: string | null
-        }
-        Update: {
-          auth_user_id?: string
-          created_at?: string
-          display_name?: string
-          existing_place_id?: string | null
-          id?: string
-          kind?: string
-          legacy_driver_id?: string | null
-          phone?: string
-          place_category?: string | null
-          place_address?: string | null
-          place_description?: string | null
-          place_images?: string[]
-          place_map_url?: string | null
-          place_mode?: string | null
-          place_payment?: string | null
-          place_telegram_url?: string | null
-          place_title?: string | null
-          place_whatsapp?: string | null
-          place_whatsapp_group_url?: string | null
-          rejection_reason?: string | null
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          status?: string
-          updated_at?: string
-          vehicle_type?: string | null
-          whatsapp?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "account_requests_existing_place_id_fkey"
-            columns: ["existing_place_id"]
-            isOneToOne: false
-            referencedRelation: "places"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "account_requests_legacy_driver_id_fkey"
-            columns: ["legacy_driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "account_requests_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      audit_log: {
-        Row: {
-          action: string
-          actor_id: string | null
-          created_at: string
-          entity_id: string
-          entity_type: string
-          id: number
-          metadata: Json
-        }
-        Insert: {
-          action: string
-          actor_id?: string | null
-          created_at?: string
-          entity_id: string
-          entity_type: string
-          id?: never
-          metadata?: Json
-        }
-        Update: {
-          action?: string
-          actor_id?: string | null
-          created_at?: string
-          entity_id?: string
-          entity_type?: string
-          id?: never
-          metadata?: Json
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_log_actor_id_fkey"
-            columns: ["actor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       delivery_orders: {
         Row: {
@@ -467,8 +539,8 @@ export type Database = {
           images: string[] | null
           notes: string
           place_name_or_phone: string
-          proposed_category: string | null
           proposed_address: string | null
+          proposed_category: string | null
           proposed_description: string | null
           proposed_images: string[]
           proposed_instapay_vfcash: string | null
@@ -492,8 +564,8 @@ export type Database = {
           images?: string[] | null
           notes: string
           place_name_or_phone: string
-          proposed_category?: string | null
           proposed_address?: string | null
+          proposed_category?: string | null
           proposed_description?: string | null
           proposed_images?: string[]
           proposed_instapay_vfcash?: string | null
@@ -517,8 +589,8 @@ export type Database = {
           images?: string[] | null
           notes?: string
           place_name_or_phone?: string
-          proposed_category?: string | null
           proposed_address?: string | null
+          proposed_category?: string | null
           proposed_description?: string | null
           proposed_images?: string[]
           proposed_instapay_vfcash?: string | null
@@ -547,6 +619,145 @@ export type Database = {
             columns: ["target_place_id"]
             isOneToOne: false
             referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      listing_upload_rate_limits: {
+        Row: {
+          attempts: number
+          request_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          request_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          request_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
+      marketing_campaigns: {
+        Row: {
+          campaign_code: string
+          channel_id: string
+          created_at: string
+          created_by: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          last_published_at: string | null
+          payload: Json
+          status: string
+          template_key: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_code?: string
+          channel_id: string
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          last_published_at?: string | null
+          payload?: Json
+          status?: string
+          template_key: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_code?: string
+          channel_id?: string
+          created_at?: string
+          created_by?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          last_published_at?: string | null
+          payload?: Json
+          status?: string
+          template_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaigns_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_channels: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string
+          slug: string
+          updated_at: string
+          whatsapp_url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string
+          slug: string
+          updated_at?: string
+          whatsapp_url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string
+          slug?: string
+          updated_at?: string
+          whatsapp_url?: string
+        }
+        Relationships: []
+      }
+      marketing_publications: {
+        Row: {
+          campaign_id: string
+          id: number
+          published_at: string
+          published_by: string | null
+        }
+        Insert: {
+          campaign_id: string
+          id?: number
+          published_at?: string
+          published_by?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          id?: number
+          published_at?: string
+          published_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_publications_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
             referencedColumns: ["id"]
           },
         ]
@@ -722,27 +933,6 @@ export type Database = {
           },
         ]
       }
-      listing_upload_rate_limits: {
-        Row: {
-          attempts: number
-          request_key: string
-          updated_at: string
-          window_started_at: string
-        }
-        Insert: {
-          attempts?: number
-          request_key: string
-          updated_at?: string
-          window_started_at?: string
-        }
-        Update: {
-          attempts?: number
-          request_key?: string
-          updated_at?: string
-          window_started_at?: string
-        }
-        Relationships: []
-      }
       pending_requests: {
         Row: {
           address: string | null
@@ -755,8 +945,8 @@ export type Database = {
           map_url: string | null
           phone: string
           status: string | null
-          title: string
           telegram_url: string | null
+          title: string
           whatsapp: string | null
           whatsapp_group_url: string | null
         }
@@ -771,8 +961,8 @@ export type Database = {
           map_url?: string | null
           phone: string
           status?: string | null
-          title: string
           telegram_url?: string | null
+          title: string
           whatsapp?: string | null
           whatsapp_group_url?: string | null
         }
@@ -787,12 +977,38 @@ export type Database = {
           map_url?: string | null
           phone?: string
           status?: string | null
-          title?: string
           telegram_url?: string | null
+          title?: string
           whatsapp?: string | null
           whatsapp_group_url?: string | null
         }
         Relationships: []
+      }
+      place_upvote_receipts: {
+        Row: {
+          created_at: string
+          place_id: string
+          request_key: string
+        }
+        Insert: {
+          created_at?: string
+          place_id: string
+          request_key: string
+        }
+        Update: {
+          created_at?: string
+          place_id?: string
+          request_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_upvote_receipts_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       places: {
         Row: {
@@ -889,6 +1105,27 @@ export type Database = {
           },
         ]
       }
+      public_submission_rate_limits: {
+        Row: {
+          attempts: number
+          request_key: string
+          updated_at: string
+          window_started_at: string
+        }
+        Insert: {
+          attempts?: number
+          request_key: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Update: {
+          attempts?: number
+          request_key?: string
+          updated_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       push_subscriptions: {
         Row: {
           auth: string
@@ -983,6 +1220,10 @@ export type Database = {
         Returns: boolean
       }
       consume_listing_upload_rate_limit: {
+        Args: { p_limit?: number; p_request_key: string }
+        Returns: boolean
+      }
+      consume_public_submission_rate_limit: {
         Args: { p_limit?: number; p_request_key: string }
         Returns: boolean
       }
@@ -1136,6 +1377,33 @@ export type Database = {
           p_release: string
           p_request_key: string
           p_route: string
+        }
+        Returns: boolean
+      }
+      record_place_upvote: {
+        Args: { p_place_id: string; p_request_key: string }
+        Returns: boolean
+      }
+      record_site_analytics: {
+        Args: {
+          p_event_name: string
+          p_limit?: number
+          p_route: string
+          p_target_key: string
+          p_target_type: string
+          p_visitor_hash: string
+        }
+        Returns: boolean
+      }
+      record_site_analytics_v2: {
+        Args: {
+          p_campaign_key?: string
+          p_event_name: string
+          p_limit?: number
+          p_route: string
+          p_target_key: string
+          p_target_type: string
+          p_visitor_hash: string
         }
         Returns: boolean
       }

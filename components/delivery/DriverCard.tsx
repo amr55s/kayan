@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Card, CardBody, Chip } from '@heroui/react';
-import { Bike, MessageCircle, Phone } from 'lucide-react';
+import { Bike, ExternalLink, MessageCircle, Phone, Share2 } from 'lucide-react';
+import Link from 'next/link';
 import type { Driver } from '@/types';
 import { formatPhoneForTel, formatWhatsAppUrl } from '@/lib/utils';
+import { shareDirectoryItem } from '@/lib/share';
+import { trackSiteEvent } from '@/lib/analytics/client';
 
 function availabilityLabel(activeUntil: string | null | undefined, now: number): string {
   if (!activeUntil) return 'خامل';
@@ -19,9 +22,13 @@ function availabilityLabel(activeUntil: string | null | undefined, now: number):
 export function DriverCard({
   driver,
   renderedAt,
+  detailsHref,
+  onOpenDetails,
 }: {
   driver: Driver;
   renderedAt: number;
+  detailsHref: string;
+  onOpenDetails: () => void;
 }) {
   const [now, setNow] = useState(renderedAt);
 
@@ -44,6 +51,18 @@ export function DriverCard({
   const label = availabilityLabel(driver.active_until, now);
   const displayName = driver.name?.trim() || 'كابتن توصيل';
 
+  const share = async () => {
+    const url = new URL(detailsHref, window.location.origin).toString();
+    const completed = await shareDirectoryItem(
+      displayName,
+      url,
+      'كابتن توصيل داخل المنطقة — تواصل مباشر بدون وسيط',
+    );
+    if (completed) {
+      trackSiteEvent('share_click', { targetType: 'driver', targetKey: driver.id });
+    }
+  };
+
   return (
     <Card className="w-full min-w-0 snap-start border border-zinc-700 bg-zinc-900 text-white shadow-none">
       <CardBody className="flex flex-col gap-2.5 p-3">
@@ -54,7 +73,13 @@ export function DriverCard({
               className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-800 text-sm font-bold text-white"
             />
             <div className="min-w-0">
-              <p className="truncate text-sm font-extrabold">{displayName}</p>
+              <Link
+                href={detailsHref}
+                onClick={onOpenDetails}
+                className="block truncate text-sm font-extrabold hover:underline"
+              >
+                {displayName}
+              </Link>
               <p className="dir-ltr mt-0.5 text-right font-mono text-xs text-zinc-300">
                 {driver.phone}
               </p>
@@ -73,9 +98,28 @@ export function DriverCard({
           >
             {isAvailable ? label : 'خامل'}
           </Chip>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="light"
+            aria-label={`مشاركة ${displayName}`}
+            onPress={share}
+            className="size-9 min-w-9 text-zinc-300"
+          >
+            <Share2 className="size-4" />
+          </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 border-t border-zinc-800 pt-2.5">
+        <div className="grid grid-cols-3 gap-2 border-t border-zinc-800 pt-2.5">
+          <Button
+            as={Link}
+            href={detailsHref}
+            onPress={onOpenDetails}
+            startContent={<ExternalLink className="size-4" />}
+            className="border border-zinc-700 bg-zinc-900 text-xs font-bold text-white"
+          >
+            التفاصيل
+          </Button>
           <Button
             as="a"
             href={formatWhatsAppUrl(

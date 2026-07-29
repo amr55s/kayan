@@ -15,12 +15,16 @@ const payloadSchema = z.object({
   eventName: z.enum([
     'page_view',
     'place_open',
+    'driver_open',
     'phone_click',
     'whatsapp_click',
     'group_click',
     'telegram_click',
     'map_click',
     'share_click',
+    'marketing_share_click',
+    'card_download',
+    'guide_open',
     'favorite_click',
     'upvote_click',
     'search_use',
@@ -31,9 +35,10 @@ const payloadSchema = z.object({
     'driver_signup_open',
     'support_click',
   ]),
-  targetType: z.enum(['site', 'place', 'category', 'feature']),
+  targetType: z.enum(['site', 'place', 'driver', 'category', 'feature']),
   targetKey: z.string().max(64).default(''),
   route: z.string().regex(/^\/[a-z0-9/_-]*$/i).max(120),
+  campaignKey: z.string().regex(/^[a-z0-9_-]{0,64}$/i).default(''),
 });
 
 const placeEvents = new Set([
@@ -47,6 +52,14 @@ const placeEvents = new Set([
   'favorite_click',
   'upvote_click',
 ]);
+const driverEvents = new Set([
+  'driver_open',
+  'phone_click',
+  'whatsapp_click',
+  'share_click',
+  'marketing_share_click',
+  'card_download',
+]);
 const featureEvents = new Set([
   'search_use',
   'join_open',
@@ -54,6 +67,9 @@ const featureEvents = new Set([
   'add_listing_open',
   'driver_signup_open',
   'support_click',
+  'marketing_share_click',
+  'card_download',
+  'guide_open',
 ]);
 
 function targetIsValid(payload: z.infer<typeof payloadSchema>): boolean {
@@ -62,6 +78,18 @@ function targetIsValid(payload: z.infer<typeof payloadSchema>): boolean {
   }
   if (placeEvents.has(payload.eventName)) {
     return payload.targetType === 'place' && UUID_PATTERN.test(payload.targetKey);
+  }
+  if (
+    driverEvents.has(payload.eventName)
+    && payload.targetType === 'driver'
+  ) {
+    return UUID_PATTERN.test(payload.targetKey);
+  }
+  if (payload.eventName === 'marketing_share_click' || payload.eventName === 'card_download') {
+    if (payload.targetType === 'place' || payload.targetType === 'driver') {
+      return UUID_PATTERN.test(payload.targetKey);
+    }
+    return payload.targetType === 'feature' && SAFE_KEY_PATTERN.test(payload.targetKey);
   }
   if (payload.eventName === 'category_select') {
     return payload.targetType === 'category' && SAFE_KEY_PATTERN.test(payload.targetKey);
@@ -105,12 +133,13 @@ export async function POST(request: Request) {
       .update(`${parsed.data.visitorId}:${secret}`)
       .digest('hex');
     const admin = createAdminClient();
-    const { error } = await (admin as any).rpc('record_site_analytics', {
+    const { error } = await (admin as any).rpc('record_site_analytics_v2', {
       p_visitor_hash: visitorHash,
       p_event_name: parsed.data.eventName,
       p_target_type: parsed.data.targetType,
       p_target_key: parsed.data.targetKey,
       p_route: parsed.data.route,
+      p_campaign_key: parsed.data.campaignKey,
       p_limit: 120,
     });
     if (error) {

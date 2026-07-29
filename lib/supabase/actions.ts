@@ -101,24 +101,10 @@ export async function uploadImageToStorage(
     }
 
     const supabase = createAdminClient();
-    const requestHeaders = await headers();
-    const requestIp =
-      requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || requestHeaders.get('x-real-ip')
-      || 'local';
-    const rateSecret =
-      process.env.CLIENT_ERROR_HASH_SALT
-      || process.env.SUPABASE_SECRET_KEY
-      || process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!rateSecret) {
-      return { success: false, message: 'إعدادات رفع الصور غير مكتملة.' };
-    }
-    const requestKey = createHash('sha256')
-      .update(`${requestIp}:listing-upload:${rateSecret}`)
-      .digest('hex');
+    const requestKey = await getAnonymousRequestKey('listing-upload');
     const { data: allowed, error: limitError } = await (supabase as any).rpc(
       'consume_listing_upload_rate_limit',
-      { p_request_key: requestKey, p_limit: 12 },
+      { p_request_key: requestKey, p_limit: 24 },
     );
     if (limitError || !allowed) {
       return {
@@ -146,11 +132,17 @@ export async function uploadImageToStorage(
         });
 
       if (!error && data?.path) {
-        storedPath = data.path;
-        break;
+        const { data: storedInfo, error: infoError } = await supabase.storage
+          .from('listing-images')
+          .info(data.path);
+        if (!infoError && storedInfo?.size && storedInfo.size > 0) {
+          storedPath = data.path;
+          break;
+        }
+        console.error(`Storage verification attempt ${attempt} failed:`, infoError);
+      } else {
+        console.error(`Storage upload attempt ${attempt} failed:`, error);
       }
-
-      console.error(`Storage upload attempt ${attempt} failed:`, error);
     }
 
     if (!storedPath) {
@@ -176,7 +168,7 @@ export async function uploadImageToStorage(
     console.error('Storage upload exception:', err);
     return {
       success: false,
-      message: 'تعذر معالجة الصورة أو رفعها، لكن يمكنك إرسال باقي الطلب.',
+      message: 'تعذر معالجة الصورة أو رفعها. لم يتم حفظ المكان بدونها؛ حاول مرة أخرى.',
     };
   }
 }

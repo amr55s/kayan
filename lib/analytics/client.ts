@@ -3,12 +3,16 @@
 export type SiteAnalyticsEvent =
   | 'page_view'
   | 'place_open'
+  | 'driver_open'
   | 'phone_click'
   | 'whatsapp_click'
   | 'group_click'
   | 'telegram_click'
   | 'map_click'
   | 'share_click'
+  | 'marketing_share_click'
+  | 'card_download'
+  | 'guide_open'
   | 'favorite_click'
   | 'upvote_click'
   | 'search_use'
@@ -22,10 +26,13 @@ export type SiteAnalyticsEvent =
 type AnalyticsTarget =
   | { targetType: 'site'; targetKey?: never }
   | { targetType: 'place'; targetKey: string }
+  | { targetType: 'driver'; targetKey: string }
   | { targetType: 'category'; targetKey: string }
   | { targetType: 'feature'; targetKey: string };
 
 const VISITOR_KEY = 'kayan_analytics_visitor_v1';
+const CAMPAIGN_KEY = 'kayan_campaign_ref_v1';
+const SAFE_CAMPAIGN = /^[a-z0-9_-]{8,64}$/i;
 const recentEvents = new Map<string, number>();
 let memoryVisitorId = '';
 
@@ -66,6 +73,20 @@ function getVisitorId(): string {
   return memoryVisitorId;
 }
 
+function getCampaignKey(): string {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('ref') || '';
+    if (SAFE_CAMPAIGN.test(fromUrl)) {
+      window.sessionStorage.setItem(CAMPAIGN_KEY, fromUrl);
+      return fromUrl;
+    }
+    const stored = window.sessionStorage.getItem(CAMPAIGN_KEY) || '';
+    return SAFE_CAMPAIGN.test(stored) ? stored : '';
+  } catch {
+    return '';
+  }
+}
+
 export function trackSiteEvent(
   eventName: SiteAnalyticsEvent,
   target: AnalyticsTarget = { targetType: 'site' },
@@ -83,6 +104,7 @@ export function trackSiteEvent(
     targetType: target.targetType,
     targetKey: target.targetKey ?? '',
     route: window.location.pathname,
+    campaignKey: getCampaignKey(),
   });
 
   void fetch('/api/analytics-events', {

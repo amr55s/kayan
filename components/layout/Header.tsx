@@ -13,7 +13,7 @@ import {
   ModalContent,
   ModalHeader,
 } from '@heroui/react';
-import { Bike, Building2, LayoutDashboard, LogIn, MessageSquareText, UserPlus } from 'lucide-react';
+import { Bike, BookOpen, Building2, LayoutDashboard, LogIn, MessageSquareText, Share2, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
@@ -92,6 +92,24 @@ export const Header: React.FC<HeaderProps> = ({
         </NavbarBrand>
 
         <NavbarContent justify="end" className="min-w-0 shrink gap-0.5 sm:shrink-0 sm:gap-2">
+          <NavbarItem className="hidden md:block">
+            <Link
+              href="/guide"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-100"
+            >
+              <BookOpen className="size-4" />
+              طريقة الاستخدام
+            </Link>
+          </NavbarItem>
+          <NavbarItem className="hidden md:block">
+            <Link
+              href="/share"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-100"
+            >
+              <Share2 className="size-4" />
+              شارك كيان
+            </Link>
+          </NavbarItem>
           {onOpenFeedbackModal && (
             <NavbarItem>
               <button
@@ -140,6 +158,26 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
               </ModalHeader>
               <ModalBody className="space-y-2 py-4">
+                <div className="grid grid-cols-2 gap-2 pb-2">
+                  <Button
+                    as={Link}
+                    href="/guide"
+                    onPress={() => choose()}
+                    startContent={<BookOpen className="size-4" />}
+                    className="border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900"
+                  >
+                    طريقة الاستخدام
+                  </Button>
+                  <Button
+                    as={Link}
+                    href="/share"
+                    onPress={() => choose()}
+                    startContent={<Share2 className="size-4" />}
+                    className="border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900"
+                  >
+                    شارك كيان
+                  </Button>
+                </div>
                 <Button
                   onClick={() => choose(onOpenDriverModal)}
                   startContent={<Bike className="size-5" />}

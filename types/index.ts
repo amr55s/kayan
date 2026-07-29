@@ -34,6 +34,49 @@ export interface Driver {
   source: 'public' | 'account';
 }
 
+export type MarketingEntityType = 'site' | 'place' | 'driver' | 'feature';
+
+export type MarketingTemplateKey =
+  | 'new_place'
+  | 'new_driver'
+  | 'weekly_roundup'
+  | 'merchant_invite'
+  | 'driver_invite'
+  | 'missing_service'
+  | 'data_correction'
+  | 'local_ambassadors'
+  | 'general_site';
+
+export interface MarketingChannel {
+  id: string;
+  name: string;
+  slug: string;
+  whatsapp_url: string;
+  notes: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MarketingCampaign {
+  id: string;
+  channel_id: string;
+  entity_type: MarketingEntityType;
+  entity_id: string | null;
+  template_key: MarketingTemplateKey;
+  campaign_code: string;
+  status: 'draft' | 'published';
+  payload: Record<string, unknown>;
+  last_published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  publication_count?: number;
+  visits?: number;
+  opens?: number;
+  actions?: number;
+  shares?: number;
+}
+
 export interface Place {
   id: string;
   title: string;

@@ -18,7 +18,11 @@ import {
 import { Edit, PlusCircle, Check, Upload, X, Star, Building, CreditCard, Trash2 } from 'lucide-react';
 import { Place } from '@/types';
 import { serverInsertPlaceDirectly, serverUpdateActivePlace, serverDeleteActivePlace } from '@/lib/supabase/admin-actions';
-import { uploadOptimizedImages } from '@/lib/images/client';
+import {
+  imageFileKey,
+  LISTING_IMAGE_ACCEPT,
+  uploadOptimizedImages,
+} from '@/lib/images/client';
 import { CATEGORY_OPTIONS } from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
 
@@ -53,6 +57,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -76,6 +81,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
       setExistingImages(mode === 'edit' && place ? place.images || [] : []);
       setNewImageFiles([]);
       setNewImagePreviews([]);
+      setUploadedImageUrls([]);
       setErrorMsg('');
       setProcessingMsg('');
     });
@@ -99,6 +105,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
     setExistingImages([]);
     setNewImageFiles([]);
     setNewImagePreviews([]);
+    setUploadedImageUrls([]);
     setErrorMsg('');
     setProcessingMsg('');
   };
@@ -106,8 +113,9 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const filesArray = Array.from(e.target.files);
-    if (newImageFiles.length + filesArray.length > 6) {
+    if (newImageFiles.length + uploadedImageUrls.length + filesArray.length > 6) {
       setErrorMsg('يمكن رفع 6 صور جديدة كحد أقصى في المرة الواحدة.');
+      e.target.value = '';
       return;
     }
 
@@ -117,6 +125,8 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
 
     setNewImageFiles(updatedFiles);
     setNewImagePreviews(updatedPreviews);
+    setErrorMsg('');
+    e.target.value = '';
   };
 
   const handleRemoveExistingImage = (indexToRemove: number) => {
@@ -145,6 +155,10 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
       setErrorMsg('يرجى إدخال رقم هاتف مصري صحيح (مثال: 01012345678).');
       return;
     }
+    if (mode === 'create' && newImageFiles.length + uploadedImageUrls.length === 0) {
+      setErrorMsg('أضف صورة واحدة على الأقل للمكان أو المنيو قبل النشر.');
+      return;
+    }
 
     setIsSubmitting(true);
     setErrorMsg('');
@@ -163,7 +177,35 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
         },
       );
 
-      const finalImages = Array.from(new Set([...existingImages, ...uploadResult.urls]));
+      const nextUploadedUrls = Array.from(new Set([
+        ...uploadedImageUrls,
+        ...uploadResult.urls,
+      ]));
+      setUploadedImageUrls(nextUploadedUrls);
+
+      const failedKeys = new Set(uploadResult.failures.map((failure) => failure.fileKey));
+      const retryFiles: File[] = [];
+      const retryPreviews: string[] = [];
+      newImageFiles.forEach((file, index) => {
+        if (failedKeys.has(imageFileKey(file))) {
+          retryFiles.push(file);
+          if (newImagePreviews[index]) retryPreviews.push(newImagePreviews[index]);
+        } else if (newImagePreviews[index]) {
+          URL.revokeObjectURL(newImagePreviews[index]);
+        }
+      });
+      setNewImageFiles(retryFiles);
+      setNewImagePreviews(retryPreviews);
+
+      if (uploadResult.failedFiles.length) {
+        const firstFailure = uploadResult.failures[0]?.message;
+        setErrorMsg(
+          `تعذر رفع ${uploadResult.failedFiles.length} من الصور${firstFailure ? `: ${firstFailure}` : '.'} لم يتم حفظ المكان بدونها؛ اضغط حفظ لإعادة محاولة الصور الفاشلة فقط.`,
+        );
+        return;
+      }
+
+      const finalImages = Array.from(new Set([...existingImages, ...nextUploadedUrls]));
 
       if (mode === 'create') {
         const res = await serverInsertPlaceDirectly({
@@ -201,15 +243,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
         if (!res.success) throw new Error(res.message);
       }
 
-      if (uploadResult.failedFiles.length) {
-        setNewImageFiles([]);
-        newImagePreviews.forEach((url) => URL.revokeObjectURL(url));
-        setNewImagePreviews([]);
-        setErrorMsg(
-          `تم حفظ بيانات المكان، لكن تعذر رفع ${uploadResult.failedFiles.length} من الصور. اخترها مرة أخرى لإعادة المحاولة.`,
-        );
-        return;
-      }
+      setUploadedImageUrls([]);
       onSuccess();
       onOpenChange(false);
     } catch (err: any) {
@@ -423,14 +457,14 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   <div className="flex items-center justify-between text-xs font-bold text-zinc-800 dark:text-zinc-200">
                     <span>إدارة صور المنيو والمكان</span>
                     <span className="text-zinc-400 font-normal">
-                      إجمالي {existingImages.length + newImageFiles.length} صور
+                      إجمالي {existingImages.length + uploadedImageUrls.length + newImageFiles.length} صور
                     </span>
                   </div>
 
                   <input
                     type="file"
                     ref={fileInputRef}
-                    accept="image/*"
+                    accept={LISTING_IMAGE_ACCEPT}
                     multiple
                     onChange={handleFileChange}
                     className="hidden"
@@ -445,7 +479,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   </div>
 
                   {/* Existing & New Images Gallery Grid */}
-                  {(existingImages.length > 0 || newImagePreviews.length > 0) && (
+                  {(existingImages.length > 0 || uploadedImageUrls.length > 0 || newImagePreviews.length > 0) && (
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-2">
                       {/* Existing Images */}
                       {existingImages.map((imgUrl, idx) => (
@@ -464,6 +498,29 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                             onClick={() => handleRemoveExistingImage(idx)}
                             className="absolute top-1 right-1 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-rose-600 text-white shadow-md transition-transform hover:scale-105"
                             title="حذف الصورة"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Images uploaded during this save attempt */}
+                      {uploadedImageUrls.map((imgUrl, idx) => (
+                        <div key={`uploaded-${imgUrl}`} className="relative group w-full h-20 rounded-xl overflow-hidden border-2 border-emerald-500 bg-emerald-50">
+                          <HeroImage
+                            src={imgUrl}
+                            alt={`صورة تم رفعها ${idx + 1}`}
+                            classNames={{
+                              wrapper: "w-full h-full",
+                              img: "w-full h-full object-cover",
+                            }}
+                            radius="none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setUploadedImageUrls((current) => current.filter((url) => url !== imgUrl))}
+                            className="absolute top-1 right-1 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-rose-600 text-white shadow-md transition-transform hover:scale-105"
+                            title="حذف الصورة المرفوعة"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>

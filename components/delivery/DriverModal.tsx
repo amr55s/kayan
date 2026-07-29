@@ -128,9 +128,14 @@ export function DriverModal({
                     بعد موافقة الإدارة ستدخل برقم الهاتف وكلمة المرور التي اخترتها.
                     لو رقمك مرتبط ببطاقة كابتن قديمة سيتم ربط الحساب بها تلقائياً.
                   </p>
-                  <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
-                    تم
-                  </Button>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button as="a" href="/share" variant="flat" className="font-bold">
+                      ساعدنا في نشر كيان
+                    </Button>
+                    <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
+                      تم
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <form id="driver-account-form" onSubmit={handleSubmit} className="space-y-4">

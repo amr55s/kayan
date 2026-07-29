@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input, Button, Skeleton, Card } from '@heroui/react';
-import { Search, MapPinOff, RefreshCw, Heart, Phone } from 'lucide-react';
+import { Search, MapPinOff, RefreshCw, Heart, MessageCircle } from 'lucide-react';
 import { Place, Driver, CategoryType } from '@/types';
 import { Header } from '@/components/layout/Header';
 import { DeliveryBar } from '@/components/delivery/DeliveryBar';
@@ -14,6 +14,7 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { AddListingModal } from '@/components/modals/AddListingModal';
 import { FeedbackModal } from '@/components/modals/FeedbackModal';
 import { DriverModal } from '@/components/delivery/DriverModal';
+import { DriverDetailsModal } from '@/components/delivery/DriverDetailsModal';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { FeedbackType } from '@/types';
 import { trackSiteEvent } from '@/lib/analytics/client';
@@ -26,6 +27,9 @@ interface DirectoryViewProps {
   renderedAt: number;
 }
 
+const DIRECT_DETAIL_STATE = '__kayanDirectPlaceDetail';
+const DIRECT_DETAIL_BASE_STATE = '__kayanDirectPlaceBase';
+
 export const DirectoryView: React.FC<DirectoryViewProps> = ({
   initialPlaces,
   initialDrivers,
@@ -36,6 +40,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   const router = useRouter();
   const searchParams = useSearchParams();
   const detailOpenedFromDirectory = useRef(false);
+  const directDetailHistoryPrepared = useRef(false);
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,8 +72,12 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
 
   const { favorites, favoritesCount } = useFavorites();
   const selectedPlaceId = searchParams.get('place');
+  const selectedDriverId = selectedPlaceId ? null : searchParams.get('driver');
   const selectedPlace = selectedPlaceId
     ? initialPlaces.find((place) => place.id === selectedPlaceId) ?? null
+    : null;
+  const selectedDriver = selectedDriverId
+    ? initialDrivers.find((driver) => driver.id === selectedDriverId) ?? null
     : null;
 
   useEffect(() => {
@@ -85,32 +94,112 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   const removePlaceFromUrl = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('place');
+    params.delete('driver');
     return params.size ? `/?${params.toString()}` : '/';
   }, [searchParams]);
 
   useEffect(() => {
-    if (!selectedPlaceId || selectedPlace) return;
+    if (
+      (!selectedPlaceId && !selectedDriverId)
+      || (!selectedPlace && !selectedDriver)
+      || detailOpenedFromDirectory.current
+      || directDetailHistoryPrepared.current
+    ) {
+      return;
+    }
+
+    const currentState =
+      window.history.state && typeof window.history.state === 'object'
+        ? window.history.state as Record<string, unknown>
+        : {};
+    if (currentState[DIRECT_DETAIL_STATE]) {
+      directDetailHistoryPrepared.current = true;
+      return;
+    }
+
+    const detailUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const baseUrl = removePlaceFromUrl();
+
+    // A shared URL starts without an in-app page behind it. Seed one base
+    // entry without notifying Next.js, then keep the visible detail URL on top.
+    // The next real Back/Forward event is handled normally by the router.
+    History.prototype.replaceState.call(
+      window.history,
+      { ...currentState, [DIRECT_DETAIL_BASE_STATE]: true },
+      '',
+      baseUrl,
+    );
+    History.prototype.pushState.call(
+      window.history,
+      { ...currentState, [DIRECT_DETAIL_STATE]: true },
+      '',
+      detailUrl,
+    );
+    directDetailHistoryPrepared.current = true;
+  }, [
+    removePlaceFromUrl,
+    selectedDriver,
+    selectedDriverId,
+    selectedPlace,
+    selectedPlaceId,
+  ]);
+
+  useEffect(() => {
+    const requestedId = selectedPlaceId || selectedDriverId;
+    const selectedDetail = selectedPlace || selectedDriver;
+    if (!requestedId || selectedDetail) return;
     const frame = window.requestAnimationFrame(() => {
       setInvalidDetail(true);
       detailOpenedFromDirectory.current = false;
       router.replace(removePlaceFromUrl(), { scroll: false });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [removePlaceFromUrl, router, selectedPlace, selectedPlaceId]);
+  }, [
+    removePlaceFromUrl,
+    router,
+    selectedDriver,
+    selectedDriverId,
+    selectedPlace,
+    selectedPlaceId,
+  ]);
+
+  useEffect(() => {
+    if (!selectedDriver) return;
+    trackSiteEvent('driver_open', {
+      targetType: 'driver',
+      targetKey: selectedDriver.id,
+    });
+  }, [selectedDriver]);
 
   function detailHref(placeId: string) {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('driver');
     params.set('place', placeId);
+    return `/?${params.toString()}`;
+  }
+
+  function driverHref(driverId: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('place');
+    params.set('driver', driverId);
     return `/?${params.toString()}`;
   }
 
   function closeDetails(open: boolean) {
     if (open) return;
-    if (detailOpenedFromDirectory.current && window.history.length > 1) {
+    const currentState =
+      window.history.state && typeof window.history.state === 'object'
+        ? window.history.state as Record<string, unknown>
+        : {};
+    const hasInAppBaseEntry = Boolean(
+      detailOpenedFromDirectory.current || currentState[DIRECT_DETAIL_STATE],
+    );
+    if (hasInAppBaseEntry && window.history.length > 1) {
       detailOpenedFromDirectory.current = false;
       router.back();
       return;
     }
+    detailOpenedFromDirectory.current = false;
     router.replace(removePlaceFromUrl(), { scroll: false });
   }
 
@@ -191,6 +280,10 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         drivers={initialDrivers}
         renderedAt={renderedAt}
         onOpenRegistration={() => setIsDriverOpen(true)}
+        driverHref={driverHref}
+        onOpenDriverDetails={() => {
+          detailOpenedFromDirectory.current = true;
+        }}
       />
 
       {/* Main Directory Body */}
@@ -292,7 +385,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               role="status"
               className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700"
             >
-              <span>البطاقة المطلوبة غير موجودة أو تم حذفها، وتم إبقاؤك في دليل الأماكن.</span>
+              <span>البطاقة المطلوبة غير موجودة أو تم حذفها، وتم إبقاؤك في دليل كيان.</span>
               <Button
                 isIconOnly
                 variant="light"
@@ -381,13 +474,27 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
       {/* Footer */}
       <footer className="w-full border-t border-zinc-200 bg-white px-4 py-5 text-center text-xs text-zinc-500">
         <div className="mx-auto flex max-w-7xl flex-col items-center gap-2">
+          <div className="flex flex-wrap justify-center gap-1">
+            <a href="/guide" className="inline-flex min-h-11 items-center rounded-xl px-3 font-bold text-zinc-700 hover:bg-zinc-100">
+              طريقة استخدام الموقع
+            </a>
+            <a href="/share" className="inline-flex min-h-11 items-center rounded-xl px-3 font-bold text-zinc-700 hover:bg-zinc-100">
+              ساعدنا في نشر كيان
+            </a>
+          </div>
           <a
-            href="tel:+201094552421"
+            href="https://chat.whatsapp.com/JTuPs9xv0CZAZhpzxttU3R?s=cl&p=i&ilr=0"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackSiteEvent('support_click', {
+              targetType: 'feature',
+              targetKey: 'support_whatsapp_group',
+            })}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
-            aria-label="الاتصال بدعم كيان سيتي سبوت على رقم 01094552421"
+            aria-label="الانضمام إلى جروب KAYAN CITY SPOT عبر واتساب"
           >
-            <Phone className="size-4" aria-hidden="true" />
-            <span>للتواصل مع الدعم: <bdi dir="ltr">01094552421</bdi></span>
+            <MessageCircle className="size-4" aria-hidden="true" />
+            <span>انضم لجروب KAYAN CITY SPOT على واتساب</span>
           </a>
           <div>© {new Date(renderedAt).getFullYear()} KAYAN CITY SPOT</div>
         </div>
@@ -399,6 +506,12 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         onOpenChange={closeDetails}
         onSuggestDetails={suggestDetails}
         place={selectedPlace}
+      />
+      <DriverDetailsModal
+        key={selectedDriver?.id ?? 'driver-closed'}
+        isOpen={Boolean(selectedDriver)}
+        onOpenChange={closeDetails}
+        driver={selectedDriver}
       />
     </div>
   );

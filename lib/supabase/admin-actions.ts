@@ -5,6 +5,7 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { PendingRequest, Place, Driver, FeedbackRequest } from '@/types';
 import { getCurrentProfile } from '@/lib/auth/guards';
 import { validatePlaceDetails } from '@/lib/place-details';
+import { validateListingImageUrls } from '@/lib/images/urls';
 
 async function requireAdminSession() {
   const profile = await getCurrentProfile();
@@ -307,6 +308,10 @@ export async function serverInsertPlaceDirectly(
       address: placeData.address,
       mapUrl: placeData.map_url,
     });
+    const uploadedImages = validateListingImageUrls(placeData.images ?? [], 6);
+    if (!uploadedImages.length) {
+      throw new Error('أضف صورة واحدة على الأقل للمكان أو المنيو قبل النشر.');
+    }
     const supabase = createAdminClient();
     const { error } = await (supabase as any).from('places').insert([
       {
@@ -320,7 +325,7 @@ export async function serverInsertPlaceDirectly(
         telegram_url: details.telegramUrl,
         address: details.address,
         map_url: details.mapUrl,
-        images: placeData.images || [],
+        images: uploadedImages,
         is_featured: placeData.is_featured || false,
       },
     ]);

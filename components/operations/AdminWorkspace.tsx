@@ -24,6 +24,7 @@ import {
   Lightbulb,
   Link2,
   MessageSquareText,
+  Megaphone,
   MousePointerClick,
   Pencil,
   Plus,
@@ -56,7 +57,9 @@ import { AccountRequestManager } from '@/components/admin/AccountRequestManager'
 import { UserEditorModal } from '@/components/admin/UserEditorModal';
 import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
 import type { AccountRequest, FeedbackRequest, PendingRequest, Place } from '@/types';
+import type { Driver, MarketingCampaign, MarketingChannel } from '@/types';
 import type { BehaviorAnalyticsSummary } from '@/lib/analytics/admin';
+import { MarketingCenter } from '@/components/admin/MarketingCenter';
 
 type Merchant = { id: string; display_name: string; is_active: boolean };
 type Profile = {
@@ -131,6 +134,9 @@ type AdminWorkspaceProps = {
   accountRequests: AccountRequest[];
   clientErrors: ClientErrorSummary[];
   behaviorAnalytics: BehaviorAnalyticsSummary;
+  marketingChannels: MarketingChannel[];
+  marketingCampaigns: MarketingCampaign[];
+  marketingDrivers: Driver[];
 };
 
 export function AdminWorkspace(props: AdminWorkspaceProps) {
@@ -400,6 +406,23 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
       )}
 
       <Tabs aria-label="إدارة المنصة">
+        <Tab
+          id="marketing"
+          key="marketing"
+          title={
+            <span className="flex items-center gap-1.5">
+              <Megaphone className="size-4" />
+              التسويق والنشر
+            </span>
+          }
+        >
+          <MarketingCenter
+            places={props.places}
+            drivers={props.marketingDrivers}
+            channels={props.marketingChannels}
+            campaigns={props.marketingCampaigns}
+          />
+        </Tab>
         <Tab
           id="account-requests"
           key="account-requests"

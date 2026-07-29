@@ -11,7 +11,28 @@ const MAX_WIDTH = 2200;
 const MAX_HEIGHT = 3000;
 const MAX_PIXELS = 5_000_000;
 const SERVER_FALLBACK_BYTES = 3_400_000;
-const ALLOWED_SOURCE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const CLIENT_UPLOAD_ATTEMPTS = 2;
+const ALLOWED_SOURCE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/avif',
+  'image/heic',
+  'image/heif',
+]);
+const SERVER_FALLBACK_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const EXTENSION_TYPES: Record<string, string> = {
+  avif: 'image/avif',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
+export const LISTING_IMAGE_ACCEPT =
+  'image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif';
 
 export type ImageProcessingProgress = {
   current: number;
@@ -23,6 +44,11 @@ export type ImageProcessingProgress = {
 export type ImageBatchUploadResult = {
   urls: string[];
   failedFiles: string[];
+  failures: Array<{
+    fileKey: string;
+    fileName: string;
+    message: string;
+  }>;
 };
 
 type DecodedImage = {
@@ -123,8 +149,38 @@ async function renderImage(
 
 function yieldToBrowser(): Promise<void> {
   return new Promise((resolve) => {
-    window.requestAnimationFrame(() => resolve());
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = window.setTimeout(finish, 80);
+    if (document.visibilityState === 'visible') {
+      window.requestAnimationFrame(finish);
+    }
   });
+}
+
+function sourceMimeType(file: File): string {
+  const declaredType = file.type.toLowerCase().split(';')[0].trim();
+  if (ALLOWED_SOURCE_TYPES.has(declaredType)) return declaredType;
+  const extension = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return EXTENSION_TYPES[extension] ?? declaredType;
+}
+
+export function imageFileKey(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}:${sourceMimeType(file)}`;
+}
+
+function safeUploadMessage(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message.trim();
+  return 'تعذر رفع الصورة بسبب مشكلة مؤقتة في الاتصال.';
+}
+
+function canRetryUpload(message: string): boolean {
+  return !/صيغة|فارغة|أكبر من|إعدادات|صور كثيرة|بعد ساعة/.test(message);
 }
 
 /**
@@ -133,7 +189,8 @@ function yieldToBrowser(): Promise<void> {
  */
 export async function optimizeImageForUpload(file: File): Promise<File> {
   if (!file.size) throw new Error(`الصورة "${file.name}" فارغة.`);
-  if (!ALLOWED_SOURCE_TYPES.has(file.type)) {
+  const normalizedType = sourceMimeType(file);
+  if (!ALLOWED_SOURCE_TYPES.has(normalizedType)) {
     throw new Error(`صيغة الصورة "${file.name}" غير مدعومة.`);
   }
   if (file.size > MAX_SOURCE_BYTES) {
@@ -173,9 +230,16 @@ export async function optimizeImageForUpload(file: File): Promise<File> {
     });
   } catch (error) {
     console.warn('Browser image optimization failed; using server fallback.', error);
-    if (file.size <= SERVER_FALLBACK_BYTES) return file;
+    if (file.size <= SERVER_FALLBACK_BYTES && SERVER_FALLBACK_TYPES.has(normalizedType)) {
+      return file.type === normalizedType
+        ? file
+        : new File([file], file.name, {
+            type: normalizedType,
+            lastModified: file.lastModified,
+          });
+    }
     throw new Error(
-      `تعذر قراءة الصورة "${file.name}" داخل المتصفح. جرّب إرسالها من تطبيق الصور أو واتساب.`,
+      `تعذر قراءة الصورة "${file.name}" داخل المتصفح. حوّلها إلى JPG أو أرسلها من تطبيق الصور أو واتساب ثم حاول مرة أخرى.`,
     );
   } finally {
     image?.release();
@@ -208,6 +272,7 @@ export async function uploadOptimizedImages(
 ): Promise<ImageBatchUploadResult> {
   const urls: string[] = [];
   const failedFiles: string[] = [];
+  const failures: ImageBatchUploadResult['failures'] = [];
 
   for (let index = 0; index < files.length; index += 1) {
     const originalFile = files[index];
@@ -225,18 +290,46 @@ export async function uploadOptimizedImages(
         fileName: optimizedFile.name,
         stage: 'uploading',
       });
-      const result = await uploadImageToStorage(optimizedFile, folder);
-      if (!result.success || !result.url) {
-        failedFiles.push(originalFile.name);
+      let uploadedUrl = '';
+      let failureMessage = 'تعذر رفع الصورة حالياً.';
+      for (let attempt = 1; attempt <= CLIENT_UPLOAD_ATTEMPTS; attempt += 1) {
+        try {
+          const result = await uploadImageToStorage(optimizedFile, folder);
+          if (result.success && result.url) {
+            uploadedUrl = result.url;
+            break;
+          }
+          failureMessage = result.success
+            ? 'تعذر إنشاء رابط الصورة بعد رفعها.'
+            : result.message;
+          if (!canRetryUpload(failureMessage)) break;
+        } catch (error) {
+          failureMessage = safeUploadMessage(error);
+        }
+        if (attempt < CLIENT_UPLOAD_ATTEMPTS) await yieldToBrowser();
+      }
+
+      if (uploadedUrl) {
+        urls.push(uploadedUrl);
       } else {
-        urls.push(result.url);
+        failedFiles.push(originalFile.name);
+        failures.push({
+          fileKey: imageFileKey(originalFile),
+          fileName: originalFile.name,
+          message: failureMessage,
+        });
       }
     } catch (error) {
       console.error(`Image upload failed for "${originalFile.name}":`, error);
       failedFiles.push(originalFile.name);
+      failures.push({
+        fileKey: imageFileKey(originalFile),
+        fileName: originalFile.name,
+        message: safeUploadMessage(error),
+      });
     }
     await yieldToBrowser();
   }
 
-  return { urls, failedFiles };
+  return { urls, failedFiles, failures };
 }

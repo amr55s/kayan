@@ -17,6 +17,18 @@ test('place details are deep-linked without creating a fragile dynamic route', (
   assert.match(directory, /params\.set\('place', placeId\)/);
   assert.match(directory, /البطاقة المطلوبة غير موجودة/);
   assert.match(directory, /router\.replace\(removePlaceFromUrl\(\)/);
+  assert.match(directory, /DIRECT_DETAIL_STATE/);
+  assert.match(directory, /History\.prototype\.replaceState\.call/);
+  assert.match(directory, /History\.prototype\.pushState\.call/);
+  assert.match(directory, /currentState\[DIRECT_DETAIL_STATE\]/);
+  assert.match(directory, /hasInAppBaseEntry[\s\S]*router\.back\(\)/);
+});
+
+test('native place sharing includes the direct URL only once', () => {
+  const share = read('lib/share.ts');
+  assert.match(share, /const text = `\$\{title\}\\n\$\{phone\}\\nعبر كيان سيتي سبوت`/);
+  assert.match(share, /navigator\.share\(\{ title: .* text, url \}\)/);
+  assert.match(share, /fallbackWhatsApp\(`\$\{text\}\\n\$\{url\}`\)/);
 });
 
 test('verified merchants update their linked place directly while public suggestions stay moderated', () => {

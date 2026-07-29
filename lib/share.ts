@@ -4,7 +4,7 @@ export async function sharePlace(
   pageUrl?: string
 ): Promise<boolean> {
   const url = pageUrl || (typeof window !== 'undefined' ? window.location.href : '');
-  const text = `${title}\n${phone}\nعبر كيان سيتي سبوت\n${url}`;
+  const text = `${title}\n${phone}\nعبر كيان سيتي سبوت`;
 
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
@@ -12,12 +12,34 @@ export async function sharePlace(
       return true;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return false;
-      fallbackWhatsApp(text);
+      fallbackWhatsApp(`${text}\n${url}`);
       return true;
     }
   }
 
-  fallbackWhatsApp(text);
+  fallbackWhatsApp(`${text}\n${url}`);
+  return true;
+}
+
+export async function shareDirectoryItem(
+  title: string,
+  pageUrl: string,
+  description = 'شاهد التفاصيل وتواصل مباشرة بدون وسيط أو عمولات عبر كيان سيتي سبوت',
+): Promise<boolean> {
+  const text = `${title}\n${description}`;
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    try {
+      await navigator.share({
+        title: `${title} — كيان سيتي سبوت`,
+        text,
+        url: pageUrl,
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return false;
+    }
+  }
+  fallbackWhatsApp(`${text}\n${pageUrl}`);
   return true;
 }
 

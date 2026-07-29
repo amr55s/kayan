@@ -141,6 +141,17 @@ async function fetchRegisteredDrivers(): Promise<RegisteredDriverRow[]> {
   return (result.data ?? []) as RegisteredDriverRow[];
 }
 
+export async function fetchPublicDrivers(): Promise<Driver[]> {
+  const [legacyResult, registeredResult] = await Promise.all([
+    settle(fetchLegacyDrivers()),
+    settle(fetchRegisteredDrivers()),
+  ]);
+  return mergePublicDrivers(
+    legacyResult.status === 'fulfilled' ? legacyResult.value : [],
+    registeredResult.status === 'fulfilled' ? registeredResult.value : [],
+  );
+}
+
 export async function fetchHomePageData(): Promise<{
   places: Place[];
   drivers: Driver[];

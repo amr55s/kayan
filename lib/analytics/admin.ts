@@ -8,6 +8,7 @@ type AnalyticsEventRow = {
   target_type: string;
   target_key: string;
   route: string;
+  campaign_key?: string;
   events: number | string;
 };
 
@@ -29,6 +30,13 @@ export type BehaviorAnalyticsSummary = {
   daily: Array<{ date: string; views: number; visitors: number }>;
   topActions: Array<{ name: string; count: number }>;
   topPlaces: Array<{ placeId: string; opens: number; actions: number }>;
+  campaignEvents: Array<{
+    campaignKey: string;
+    visits: number;
+    opens: number;
+    actions: number;
+    shares: number;
+  }>;
 };
 
 const emptySummary: BehaviorAnalyticsSummary = {
@@ -44,6 +52,7 @@ const emptySummary: BehaviorAnalyticsSummary = {
   daily: [],
   topActions: [],
   topPlaces: [],
+  campaignEvents: [],
 };
 
 function dateOnly(date: Date): string {
@@ -60,7 +69,7 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
     const [eventResult, visitorResult] = await Promise.all([
       (admin as any)
         .from('analytics_daily_events')
-        .select('event_date, event_name, target_type, target_key, route, events')
+        .select('event_date, event_name, target_type, target_key, route, campaign_key, events')
         .gte('event_date', since)
         .order('event_date', { ascending: true })
         .limit(5_000),
@@ -81,6 +90,12 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
     const placeTotals = new Map<string, { opens: number; actions: number }>();
     const dailyViews = new Map<string, number>();
     const dailyVisitors = new Map<string, Set<string>>();
+    const campaignTotals = new Map<string, {
+      visits: number;
+      opens: number;
+      actions: number;
+      shares: number;
+    }>();
     let pageViews = 0;
     let placeOpens = 0;
     let actionClicks = 0;
@@ -100,10 +115,37 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
       }
       if (event.event_name === 'place_open') placeOpens += count;
       if (event.event_name === 'search_use') searchUses += count;
-      if (!['page_view', 'place_open', 'search_use', 'category_select'].includes(event.event_name)) {
+      if (![
+        'page_view',
+        'place_open',
+        'driver_open',
+        'guide_open',
+        'search_use',
+        'category_select',
+      ].includes(event.event_name)) {
         actionClicks += count;
       }
       actionTotals.set(event.event_name, (actionTotals.get(event.event_name) ?? 0) + count);
+
+      if (event.campaign_key) {
+        const campaign = campaignTotals.get(event.campaign_key) ?? {
+          visits: 0,
+          opens: 0,
+          actions: 0,
+          shares: 0,
+        };
+        if (event.event_name === 'page_view') campaign.visits += count;
+        if (event.event_name === 'place_open' || event.event_name === 'driver_open') {
+          campaign.opens += count;
+        }
+        if (['phone_click', 'whatsapp_click', 'group_click', 'map_click'].includes(event.event_name)) {
+          campaign.actions += count;
+        }
+        if (event.event_name === 'share_click' || event.event_name === 'marketing_share_click') {
+          campaign.shares += count;
+        }
+        campaignTotals.set(event.campaign_key, campaign);
+      }
 
       if (event.target_type === 'place' && event.target_key) {
         const place = placeTotals.get(event.target_key) ?? { opens: 0, actions: 0 };
@@ -145,6 +187,10 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
             right.actions + right.opens - (left.actions + left.opens),
         )
         .slice(0, 8),
+      campaignEvents: Array.from(campaignTotals, ([campaignKey, totals]) => ({
+        campaignKey,
+        ...totals,
+      })),
     };
   } catch (error) {
     console.warn('Behavior analytics are not available yet:', error);

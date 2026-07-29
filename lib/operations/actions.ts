@@ -186,6 +186,13 @@ export async function submitAccountRequest(
   try {
     const data = accountRequestSchema.parse(input);
     const uploadedImages = validateListingImageUrls(imageUrls, 3);
+    if (
+      data.kind === 'merchant'
+      && data.placeMode === 'new'
+      && uploadedImages.length === 0
+    ) {
+      throw new Error('أضف صورة واحدة على الأقل للمكان أو المنيو قبل إرسال الطلب.');
+    }
 
     const admin = createAdminClient();
     const rateLimitSecret =
