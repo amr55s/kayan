@@ -28,14 +28,15 @@ export function DashboardHeader({
   const signOut = async () => {
     setIsSigningOut(true);
     setErrorMessage('');
-    const { error } = await createClient().auth.signOut();
-    if (error) {
+    try {
+      const { error } = await createClient().auth.signOut();
+      if (error) throw error;
+      router.replace('/');
+      router.refresh();
+    } catch {
       setErrorMessage('تعذر تسجيل الخروج. حاول مرة أخرى.');
       setIsSigningOut(false);
-      return;
     }
-    router.replace('/');
-    router.refresh();
   };
 
   return (
@@ -64,11 +65,11 @@ export function DashboardHeader({
         <div className="flex shrink-0 items-center gap-1.5">
           <Link
             href="/"
+            aria-label="العودة إلى الخدمات"
             className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
           >
             <Home className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">العودة إلى كيان سيتي سبوت</span>
-            <span className="sm:hidden">الخدمات</span>
           </Link>
           <button
             type="button"
@@ -77,7 +78,8 @@ export function DashboardHeader({
             className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-zinc-950 px-3 text-xs font-bold text-white transition-colors hover:bg-zinc-800 disabled:cursor-wait disabled:opacity-60"
           >
             <LogOut className="size-4" aria-hidden="true" />
-            {isSigningOut ? 'جارٍ الخروج...' : 'تسجيل الخروج'}
+            <span className="sm:hidden">{isSigningOut ? 'جارٍ…' : 'خروج'}</span>
+            <span className="hidden sm:inline">{isSigningOut ? 'جارٍ الخروج…' : 'تسجيل الخروج'}</span>
           </button>
         </div>
       </div>

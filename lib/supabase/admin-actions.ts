@@ -407,24 +407,30 @@ export async function serverDeleteActivePlace(
 
 export async function serverToggleDriverStatus(
   driverId: string,
-  currentStatus: boolean
+  currentStatus: boolean,
+  source: 'public' | 'account' = 'public',
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    await requireAdminSession();
+    const actor = await requireAdminSession();
+    if (!/^[0-9a-f-]{36}$/i.test(driverId)) throw new Error('معرف الكابتن غير صالح.');
     const supabase = createAdminClient();
-
-    const { error } = await (supabase as any)
-      .from('drivers')
-      .update({
-        is_active: !currentStatus,
-        active_until: !currentStatus ? new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() : null
-      })
-      .eq('id', driverId);
+    const { error } = await (supabase as any).rpc('admin_update_managed_driver', {
+      p_driver_id: driverId,
+      p_source: source,
+      p_is_active: !currentStatus,
+    });
 
     if (error) {
       return { success: false, message: 'حدث خطأ أثناء تغيير حالة السائق.' };
     }
 
+    await (supabase as any).from('audit_log').insert({
+      actor_id: actor.id,
+      action: !currentStatus ? 'driver_activated' : 'driver_deactivated',
+      entity_type: source === 'account' ? 'profile' : 'driver',
+      entity_id: driverId,
+      metadata: { source },
+    });
     triggerInstantRevalidation();
     return { success: true };
   } catch (error) {
@@ -491,9 +497,10 @@ export async function serverUpdateDriver(
     whatsapp?: string | null;
     vehicleType?: string | null;
   },
+  source: 'public' | 'account' = 'public',
 ): Promise<{ success: boolean; message?: string }> {
   try {
-    await requireAdminSession();
+    const actor = await requireAdminSession();
     const phone = input.phone.replace(/\D/g, '').replace(/^20/, '0');
     const whatsapp = input.whatsapp?.replace(/\D/g, '').replace(/^20/, '0') || phone;
     if (!/^[0-9a-f-]{36}$/i.test(driverId)) throw new Error('معرف الكابتن غير صالح.');
@@ -505,16 +512,22 @@ export async function serverUpdateDriver(
     }
 
     const supabase = createAdminClient();
-    const { error } = await (supabase as any)
-      .from('drivers')
-      .update({
-        name: input.name.trim(),
-        phone,
-        whatsapp,
-        vehicle_type: input.vehicleType?.trim() || null,
-      })
-      .eq('id', driverId);
+    const { error } = await (supabase as any).rpc('admin_update_managed_driver', {
+      p_driver_id: driverId,
+      p_source: source,
+      p_name: input.name.trim(),
+      p_contact_phone: phone,
+      p_whatsapp: whatsapp,
+      p_vehicle_type: input.vehicleType?.trim() || '',
+    });
     if (error) throw error;
+    await (supabase as any).from('audit_log').insert({
+      actor_id: actor.id,
+      action: 'driver_public_profile_updated',
+      entity_type: source === 'account' ? 'profile' : 'driver',
+      entity_id: driverId,
+      metadata: { source },
+    });
     triggerInstantRevalidation(['drivers']);
     return { success: true, message: 'تم تحديث بيانات الكابتن.' };
   } catch (error) {

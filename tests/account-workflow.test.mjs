@@ -150,7 +150,7 @@ test('WhatsApp support link stays visible across the whole site', () => {
   );
 });
 
-test('driver signup and public cards keep contact and WhatsApp numbers explicit', () => {
+test('driver contact fields stay explicit while public cards expose actions only', () => {
   const modal = read('components/delivery/DriverModal.tsx');
   const card = read('components/delivery/DriverCard.tsx');
   const bar = read('components/delivery/DeliveryBar.tsx');
@@ -158,8 +158,10 @@ test('driver signup and public cards keep contact and WhatsApp numbers explicit'
   assert.match(modal, /label="رقم للتواصل"/);
   assert.match(modal, /label="رقم للواتس"/);
   assert.match(modal, /name="whatsapp"[\s\S]*isRequired|isRequired[\s\S]*name="whatsapp"/);
-  assert.match(card, /للتواصل:/);
-  assert.match(card, /للواتس:/);
+  assert.doesNotMatch(card, /للتواصل:/);
+  assert.doesNotMatch(card, /للواتس:/);
+  assert.match(card, />\s*واتساب\s*</);
+  assert.match(card, />\s*اتصال\s*</);
   assert.match(card, /whatsapp_click/);
   assert.match(card, /phone_click/);
   assert.doesNotMatch(card, />\s*التفاصيل\s*</);

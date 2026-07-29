@@ -449,6 +449,7 @@ export type Database = {
       driver_profiles: {
         Row: {
           active_until: string | null
+          contact_phone: string | null
           created_at: string
           is_available: boolean
           last_seen_at: string | null
@@ -460,6 +461,7 @@ export type Database = {
         }
         Insert: {
           active_until?: string | null
+          contact_phone?: string | null
           created_at?: string
           is_available?: boolean
           last_seen_at?: string | null
@@ -471,6 +473,7 @@ export type Database = {
         }
         Update: {
           active_until?: string | null
+          contact_phone?: string | null
           created_at?: string
           is_available?: boolean
           last_seen_at?: string | null
@@ -1471,12 +1474,14 @@ export type Database = {
       }
       update_driver_public_profile: {
         Args: {
+          p_contact_phone?: string
           p_display_name: string
           p_vehicle_type?: string
           p_whatsapp?: string
         }
         Returns: {
           active_until: string | null
+          contact_phone: string | null
           created_at: string
           is_available: boolean
           last_seen_at: string | null

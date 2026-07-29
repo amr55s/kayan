@@ -115,6 +115,7 @@ export const merchantPlaceSchema = z.object({
 
 export const driverPublicProfileSchema = z.object({
   displayName: z.string().trim().min(2).max(100),
+  contactPhone: egyptianPhone,
   whatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
   vehicleType: z.string().trim().max(60).optional().nullable(),
 });

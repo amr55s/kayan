@@ -90,3 +90,43 @@ test('database migration keeps diagnostics private and storage writes server-onl
   assert.match(postDeploy, /grant execute on function %s to authenticated/);
   assert.match(migration, /grant execute on function public\.record_client_error/);
 });
+
+test('driver contact actions use a distinct managed field without exposing login data', () => {
+  const migration = read(
+    'supabase/migrations/20260729115854_driver_contact_and_pwa_reliability.sql',
+  );
+  const workspace = read('components/operations/DriverWorkspace.tsx');
+  const adminManager = read('components/admin/DriverManager.tsx');
+  const publicCard = read('components/delivery/DriverCard.tsx');
+
+  assert.match(migration, /add column if not exists contact_phone text/);
+  assert.match(migration, /coalesce\(driver\.contact_phone, legacy\.phone, profile\.phone\)/);
+  assert.match(migration, /admin_update_managed_driver/);
+  assert.match(migration, /to service_role/);
+  assert.match(workspace, /name="contactPhone"/);
+  assert.match(workspace, /pwa|بطاقتك|بيانات البطاقة العامة/i);
+  assert.match(adminManager, /رقم الاتصال العام/);
+  assert.doesNotMatch(publicCard, /driver\.phone\}/);
+  assert.match(publicCard, /formatPhoneForTel\(driver\.phone\)/);
+});
+
+test('PWA caches only public shell data and provides an iOS-safe install path', () => {
+  const serviceWorker = read('public/sw.js');
+  const installer = read('components/layout/PwaInstaller.tsx');
+  const manifest = read('public/manifest.json');
+  const layout = read('app/layout.tsx');
+  const nextConfig = read('next.config.ts');
+
+  assert.match(serviceWorker, /PRIVATE_PREFIXES = \['\/admin', '\/driver', '\/merchant', '\/login'\]/);
+  assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\)/);
+  assert.match(serviceWorker, /isNextDataRequest/);
+  assert.match(serviceWorker, /offline\.html/);
+  assert.match(installer, /إضافة إلى الشاشة الرئيسية/);
+  assert.match(installer, /updateViaCache: 'none'/);
+  assert.match(installer, /SKIP_WAITING/);
+  assert.match(manifest, /"display": "standalone"/);
+  assert.match(manifest, /apple-touch-icon|maskable/);
+  assert.match(layout, /<PwaInstaller \/>/);
+  assert.match(nextConfig, /Service-Worker-Allowed/);
+  assert.match(nextConfig, /no-cache, no-store, must-revalidate/);
+});

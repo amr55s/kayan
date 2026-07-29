@@ -9,6 +9,10 @@
   color: #fff !important;
 }
 
+.kayan-admin-tabs [role='tab'][aria-selected='true'] {
+  color: #fff !important;
+}
+
 @source "./admin/error.tsx";
 @source "./admin/layout.tsx";
 @source "./admin/page.tsx";

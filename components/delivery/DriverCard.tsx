@@ -80,39 +80,33 @@ export function DriverCard({
               >
                 {displayName}
               </Link>
-              <p className="dir-ltr mt-0.5 text-right font-mono text-xs text-zinc-300">
-                <span className="font-sans text-zinc-400">للتواصل: </span>
-                {driver.phone}
-              </p>
-              <p className="dir-ltr mt-0.5 text-right font-mono text-xs text-zinc-300">
-                <span className="font-sans text-zinc-400">للواتس: </span>
-                {driver.whatsapp || driver.phone}
-              </p>
               <p className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
                 <Bike className="size-3.5" aria-hidden="true" />
                 {driver.vehicle_type || 'نوع المركبة غير محدد'}
               </p>
             </div>
           </div>
-          <Chip
-            className={`shrink-0 px-1.5 text-[10px] ${
-              isAvailable
-                ? 'border border-emerald-700/40 bg-emerald-500/10 text-emerald-300'
-                : 'border border-zinc-700 bg-zinc-800 text-zinc-300'
-            }`}
-          >
-            {isAvailable ? label : 'خامل'}
-          </Chip>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="light"
-            aria-label={`مشاركة ${displayName}`}
-            onPress={share}
-            className="size-9 min-w-9 text-zinc-300"
-          >
-            <Share2 className="size-4" aria-hidden="true" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <Chip
+              className={`max-w-24 shrink-0 px-1.5 text-[10px] ${
+                isAvailable
+                  ? 'border border-emerald-700/40 bg-emerald-500/10 text-emerald-300'
+                  : 'border border-zinc-700 bg-zinc-800 text-zinc-300'
+              }`}
+            >
+              {isAvailable ? label : 'خامل'}
+            </Chip>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              aria-label={`مشاركة ${displayName}`}
+              onPress={share}
+              className="size-9 min-w-9 text-zinc-300"
+            >
+              <Share2 className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2 border-t border-zinc-800 pt-2.5">
@@ -129,7 +123,7 @@ export function DriverCard({
               targetKey: driver.id,
             })}
             startContent={<MessageCircle className="size-4" aria-hidden="true" />}
-            className="border border-zinc-700 bg-zinc-800 text-xs font-bold text-white"
+            className="min-h-11 border border-zinc-700 bg-zinc-800 text-xs font-bold text-white"
           >
             واتساب
           </Button>
@@ -141,7 +135,7 @@ export function DriverCard({
               targetKey: driver.id,
             })}
             startContent={<Phone className="size-4" aria-hidden="true" />}
-            className="bg-white text-xs font-extrabold text-zinc-950"
+            className="min-h-11 bg-white text-xs font-extrabold text-zinc-950"
           >
             اتصال
           </Button>

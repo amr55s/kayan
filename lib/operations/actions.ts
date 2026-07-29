@@ -166,6 +166,7 @@ export async function updateDriverPublicProfile(input: unknown): Promise<ActionR
     const supabase = await createClient();
     const { error } = await (supabase as any).rpc('update_driver_public_profile', {
       p_display_name: data.displayName,
+      p_contact_phone: data.contactPhone,
       p_whatsapp: data.whatsapp || null,
       p_vehicle_type: data.vehicleType || null,
     });

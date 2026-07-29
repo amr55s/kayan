@@ -9,7 +9,6 @@ import { DeliveryBar } from '@/components/delivery/DeliveryBar';
 import { CategoryTabs } from './CategoryTabs';
 import { PlaceCard } from './PlaceCard';
 import { PlaceDetailsModal } from './PlaceDetailsModal';
-import { PwaInstaller } from '@/components/layout/PwaInstaller';
 import { useFavorites } from '@/hooks/useFavorites';
 import { AddListingModal } from '@/components/modals/AddListingModal';
 import { FeedbackModal } from '@/components/modals/FeedbackModal';
@@ -437,9 +436,6 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
           )}
         </div>
       </main>
-
-      {/* PWA Install Banner */}
-      <PwaInstaller />
 
       <AddListingModal
         isOpen={isAddOpen}

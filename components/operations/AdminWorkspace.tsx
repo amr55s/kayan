@@ -98,8 +98,10 @@ type DirectoryDriver = {
   whatsapp: string | null;
   vehicle_type: string | null;
   is_active: boolean;
+  is_available: boolean;
   active_until: string | null;
   created_at: string;
+  source: 'public' | 'account';
 };
 type AuditEntry = {
   id: number;
@@ -311,7 +313,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
     : null;
 
   return (
-    <main className="dir-rtl mx-auto max-w-7xl space-y-5 px-3 py-5 sm:px-6">
+    <main id="main-content" className="dir-rtl mx-auto max-w-7xl space-y-5 overflow-x-clip px-3 py-5 sm:px-6">
       <section>
         <h1 className="flex items-center gap-2 text-2xl font-black">
           <ShieldCheck className="size-6 text-zinc-900" />
@@ -367,6 +369,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
       <BehaviorAnalyticsOverview
         analytics={props.behaviorAnalytics}
         places={props.places}
+        drivers={props.marketingDrivers}
       />
 
       {props.clientErrors.length > 0 && (
@@ -403,7 +406,16 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
         </Card>
       )}
 
-      <Tabs aria-label="إدارة المنصة">
+      <Tabs
+        aria-label="إدارة المنصة"
+        className="kayan-admin-tabs min-w-0"
+        classNames={{
+          tabList: 'max-w-full overflow-x-auto rounded-2xl bg-zinc-100 p-1 no-scrollbar',
+          tab: 'min-h-11 shrink-0 px-4 font-bold',
+          cursor: 'bg-zinc-950',
+          panel: 'px-0 pt-4',
+        }}
+      >
         <Tab
           id="marketing"
           key="marketing"
@@ -1003,6 +1015,10 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
 
 const analyticsActionLabels: Record<string, string> = {
   place_open: 'فتح تفاصيل مكان',
+  driver_open: 'فتح تفاصيل كابتن',
+  guide_open: 'فتح دليل الاستخدام',
+  marketing_share_click: 'مشاركة مادة تسويقية',
+  card_download: 'تنزيل بطاقة نشر',
   phone_click: 'ضغط اتصال',
   whatsapp_click: 'ضغط WhatsApp',
   group_click: 'فتح جروب WhatsApp',
@@ -1023,9 +1039,11 @@ const analyticsActionLabels: Record<string, string> = {
 function BehaviorAnalyticsOverview({
   analytics,
   places,
+  drivers,
 }: {
   analytics: BehaviorAnalyticsSummary;
   places: Place[];
+  drivers: Driver[];
 }) {
   const maxDaily = Math.max(
     1,
@@ -1033,8 +1051,11 @@ function BehaviorAnalyticsOverview({
   );
   const topAction = analytics.topActions[0];
   const topPlace = analytics.topPlaces[0];
+  const topDriver = analytics.topDrivers[0];
   const placeTitle = (placeId: string) =>
     places.find((place) => place.id === placeId)?.title ?? 'مكان محذوف أو غير منشور';
+  const driverTitle = (driverId: string) =>
+    drivers.find((driver) => driver.id === driverId)?.name ?? 'كابتن محذوف أو غير منشور';
 
   return (
     <Card className="overflow-hidden border border-zinc-200">
@@ -1053,7 +1074,7 @@ function BehaviorAnalyticsOverview({
         </Chip>
       </CardHeader>
       <CardBody className="gap-5 p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <AnalyticsMetric
             label="زوار مختلفون"
             value={analytics.totalVisitors}
@@ -1069,13 +1090,19 @@ function BehaviorAnalyticsOverview({
           <AnalyticsMetric
             label="فتح التفاصيل"
             value={analytics.placeOpens}
-            detail="كل البطاقات"
+            detail="بطاقات الأماكن"
             icon={<MousePointerClick className="size-5" aria-hidden="true" />}
+          />
+          <AnalyticsMetric
+            label="فتح الكباتن"
+            value={analytics.driverOpens}
+            detail="بطاقات التوصيل"
+            icon={<UserCog className="size-5" aria-hidden="true" />}
           />
           <AnalyticsMetric
             label="إجراءات التواصل"
             value={analytics.actionClicks}
-            detail={`${analytics.actionRate}% من فتح التفاصيل`}
+            detail={`${analytics.actionRate}% من فتح البطاقات`}
             icon={<TrendingUp className="size-5" aria-hidden="true" />}
           />
           <AnalyticsMetric
@@ -1132,7 +1159,7 @@ function BehaviorAnalyticsOverview({
           </section>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-3">
           <section className="rounded-2xl border border-zinc-200 p-4">
             <h3 className="text-sm font-black">أكثر ما يضغط عليه الزوار</h3>
             <div className="mt-3 space-y-2">
@@ -1162,15 +1189,34 @@ function BehaviorAnalyticsOverview({
               )) : <EmptyState text="ستظهر البطاقات الأعلى تفاعلاً هنا." />}
             </div>
           </section>
+
+          <section className="rounded-2xl border border-zinc-200 p-4">
+            <h3 className="text-sm font-black">أكثر الكباتن تفاعلاً</h3>
+            <div className="mt-3 space-y-2">
+              {analytics.topDrivers.length ? analytics.topDrivers.slice(0, 6).map((item, index) => (
+                <div key={item.driverId} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-xl bg-zinc-50 px-3 py-2 text-sm">
+                  <span className="truncate font-bold">
+                    {index + 1}. {driverTitle(item.driverId)}
+                  </span>
+                  <span className="shrink-0 text-xs font-bold text-zinc-500">
+                    {item.opens} فتح · {item.actions} إجراء
+                  </span>
+                </div>
+              )) : <EmptyState text="ستظهر بطاقات الكباتن الأعلى تفاعلاً هنا." />}
+            </div>
+          </section>
         </div>
 
-        {(topAction || topPlace) && (
+        {(topAction || topPlace || topDriver) && (
           <p className="rounded-2xl bg-zinc-950 px-4 py-3 text-sm font-semibold leading-7 text-white">
             تحليل سريع: {topAction
               ? `أكثر تفاعل هو «${analyticsActionLabels[topAction.name] ?? topAction.name}» بعدد ${topAction.count}.`
               : ''}
             {topPlace
               ? ` والبطاقة الأعلى تفاعلاً هي «${placeTitle(topPlace.placeId)}».`
+              : ''}
+            {topDriver
+              ? ` والكابتن الأعلى تفاعلاً هو «${driverTitle(topDriver.driverId)}».`
               : ''}
           </p>
         )}
@@ -1273,7 +1319,16 @@ function DirectoryTab({
 
   return (
     <>
-      <Tabs aria-label="إدارة كيان سيتي سبوت">
+      <Tabs
+        aria-label="إدارة كيان سيتي سبوت"
+        className="kayan-admin-tabs min-w-0"
+        classNames={{
+          tabList: 'max-w-full overflow-x-auto rounded-2xl bg-zinc-100 p-1 no-scrollbar',
+          tab: 'min-h-11 shrink-0 px-4 font-bold',
+          cursor: 'bg-zinc-950',
+          panel: 'px-0 pt-4',
+        }}
+      >
         <Tab key="places" title={`الأماكن والخدمات (${places.length})`}>
           <Card className="border border-zinc-200">
             <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">

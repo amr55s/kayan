@@ -24,12 +24,14 @@ export type BehaviorAnalyticsSummary = {
   visitorsToday: number;
   pageViews: number;
   placeOpens: number;
+  driverOpens: number;
   actionClicks: number;
   searchUses: number;
   actionRate: number;
   daily: Array<{ date: string; views: number; visitors: number }>;
   topActions: Array<{ name: string; count: number }>;
   topPlaces: Array<{ placeId: string; opens: number; actions: number }>;
+  topDrivers: Array<{ driverId: string; opens: number; actions: number }>;
   campaignEvents: Array<{
     campaignKey: string;
     visits: number;
@@ -46,12 +48,14 @@ const emptySummary: BehaviorAnalyticsSummary = {
   visitorsToday: 0,
   pageViews: 0,
   placeOpens: 0,
+  driverOpens: 0,
   actionClicks: 0,
   searchUses: 0,
   actionRate: 0,
   daily: [],
   topActions: [],
   topPlaces: [],
+  topDrivers: [],
   campaignEvents: [],
 };
 
@@ -88,6 +92,7 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
     const uniqueVisitors = new Set(visitors.map((row) => row.visitor_hash));
     const actionTotals = new Map<string, number>();
     const placeTotals = new Map<string, { opens: number; actions: number }>();
+    const driverTotals = new Map<string, { opens: number; actions: number }>();
     const dailyViews = new Map<string, number>();
     const dailyVisitors = new Map<string, Set<string>>();
     const campaignTotals = new Map<string, {
@@ -98,6 +103,7 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
     }>();
     let pageViews = 0;
     let placeOpens = 0;
+    let driverOpens = 0;
     let actionClicks = 0;
     let searchUses = 0;
 
@@ -114,6 +120,7 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
         dailyViews.set(event.event_date, (dailyViews.get(event.event_date) ?? 0) + count);
       }
       if (event.event_name === 'place_open') placeOpens += count;
+      if (event.event_name === 'driver_open') driverOpens += count;
       if (event.event_name === 'search_use') searchUses += count;
       if (![
         'page_view',
@@ -153,6 +160,14 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
         else place.actions += count;
         placeTotals.set(event.target_key, place);
       }
+      if (event.target_type === 'driver' && event.target_key) {
+        const driver = driverTotals.get(event.target_key) ?? { opens: 0, actions: 0 };
+        if (event.event_name === 'driver_open') driver.opens += count;
+        else if (['phone_click', 'whatsapp_click', 'share_click'].includes(event.event_name)) {
+          driver.actions += count;
+        }
+        driverTotals.set(event.target_key, driver);
+      }
     }
 
     const daily = Array.from({ length: 14 }, (_, offset) => {
@@ -173,15 +188,24 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
       visitorsToday: dailyVisitors.get(today)?.size ?? 0,
       pageViews,
       placeOpens,
+      driverOpens,
       actionClicks,
       searchUses,
-      actionRate: placeOpens ? Math.min(100, Math.round((actionClicks / placeOpens) * 100)) : 0,
+      actionRate: placeOpens + driverOpens
+        ? Math.min(100, Math.round((actionClicks / (placeOpens + driverOpens)) * 100))
+        : 0,
       daily,
       topActions: Array.from(actionTotals, ([name, count]) => ({ name, count }))
         .filter((item) => item.name !== 'page_view')
         .sort((left, right) => right.count - left.count)
         .slice(0, 8),
       topPlaces: Array.from(placeTotals, ([placeId, totals]) => ({ placeId, ...totals }))
+        .sort(
+          (left, right) =>
+            right.actions + right.opens - (left.actions + left.opens),
+        )
+        .slice(0, 8),
+      topDrivers: Array.from(driverTotals, ([driverId, totals]) => ({ driverId, ...totals }))
         .sort(
           (left, right) =>
             right.actions + right.opens - (left.actions + left.opens),

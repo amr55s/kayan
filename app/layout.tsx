@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { SITE_NAME, SITE_NAME_AR, SITE_TAGLINE } from '@/lib/brand';
 import { WhatsAppGroupButton } from '@/components/layout/WhatsAppGroupButton';
+import { PwaInstaller } from '@/components/layout/PwaInstaller';
 import { Providers } from './providers';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -18,10 +19,20 @@ export const metadata: Metadata = {
   ),
   title: `${SITE_NAME} | ${SITE_TAGLINE}`,
   description: `${SITE_NAME_AR} يجمع المحلات والمطاعم والصيدليات والخدمات والتوصيل والتواصل المباشر في مكان واحد`,
+  applicationName: SITE_NAME,
   manifest: '/manifest.json',
   icons: {
     icon: '/icons/icon-192.png',
-    apple: '/icons/icon-192.png',
+    apple: '/icons/apple-touch-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: SITE_NAME,
+    startupImage: [],
+  },
+  formatDetection: {
+    telephone: false,
   },
   alternates: { canonical: '/' },
 };
@@ -53,6 +64,7 @@ export default function RootLayout({
         </a>
         <Providers>
           {children}
+          <PwaInstaller />
           <WhatsAppGroupButton />
         </Providers>
         <Analytics />

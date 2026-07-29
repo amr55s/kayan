@@ -58,6 +58,7 @@ export default async function AdminDashboard() {
     { data: pendingRequests },
     { data: feedbackRequests },
     { data: drivers },
+    { data: registeredDrivers },
     { data: auditLog },
     { data: accountRequests },
     clientErrors,
@@ -99,6 +100,10 @@ export default async function AdminDashboard() {
     safeAdminQuery('drivers', (supabase as any)
       .from('drivers')
       .select('id, name, phone, whatsapp, vehicle_type, is_active, active_until, created_at')
+      .order('created_at', { ascending: false })),
+    safeAdminQuery('registered_driver_profiles', (adminData as any)
+      .from('driver_profiles')
+      .select('profile_id, contact_phone, whatsapp, vehicle_type, is_available, active_until, legacy_driver_id, created_at, profile:profiles!driver_profiles_profile_id_fkey(display_name, phone, is_active, created_at, role)')
       .order('created_at', { ascending: false })),
     safeAdminQuery('audit_log', (supabase as any)
       .from('audit_log')
@@ -150,6 +155,46 @@ export default async function AdminDashboard() {
       shares: 0,
     }),
   }));
+  const linkedLegacyIds = new Set(
+    (registeredDrivers ?? [])
+      .map((driver: any) => driver.legacy_driver_id)
+      .filter(Boolean),
+  );
+  const adminRenderedAt = marketingHomeData.renderedAt;
+  const managedDrivers = [
+    ...(registeredDrivers ?? [])
+      .filter((driver: any) => {
+        const account = Array.isArray(driver.profile) ? driver.profile[0] : driver.profile;
+        return account?.role === 'driver';
+      })
+      .map((driver: any) => {
+        const account = Array.isArray(driver.profile) ? driver.profile[0] : driver.profile;
+        return {
+          id: driver.profile_id,
+          name: account?.display_name ?? 'كابتن توصيل',
+          phone: driver.contact_phone ?? account?.phone ?? '',
+          whatsapp: driver.whatsapp,
+          vehicle_type: driver.vehicle_type,
+          is_active: Boolean(account?.is_active),
+          is_available: Boolean(driver.is_available)
+            && Boolean(driver.active_until)
+            && new Date(driver.active_until).getTime() > adminRenderedAt,
+          active_until: driver.active_until,
+          created_at: account?.created_at ?? driver.created_at,
+          source: 'account' as const,
+        };
+      }),
+    ...(drivers ?? [])
+      .filter((driver: any) => !linkedLegacyIds.has(driver.id))
+      .map((driver: any) => ({
+        ...driver,
+        is_active: Boolean(driver.is_active),
+        is_available: Boolean(driver.is_active)
+          && Boolean(driver.active_until)
+          && new Date(driver.active_until).getTime() > adminRenderedAt,
+        source: 'public' as const,
+      })),
+  ];
 
   return (
     <>
@@ -162,7 +207,7 @@ export default async function AdminDashboard() {
         places={places ?? []}
         pendingRequests={pendingRequests ?? []}
         feedbackRequests={feedbackRequests ?? []}
-        drivers={drivers ?? []}
+        drivers={managedDrivers}
         auditLog={auditLog ?? []}
         accountRequests={accountRequests ?? []}
         clientErrors={clientErrors}
