@@ -99,16 +99,9 @@ async function safeImageBuffer(url: string | null | undefined): Promise<Buffer |
     if (contentLength > 6_000_000) return null;
     const bytes = Buffer.from(await response.arrayBuffer());
     if (bytes.byteLength > 6_000_000) return null;
-    const resized = await sharp(bytes)
+    return await sharp(bytes)
       .rotate()
       .resize(920, 470, { fit: 'cover', position: 'attention' })
-      .png()
-      .toBuffer();
-    const mask = Buffer.from(
-      '<svg width="920" height="470"><rect width="920" height="470" rx="42" fill="white"/></svg>',
-    );
-    return await sharp(resized)
-      .composite([{ input: mask, blend: 'dest-in' }])
       .png()
       .toBuffer();
   } catch {
@@ -189,6 +182,9 @@ export async function GET(request: Request) {
     errorCorrectionLevel: 'M',
   });
   const photo = await safeImageBuffer(entity.image);
+  const photoMarkup = photo
+    ? `<image x="80" y="92" width="920" height="470" preserveAspectRatio="xMidYMid slice" href="data:image/png;base64,${photo.toString('base64')}" clip-path="url(#photo)"/>`
+    : '';
 
   const svg = Buffer.from(`
     <svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
@@ -202,7 +198,7 @@ export async function GET(request: Request) {
       <rect width="1080" height="1080" fill="#f4f4f5"/>
       <rect x="44" y="44" width="992" height="992" rx="64" fill="white"/>
       ${photo ? '' : '<rect x="80" y="92" width="920" height="470" rx="42" fill="url(#bg)"/>'}
-      ${photo ? '<rect x="80" y="92" width="920" height="470" rx="42" fill="#e4e4e7"/>' : ''}
+      ${photoMarkup}
       <rect x="80" y="92" width="920" height="470" rx="42" fill="none" stroke="#e4e4e7" stroke-width="3"/>
       <rect x="112" y="116" width="250" height="56" rx="28" fill="#09090b"/>
       <text x="237" y="153" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="700">KAYAN CITY SPOT</text>
@@ -220,21 +216,9 @@ export async function GET(request: Request) {
   `);
 
   let card = sharp(svg);
-  const brandBadge = Buffer.from(`
-    <svg width="250" height="56" xmlns="http://www.w3.org/2000/svg">
-      <rect width="250" height="56" rx="28" fill="#09090b"/>
-      <text x="125" y="37" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="700">KAYAN CITY SPOT</text>
-    </svg>
-  `);
   const composites: OverlayOptions[] = [
     { input: qr, left: 725, top: 675 },
   ];
-  if (photo) {
-    composites.unshift(
-      { input: photo, left: 80, top: 92 },
-      { input: brandBadge, left: 112, top: 116 },
-    );
-  }
   card = card.composite(composites);
   let output = card.png({ compressionLevel: 9, adaptiveFiltering: true });
   if (preview) {
