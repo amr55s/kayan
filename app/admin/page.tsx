@@ -32,7 +32,7 @@ async function loadClientErrors() {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from('client_error_reports')
-      .select('id, fingerprint, event_type, route, browser_family, os_family, release, occurrences, first_seen_at, last_seen_at')
+      .select('id, fingerprint, event_type, error_kind, route, browser_family, os_family, release, occurrences, first_seen_at, last_seen_at')
       .gte('last_seen_at', since)
       .order('last_seen_at', { ascending: false })
       .limit(50);
@@ -211,6 +211,7 @@ export default async function AdminDashboard() {
         auditLog={auditLog ?? []}
         accountRequests={accountRequests ?? []}
         clientErrors={clientErrors}
+        currentRelease={process.env.VERCEL_GIT_COMMIT_SHA || 'local'}
         behaviorAnalytics={behaviorAnalytics}
         marketingChannels={marketingChannels ?? []}
         marketingCampaigns={enrichedCampaigns}

@@ -8,6 +8,17 @@ export const runtime = 'nodejs';
 const reportSchema = z.object({
   fingerprint: z.string().regex(/^[a-f0-9]{16,64}$/),
   eventType: z.enum(['window_error', 'unhandled_rejection', 'react_boundary']),
+  errorKind: z.enum([
+    'ReactError',
+    'ChunkLoadError',
+    'NetworkError',
+    'AbortError',
+    'TypeError',
+    'ReferenceError',
+    'RangeError',
+    'SyntaxError',
+    'Unknown',
+  ]),
   route: z.string().min(1).max(160).startsWith('/').refine(
     (value) => !value.includes('?') && !value.includes('#'),
   ),
@@ -54,10 +65,11 @@ export async function POST(request: Request) {
       .update(`${requestIp}:${parsed.data.fingerprint}:client-error:${salt}`)
       .digest('hex');
     const admin = createAdminClient();
-    await (admin as any).rpc('record_client_error', {
+    await (admin as any).rpc('record_client_error_v2', {
       p_request_key: requestKey,
       p_fingerprint: parsed.data.fingerprint,
       p_event_type: parsed.data.eventType,
+      p_error_kind: parsed.data.errorKind,
       p_route: parsed.data.route,
       p_browser_family: parsed.data.browserFamily,
       p_os_family: parsed.data.osFamily,

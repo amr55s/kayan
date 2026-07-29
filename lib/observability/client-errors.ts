@@ -5,8 +5,20 @@ export type ClientErrorEventType =
   | 'unhandled_rejection'
   | 'react_boundary';
 
+export type ClientErrorKind =
+  | 'ReactError'
+  | 'ChunkLoadError'
+  | 'NetworkError'
+  | 'AbortError'
+  | 'TypeError'
+  | 'ReferenceError'
+  | 'RangeError'
+  | 'SyntaxError'
+  | 'Unknown';
+
 let currentRelease = 'local';
 const recentlySent = new Map<string, number>();
+const recentlyObserved = new Map<string, number>();
 
 export function setClientErrorRelease(release: string) {
   currentRelease = release.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 64) || 'local';
@@ -45,6 +57,44 @@ function safeSignature(error: unknown): string {
     .join('|');
 }
 
+export function classifyClientError(error: unknown): ClientErrorKind {
+  const name = error instanceof Error ? error.name : '';
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : '';
+  if (/minified React error #\d+/i.test(message)) return 'ReactError';
+  if (
+    name === 'ChunkLoadError'
+    || /chunkloaderror|loading (?:css )?chunk [\w-]+ failed|failed to fetch dynamically imported module/i.test(message)
+  ) {
+    return 'ChunkLoadError';
+  }
+  if (name === 'AbortError') return 'AbortError';
+  if (/networkerror|failed to fetch|network request failed/i.test(message)) {
+    return 'NetworkError';
+  }
+  if (name === 'TypeError') return 'TypeError';
+  if (name === 'ReferenceError') return 'ReferenceError';
+  if (name === 'RangeError') return 'RangeError';
+  if (name === 'SyntaxError') return 'SyntaxError';
+  return 'Unknown';
+}
+
+export function normalizeWindowError(
+  event: Pick<ErrorEvent, 'error' | 'message'>,
+): Error | null {
+  if (event.error instanceof Error) {
+    const message = event.error.message.trim();
+    if (!message || /^(?:script )?error\.?$/i.test(message)) return null;
+    return event.error;
+  }
+  const message = String(event.message || '').trim();
+  if (!message || /^(?:script )?error\.?$/i.test(message)) return null;
+  return new Error(message);
+}
+
 async function fingerprint(value: string): Promise<string> {
   try {
     const bytes = new TextEncoder().encode(value);
@@ -70,16 +120,29 @@ export async function reportClientError(
   try {
     const route = window.location.pathname.slice(0, 160) || '/';
     const signature = safeSignature(error);
+    const now = Date.now();
+    const observationKey = `${route}|${signature}|${currentRelease}`;
+    if ((recentlyObserved.get(observationKey) ?? 0) > now - 5_000) return;
+    recentlyObserved.set(observationKey, now);
+
     const errorFingerprint = await fingerprint(
       `${eventType}|${route}|${signature}|${currentRelease}`,
     );
-    const now = Date.now();
     if ((recentlySent.get(errorFingerprint) ?? 0) > now - 30_000) return;
     recentlySent.set(errorFingerprint, now);
+    if (recentlyObserved.size > 100 || recentlySent.size > 100) {
+      for (const [key, timestamp] of recentlyObserved) {
+        if (timestamp <= now - 30_000) recentlyObserved.delete(key);
+      }
+      for (const [key, timestamp] of recentlySent) {
+        if (timestamp <= now - 30_000) recentlySent.delete(key);
+      }
+    }
 
     const payload = JSON.stringify({
       fingerprint: errorFingerprint,
       eventType,
+      errorKind: classifyClientError(error),
       route,
       browserFamily: browserFamily(navigator.userAgent),
       osFamily: osFamily(navigator.userAgent),

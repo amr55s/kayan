@@ -116,6 +116,7 @@ type ClientErrorSummary = {
   id: number;
   fingerprint: string;
   event_type: string;
+  error_kind: string;
   route: string;
   browser_family: string;
   os_family: string;
@@ -137,6 +138,7 @@ type AdminWorkspaceProps = {
   auditLog: AuditEntry[];
   accountRequests: AccountRequest[];
   clientErrors: ClientErrorSummary[];
+  currentRelease: string;
   behaviorAnalytics: BehaviorAnalyticsSummary;
   marketingChannels: MarketingChannel[];
   marketingCampaigns: MarketingCampaign[];
@@ -185,6 +187,16 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
   );
   const pendingAccounts = props.accountRequests.filter(
     (request) => request.status === 'pending',
+  );
+  const currentClientErrors = props.clientErrors.filter(
+    (item) => item.release === props.currentRelease,
+  );
+  const historicalClientErrors = props.clientErrors.filter(
+    (item) => item.release !== props.currentRelease,
+  );
+  const currentErrorCount = currentClientErrors.reduce(
+    (total, item) => total + item.occurrences,
+    0,
   );
 
   function complete(successMessage: string) {
@@ -393,16 +405,37 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
         drivers={props.marketingDrivers}
       />
 
-      {props.clientErrors.length > 0 && (
-        <Card className="border border-amber-200 bg-amber-50/50">
+      <Card
+        className={
+          currentClientErrors.length > 0
+            ? 'border border-amber-200 bg-amber-50/50'
+            : 'border border-emerald-200 bg-emerald-50/50'
+        }
+      >
           <CardHeader className="flex items-center justify-between gap-3">
-            <span className="font-black">تقارير الأعطال المجهولة — آخر 30 يومًا</span>
-            <Chip className="bg-amber-100 text-amber-900">
-              {props.clientErrors.reduce((total, item) => total + item.occurrences, 0)} حدث
+            <div className="min-w-0">
+              <span className="font-black">سلامة الإصدار الحالي</span>
+              <p className="mt-1 truncate text-xs text-zinc-500" dir="ltr">
+                {props.currentRelease.slice(0, 12)}
+              </p>
+            </div>
+            <Chip
+              className={
+                currentClientErrors.length > 0
+                  ? 'bg-amber-100 text-amber-900'
+                  : 'bg-emerald-100 text-emerald-900'
+              }
+            >
+              {currentErrorCount > 0 ? `${currentErrorCount} حدث` : 'سليم'}
             </Chip>
           </CardHeader>
           <CardBody className="gap-2">
-            {props.clientErrors.slice(0, 10).map((item) => (
+            {currentClientErrors.length === 0 && (
+              <p className="rounded-xl border border-emerald-200 bg-white p-3 text-sm font-bold text-emerald-900">
+                لا توجد أخطاء مسجلة على الإصدار الحالي.
+              </p>
+            )}
+            {currentClientErrors.slice(0, 10).map((item) => (
               <article
                 key={item.id}
                 className="grid gap-2 rounded-xl border border-amber-200 bg-white p-3 text-xs sm:grid-cols-[1fr_auto]"
@@ -412,7 +445,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                     {item.event_type} · {item.route}
                   </p>
                   <p className="mt-1 text-zinc-500">
-                    {item.browser_family} / {item.os_family} · بصمة {item.fingerprint.slice(0, 10)}
+                    {item.error_kind} · {item.browser_family} / {item.os_family} · بصمة {item.fingerprint.slice(0, 10)}
                   </p>
                 </div>
                 <div className="text-start font-bold tabular-nums sm:text-end">
@@ -423,9 +456,47 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                 </div>
               </article>
             ))}
+            {historicalClientErrors.length > 0 && (
+              <details className="group rounded-xl border border-zinc-200 bg-white">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-bold">
+                  <span>أخطاء إصدارات سابقة — للرجوع فقط</span>
+                  <Chip size="sm" variant="flat">
+                    {historicalClientErrors.reduce(
+                      (total, item) => total + item.occurrences,
+                      0,
+                    )} حدث
+                  </Chip>
+                </summary>
+                <div className="space-y-2 border-t border-zinc-100 p-3">
+                  {historicalClientErrors.slice(0, 10).map((item) => (
+                    <article
+                      key={item.id}
+                      className="grid gap-2 rounded-xl bg-zinc-50 p-3 text-xs sm:grid-cols-[1fr_auto]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-black">
+                          {item.event_type} · {item.route}
+                        </p>
+                        <p className="mt-1 text-zinc-500">
+                          {item.error_kind} · {item.browser_family} / {item.os_family}
+                        </p>
+                        <p className="mt-1 text-zinc-400" dir="ltr">
+                          {item.release.slice(0, 12)} · {item.fingerprint.slice(0, 10)}
+                        </p>
+                      </div>
+                      <div className="text-start font-bold tabular-nums sm:text-end">
+                        <p>{item.occurrences} مرة</p>
+                        <time dateTime={item.last_seen_at}>
+                          {formatCairoDateTime(item.last_seen_at)}
+                        </time>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </details>
+            )}
           </CardBody>
         </Card>
-      )}
 
       <Tabs
         aria-label="إدارة المنصة"

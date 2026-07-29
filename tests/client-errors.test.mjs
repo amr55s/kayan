@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   reportClientError,
+  classifyClientError,
+  normalizeWindowError,
   setClientErrorRelease,
 } from '../lib/observability/client-errors.ts';
 
@@ -35,6 +37,7 @@ test('client diagnostics send only the anonymous allow-listed summary', async ()
   const payload = JSON.parse(capturedBody);
   assert.deepEqual(Object.keys(payload).sort(), [
     'browserFamily',
+    'errorKind',
     'eventType',
     'fingerprint',
     'osFamily',
@@ -45,8 +48,35 @@ test('client diagnostics send only the anonymous allow-listed summary', async ()
   assert.equal(payload.browserFamily, 'Chrome');
   assert.equal(payload.osFamily, 'Android');
   assert.equal(payload.release, 'previewshawithspaces');
+  assert.equal(payload.errorKind, 'Unknown');
   assert.match(payload.fingerprint, /^[a-f0-9]{16,32}$/);
   assert.doesNotMatch(capturedBody, /01012345678|private\.example|SECRET/);
+});
+
+test('client diagnostics classify safe error categories without leaking messages', () => {
+  assert.equal(
+    classifyClientError(new Error('Minified React error #418; secret details')),
+    'ReactError',
+  );
+  assert.equal(
+    classifyClientError(new TypeError('Failed to fetch private URL')),
+    'NetworkError',
+  );
+  assert.equal(
+    classifyClientError(Object.assign(new Error('Loading chunk 123 failed'), {
+      name: 'ChunkLoadError',
+    })),
+    'ChunkLoadError',
+  );
+});
+
+test('generic cross-origin window errors are ignored', () => {
+  assert.equal(normalizeWindowError({ error: null, message: 'Script error.' }), null);
+  assert.equal(normalizeWindowError({ error: null, message: '' }), null);
+  assert.ok(
+    normalizeWindowError({ error: new TypeError('render failed'), message: 'render failed' })
+      instanceof Error,
+  );
 });
 
 test('diagnostic transport failure remains silent', async () => {

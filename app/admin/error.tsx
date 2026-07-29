@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { Button } from '@heroui/react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { reportClientError } from '@/lib/observability/client-errors';
 
@@ -46,7 +46,7 @@ export default function Error({
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           حدث انقطاع مؤقت أثناء تحديث البيانات. سنحاول استعادة لوحة الإدارة تلقائياً.
         </p>
-        <div className="flex justify-center gap-4">
+        <div className="flex flex-wrap justify-center gap-3">
           <Button
             color="warning"
             variant="solid"
@@ -55,6 +55,14 @@ export default function Error({
             className="font-bold text-zinc-950 bg-amber-400 hover:bg-amber-500"
           >
             إعادة المحاولة
+          </Button>
+          <Button
+            variant="bordered"
+            onClick={() => window.location.reload()}
+            startContent={<RotateCcw className="w-4 h-4" />}
+            className="font-bold"
+          >
+            تحميل أحدث نسخة
           </Button>
           <Button
             as={Link}

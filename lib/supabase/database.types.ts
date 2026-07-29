@@ -303,6 +303,7 @@ export type Database = {
       client_error_reports: {
         Row: {
           browser_family: string
+          error_kind: string
           event_type: string
           fingerprint: string
           first_seen_at: string
@@ -315,6 +316,7 @@ export type Database = {
         }
         Insert: {
           browser_family: string
+          error_kind?: string
           event_type: string
           fingerprint: string
           first_seen_at?: string
@@ -327,6 +329,7 @@ export type Database = {
         }
         Update: {
           browser_family?: string
+          error_kind?: string
           event_type?: string
           fingerprint?: string
           first_seen_at?: string
@@ -1377,6 +1380,20 @@ export type Database = {
       record_client_error: {
         Args: {
           p_browser_family: string
+          p_event_type: string
+          p_fingerprint: string
+          p_limit?: number
+          p_os_family: string
+          p_release: string
+          p_request_key: string
+          p_route: string
+        }
+        Returns: boolean
+      }
+      record_client_error_v2: {
+        Args: {
+          p_browser_family: string
+          p_error_kind: string
           p_event_type: string
           p_fingerprint: string
           p_limit?: number
