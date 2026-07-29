@@ -125,13 +125,19 @@ export function DriverWorkspace({
   function run(action: () => Promise<{ success: boolean; message?: string }>) {
     setActionMessage('');
     startActionTransition(async () => {
-      const result = await action();
-      if (!result.success) {
-        setActionMessage(result.message || 'تعذر تنفيذ العملية. حاول مرة أخرى.');
-        return;
+      try {
+        const result = await action();
+        if (!result.success) {
+          setActionMessage(result.message || 'تعذر تنفيذ العملية. حاول مرة أخرى.');
+          return;
+        }
+        setActionMessage('تم تحديث الحالة بنجاح.');
+        router.refresh();
+      } catch (error) {
+        console.error('Driver action transport failed:', error);
+        setActionMessage('انقطع الاتصال بعد إرسال العملية. جاري مزامنة الحالة للتأكد من النتيجة.');
+        router.refresh();
       }
-      setActionMessage('تم تحديث الحالة بنجاح.');
-      router.refresh();
     });
   }
 
@@ -139,13 +145,19 @@ export function DriverWorkspace({
     event.preventDefault();
     setProfileMessage('');
     startProfileTransition(async () => {
-      const result = await updateDriverPublicProfile(profileForm);
-      if (!result.success) {
-        setProfileMessage(result.message);
-        return;
+      try {
+        const result = await updateDriverPublicProfile(profileForm);
+        if (!result.success) {
+          setProfileMessage(result.message);
+          return;
+        }
+        setProfileMessage('تم تحديث بيانات بطاقتك العامة.');
+        router.refresh();
+      } catch (error) {
+        console.error('Driver profile transport failed:', error);
+        setProfileMessage('انقطع الاتصال بعد الحفظ. بيانات النموذج محفوظة وجاري التحقق من التحديث.');
+        router.refresh();
       }
-      setProfileMessage('تم تحديث بيانات بطاقتك العامة.');
-      router.refresh();
     });
   }
 

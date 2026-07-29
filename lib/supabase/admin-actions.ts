@@ -414,11 +414,16 @@ export async function serverToggleDriverStatus(
     const actor = await requireAdminSession();
     if (!/^[0-9a-f-]{36}$/i.test(driverId)) throw new Error('معرف الكابتن غير صالح.');
     const supabase = createAdminClient();
-    const { error } = await (supabase as any).rpc('admin_update_managed_driver', {
-      p_driver_id: driverId,
-      p_source: source,
-      p_is_active: !currentStatus,
-    });
+    const { error } = source === 'account'
+      ? await (supabase as any).rpc('admin_repair_driver_account', {
+          p_profile_id: driverId,
+          p_is_active: !currentStatus,
+        })
+      : await (supabase as any).rpc('admin_update_managed_driver', {
+          p_driver_id: driverId,
+          p_source: source,
+          p_is_active: !currentStatus,
+        });
 
     if (error) {
       return { success: false, message: 'حدث خطأ أثناء تغيير حالة السائق.' };
@@ -512,6 +517,16 @@ export async function serverUpdateDriver(
     }
 
     const supabase = createAdminClient();
+    if (source === 'account') {
+      const { error: repairError } = await (supabase as any).rpc(
+        'admin_repair_driver_account',
+        {
+          p_profile_id: driverId,
+          p_is_active: null,
+        },
+      );
+      if (repairError) throw repairError;
+    }
     const { error } = await (supabase as any).rpc('admin_update_managed_driver', {
       p_driver_id: driverId,
       p_source: source,

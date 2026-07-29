@@ -1,7 +1,7 @@
 'use server';
 
 import { randomUUID } from 'node:crypto';
-import { revalidatePath } from 'next/cache';
+import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
 import { z } from 'zod';
 import { getCurrentProfile } from '@/lib/auth/guards';
 import { placeDetailsValidators } from '@/lib/place-details';
@@ -86,7 +86,7 @@ export async function saveMarketingChannel(
         .select('id')
         .single();
       if (error) throw error;
-      revalidatePath('/admin');
+      safeRevalidatePaths('/admin');
       return { success: true, message: 'تم تحديث الجروب.', data };
     }
 
@@ -100,7 +100,7 @@ export async function saveMarketingChannel(
       .select('id')
       .single();
     if (error) throw error;
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true, message: 'تمت إضافة الجروب.', data };
   } catch (error) {
     return {
@@ -123,7 +123,7 @@ export async function setMarketingChannelActive(
       .update({ is_active: isActive, updated_at: new Date().toISOString() })
       .eq('id', parsedId);
     if (error) throw error;
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return {
       success: true,
       message: isActive ? 'تم تفعيل الجروب.' : 'تم إيقاف الجروب.',
@@ -186,7 +186,7 @@ export async function prepareMarketingCampaign(
       if (raced) return { success: true, message: 'الحملة جاهزة.', data: raced };
       throw error;
     }
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true, message: 'تم تجهيز رابط الحملة.', data };
   } catch (error) {
     return {
@@ -222,7 +222,7 @@ export async function recordMarketingPublication(
         published_at: now,
       });
     if (insertError) throw insertError;
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return {
       success: true,
       message: 'تم تسجيل النشر ويمكن إعادة نشر الحملة لاحقًا.',

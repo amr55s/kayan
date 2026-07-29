@@ -106,46 +106,56 @@ export function MerchantOrderWorkspace({
     event.preventDefault();
     setMessage('');
     startTransition(async () => {
-      const result = await createDeliveryOrder({
-        branchId,
-        recipientName: form.recipientName,
-        recipientPhone: form.recipientPhone,
-        deliveryAddress: form.deliveryAddress,
-        deliveryArea: form.deliveryArea,
-        notes: form.notes || null,
-        collectionAmount: form.collectionAmount || null,
-        deliveryFee: form.deliveryFee || null,
-        directDriverId: directDriverId || null,
-      });
-      if (!result.success) {
-        setMessage(result.message);
-        return;
+      try {
+        const result = await createDeliveryOrder({
+          branchId,
+          recipientName: form.recipientName,
+          recipientPhone: form.recipientPhone,
+          deliveryAddress: form.deliveryAddress,
+          deliveryArea: form.deliveryArea,
+          notes: form.notes || null,
+          collectionAmount: form.collectionAmount || null,
+          deliveryFee: form.deliveryFee || null,
+          directDriverId: directDriverId || null,
+        });
+        if (!result.success) {
+          setMessage(result.message);
+          return;
+        }
+        setMessage(`تم إنشاء الطلب #${result.data?.publicCode} وعرضه لمدة 10 دقائق.`);
+        setForm({
+          recipientName: '',
+          recipientPhone: '',
+          deliveryAddress: '',
+          deliveryArea: '',
+          notes: '',
+          collectionAmount: '',
+          deliveryFee: '',
+        });
+        setDirectDriverId('');
+      } catch (error) {
+        console.error('Create delivery order transport failed:', error);
+        setMessage('انقطع الاتصال بعد إرسال الطلب. احتفظنا بالبيانات؛ حدّث قائمة الطلبات قبل إعادة الإرسال.');
       }
-      setMessage(`تم إنشاء الطلب #${result.data?.publicCode} وعرضه لمدة 10 دقائق.`);
-      setForm({
-        recipientName: '',
-        recipientPhone: '',
-        deliveryAddress: '',
-        deliveryArea: '',
-        notes: '',
-        collectionAmount: '',
-        deliveryFee: '',
-      });
-      setDirectDriverId('');
     });
   }
 
   function runOrderAction(orderId: string, action: 'rebroadcast' | 'cancel') {
     startTransition(async () => {
-      const result =
-        action === 'rebroadcast'
-          ? await rebroadcastDeliveryOrder(orderId)
-          : await changeDeliveryOrderStatus({
-              orderId,
-              nextStatus: 'cancelled',
-              reason: 'ألغاه المحل',
-            });
-      setMessage(result.success ? 'تم تحديث حالة الطلب.' : result.message);
+      try {
+        const result =
+          action === 'rebroadcast'
+            ? await rebroadcastDeliveryOrder(orderId)
+            : await changeDeliveryOrderStatus({
+                orderId,
+                nextStatus: 'cancelled',
+                reason: 'ألغاه المحل',
+              });
+        setMessage(result.success ? 'تم تحديث حالة الطلب.' : result.message);
+      } catch (error) {
+        console.error('Delivery order action transport failed:', error);
+        setMessage('انقطع الاتصال بعد إرسال التحديث. أعد مزامنة القائمة قبل تكرار العملية.');
+      }
     });
   }
 

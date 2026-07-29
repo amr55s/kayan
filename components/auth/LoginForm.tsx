@@ -5,49 +5,9 @@ import Image from 'next/image';
 import { Button, Card, CardBody, CardHeader, Input } from '@heroui/react';
 import { ArrowRight, KeyRound, Phone, UserPlus } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { changeInitialPassword } from '@/lib/operations/actions';
-import { authEmailForPhone, isEgyptianPhone } from '@/lib/auth/phone';
-import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
+import { completeInitialPassword, loginWithPhone } from '@/lib/auth/actions';
+import { isEgyptianPhone } from '@/lib/auth/phone';
 import Link from 'next/link';
-
-async function resolvePostLoginPath(
-  supabase: ReturnType<typeof createClient>,
-  userId: string,
-): Promise<string> {
-  const { data: profile, error: profileError } = await (supabase as any)
-    .from('profiles')
-    .select('role, is_active, must_change_password')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (profileError || !profile) {
-    const { data: request } = await (supabase as any)
-      .from('account_requests')
-      .select('status, rejection_reason')
-      .eq('auth_user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    await supabase.auth.signOut();
-    if (request?.status === 'pending') {
-      throw new Error('طلب الحساب ما زال قيد مراجعة الإدارة.');
-    }
-    if (request?.status === 'rejected') {
-      throw new Error(request.rejection_reason || 'تم رفض طلب الحساب. تواصل مع الإدارة.');
-    }
-    throw new Error('الحساب غير مكتمل أو غير مرتبط بملف مستخدم. تواصل مع الإدارة.');
-  }
-  if (!profile.is_active) {
-    await supabase.auth.signOut();
-    throw new Error('الحساب غير مفعل. تواصل مع الإدارة لتفعيله.');
-  }
-  if (profile.must_change_password) {
-    return '/login?change-password=1';
-  }
-
-  return dashboardPathForRole(profile.role as AppRole);
-}
 
 export function LoginForm() {
   const router = useRouter();
@@ -66,13 +26,9 @@ export function LoginForm() {
     try {
       if (changePassword) {
         if (password !== confirmPassword) throw new Error('كلمتا المرور غير متطابقتين.');
-        const result = await changeInitialPassword(password);
+        const result = await completeInitialPassword(password);
         if (!result.success) throw new Error(result.message);
-        const supabase = createClient();
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-        if (userError || !userData.user) throw new Error('انتهت الجلسة. سجل الدخول مرة أخرى.');
-        const destination = await resolvePostLoginPath(supabase, userData.user.id);
-        router.replace(destination);
+        router.replace(result.destination);
         router.refresh();
         return;
       }
@@ -80,16 +36,12 @@ export function LoginForm() {
       if (!isEgyptianPhone(phone)) {
         throw new Error('أدخل رقم هاتف مصري صحيحاً.');
       }
-      const supabase = createClient();
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: authEmailForPhone(phone),
+      const result = await loginWithPhone({
+        phone,
         password,
       });
-      if (signInError || !signInData.user) {
-        throw new Error('رقم الهاتف أو كلمة المرور غير صحيحة.');
-      }
-      const destination = await resolvePostLoginPath(supabase, signInData.user.id);
-      router.replace(destination);
+      if (!result.success) throw new Error(result.message);
+      router.replace(result.destination);
       router.refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'تعذر تسجيل الدخول.');

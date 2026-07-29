@@ -1,6 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
@@ -9,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentProfile } from '@/lib/auth/guards';
 import { validateListingImageUrls } from '@/lib/images/urls';
 import { authEmailForPhone } from '@/lib/auth/phone';
+import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
 import {
   branchSchema,
   accountRequestSchema,
@@ -84,9 +84,7 @@ export async function createDeliveryOrder(input: unknown): Promise<ActionResult<
       p_direct_driver_id: data.directDriverId ?? null,
     });
     if (error) throw error;
-    revalidatePath('/merchant');
-    revalidatePath('/driver');
-    revalidatePath('/admin/orders');
+    safeRevalidatePaths('/merchant', '/driver', '/admin/orders');
     return { success: true, data: { id: order.id, publicCode: order.public_code } };
   } catch (error) {
     return actionError(error);
@@ -99,9 +97,7 @@ export async function claimDeliveryOrder(orderId: string): Promise<ActionResult>
     const supabase = await createClient();
     const { error } = await (supabase as any).rpc('claim_delivery_order', { p_order_id: orderId });
     if (error) throw error;
-    revalidatePath('/driver');
-    revalidatePath('/merchant');
-    revalidatePath('/admin/orders');
+    safeRevalidatePaths('/driver', '/merchant', '/admin/orders');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -120,9 +116,7 @@ export async function changeDeliveryOrderStatus(input: unknown): Promise<ActionR
       p_reason: data.reason ?? null,
     });
     if (error) throw error;
-    revalidatePath('/merchant');
-    revalidatePath('/driver');
-    revalidatePath('/admin/orders');
+    safeRevalidatePaths('/merchant', '/driver', '/admin/orders');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -136,9 +130,7 @@ export async function rebroadcastDeliveryOrder(orderId: string): Promise<ActionR
     const supabase = await createClient();
     const { error } = await (supabase as any).rpc('rebroadcast_delivery_order', { p_order_id: orderId });
     if (error) throw error;
-    revalidatePath('/merchant');
-    revalidatePath('/driver');
-    revalidatePath('/admin/orders');
+    safeRevalidatePaths('/merchant', '/driver', '/admin/orders');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -151,8 +143,7 @@ export async function renewDriverAvailability(): Promise<ActionResult<{ activeUn
     const supabase = await createClient();
     const { data, error } = await (supabase as any).rpc('renew_driver_availability');
     if (error) throw error;
-    revalidatePath('/');
-    revalidatePath('/driver');
+    safeRevalidatePaths('/', '/driver');
     return { success: true, data: { activeUntil: data.active_until } };
   } catch (error) {
     return actionError(error);
@@ -171,8 +162,7 @@ export async function updateDriverPublicProfile(input: unknown): Promise<ActionR
       p_vehicle_type: data.vehicleType || null,
     });
     if (error) throw error;
-    revalidatePath('/');
-    revalidatePath('/driver');
+    safeRevalidatePaths('/', '/driver');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -337,7 +327,7 @@ export async function submitAccountRequest(
       .single();
     if (requestError || !request) throw requestError ?? new Error('تعذر حفظ طلب الحساب.');
 
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true, data: { requestId: request.id } };
   } catch (error) {
     if (authUserId) {
@@ -364,11 +354,15 @@ export async function approveAccountRequest(
     );
     if (error) throw error;
 
-    await admin.auth.admin.updateUserById(authUserId, {
+    const { error: metadataError } = await admin.auth.admin.updateUserById(authUserId, {
       user_metadata: { account_status: 'approved' },
     });
-    revalidatePath('/');
-    revalidatePath('/admin');
+    if (metadataError) {
+      // The database approval is already committed. Metadata is informational
+      // and must not make the UI claim that activation failed.
+      console.warn('Approved account metadata update was deferred:', metadataError.message);
+    }
+    safeRevalidatePaths('/', '/admin');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -394,7 +388,7 @@ export async function rejectAccountRequest(
     if (deleteError) {
       console.error('Rejected account Auth cleanup failed:', deleteError.message);
     }
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -416,8 +410,7 @@ export async function createMerchantBranch(input: unknown): Promise<ActionResult
       is_default: data.isDefault,
     }).select('id').single();
     if (error) throw error;
-    revalidatePath('/admin');
-    revalidatePath('/merchant');
+    safeRevalidatePaths('/admin', '/merchant');
     return { success: true, data: { id: branch.id } };
   } catch (error) {
     return actionError(error);
@@ -431,7 +424,7 @@ export async function createMerchant(displayName: string): Promise<ActionResult<
     const supabase = await createClient();
     const { data, error } = await (supabase as any).from('merchants').insert({ display_name: name }).select('id').single();
     if (error) throw error;
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true, data: { id: data.id } };
   } catch (error) {
     return actionError(error);
@@ -502,9 +495,7 @@ export async function updateMerchantPlace(
       },
     });
 
-    revalidatePath('/', 'page');
-    revalidatePath('/merchant');
-    revalidatePath('/admin');
+    safeRevalidatePaths(['/', 'page'], '/merchant', '/admin');
     return {
       success: true,
       data: undefined,
@@ -528,8 +519,7 @@ export async function linkBranchToPlace(
       .update({ place_id: place })
       .eq('id', branch);
     if (error) throw error;
-    revalidatePath('/admin');
-    revalidatePath('/merchant');
+    safeRevalidatePaths('/admin', '/merchant');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -537,6 +527,7 @@ export async function linkBranchToPlace(
 }
 
 export async function provisionUser(input: unknown): Promise<ActionResult<{ id: string }>> {
+  let createdUserId: string | null = null;
   try {
     const actor = await requireRole('admin');
     const data = profileProvisionSchema.parse(input);
@@ -554,6 +545,7 @@ export async function provisionUser(input: unknown): Promise<ActionResult<{ id: 
       user_metadata: { display_name: data.displayName },
     });
     if (authError || !authData.user) throw authError ?? new Error('تعذر إنشاء حساب الدخول.');
+    createdUserId = authData.user.id;
 
     const { error: profileError } = await (admin as any).from('profiles').insert({
       id: authData.user.id,
@@ -563,12 +555,11 @@ export async function provisionUser(input: unknown): Promise<ActionResult<{ id: 
       merchant_id: data.merchantId ?? null,
       must_change_password: true,
     });
-    if (profileError) {
-      await admin.auth.admin.deleteUser(authData.user.id);
-      throw profileError;
-    }
+    if (profileError) throw profileError;
     if (data.role === 'driver') {
-      const { error: driverError } = await (admin as any).from('driver_profiles').insert({ profile_id: authData.user.id });
+      const { error: driverError } = await (admin as any)
+        .from('driver_profiles')
+        .upsert({ profile_id: authData.user.id }, { onConflict: 'profile_id' });
       if (driverError) throw driverError;
     }
     await (admin as any).from('audit_log').insert({
@@ -578,9 +569,17 @@ export async function provisionUser(input: unknown): Promise<ActionResult<{ id: 
       entity_id: authData.user.id,
       metadata: { role: data.role },
     });
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
+    createdUserId = null;
     return { success: true, data: { id: authData.user.id } };
   } catch (error) {
+    if (createdUserId) {
+      try {
+        await createAdminClient().auth.admin.deleteUser(createdUserId);
+      } catch (cleanupError) {
+        console.error('Incomplete provisioned user cleanup failed:', cleanupError);
+      }
+    }
     return actionError(error);
   }
 }
@@ -592,10 +591,30 @@ export async function setUserActive(profileId: string, isActive: boolean): Promi
     if (profileId === actor.id && !isActive) {
       throw new Error('لا يمكنك تعطيل حساب الإدارة الذي تستخدمه حالياً.');
     }
-    const supabase = await createClient();
-    const { error } = await (supabase as any).from('profiles').update({ is_active: isActive }).eq('id', profileId);
-    if (error) throw error;
     const admin = createAdminClient();
+    const { data: target, error: targetError } = await (admin as any)
+      .from('profiles')
+      .select('id, role')
+      .eq('id', profileId)
+      .maybeSingle();
+    if (targetError || !target) throw targetError ?? new Error('الحساب غير موجود.');
+
+    if (target.role === 'driver') {
+      const { error } = await (admin as any).rpc('admin_repair_driver_account', {
+        p_profile_id: profileId,
+        p_is_active: isActive,
+      });
+      if (error) throw error;
+    } else {
+      const { data: updated, error } = await (admin as any)
+        .from('profiles')
+        .update({ is_active: isActive })
+        .eq('id', profileId)
+        .select('id')
+        .maybeSingle();
+      if (error || !updated) throw error ?? new Error('لم يتم تحديث الحساب.');
+    }
+
     await (admin as any).from('audit_log').insert({
       actor_id: actor.id,
       action: isActive ? 'user_activated' : 'user_deactivated',
@@ -603,7 +622,7 @@ export async function setUserActive(profileId: string, isActive: boolean): Promi
       entity_id: profileId,
       metadata: {},
     });
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -690,7 +709,7 @@ export async function updateManagedUser(input: unknown): Promise<ActionResult> {
         password_reset: Boolean(data.newPassword),
       },
     });
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -727,7 +746,7 @@ export async function deleteManagedUser(profileId: string): Promise<ActionResult
       entity_id: id,
       metadata: { role: profile.role, merchant_id: profile.merchant_id },
     });
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : '';

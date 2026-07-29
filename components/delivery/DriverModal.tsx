@@ -68,22 +68,27 @@ export function DriverModal({
     }
 
     setIsSubmitting(true);
-    const result = await submitAccountRequest({
-      kind: 'driver',
-      displayName: name,
-      phone,
-      whatsapp,
-      vehicleType,
-      password,
-    });
-    setIsSubmitting(false);
-
-    if (!result.success) {
-      setErrorMsg(result.message);
-      return;
+    try {
+      const result = await submitAccountRequest({
+        kind: 'driver',
+        displayName: name,
+        phone,
+        whatsapp,
+        vehicleType,
+        password,
+      });
+      if (!result.success) {
+        setErrorMsg(result.message);
+        return;
+      }
+      setIsSuccess(true);
+      onSuccess?.();
+    } catch (error) {
+      console.error('Driver account request transport failed:', error);
+      setErrorMsg('انقطع الاتصال بعد إرسال الطلب. لا تعِد الإرسال الآن؛ أعد فتح النافذة للتحقق من حالته.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSuccess(true);
-    onSuccess?.();
   }
 
   return (

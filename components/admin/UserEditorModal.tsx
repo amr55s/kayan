@@ -58,32 +58,46 @@ export function UserEditorModal({
     event.preventDefault();
     setPending(true);
     setError('');
-    const result = await updateManagedUser({
-      id: profile.id,
-      ...form,
-      merchantId: form.role === 'merchant' ? form.merchantId || null : null,
-    });
-    setPending(false);
-    if (!result.success) {
-      setError(result.message);
-      return;
+    try {
+      const result = await updateManagedUser({
+        id: profile.id,
+        ...form,
+        merchantId: form.role === 'merchant' ? form.merchantId || null : null,
+      });
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
+      onOpenChange(false);
+      onSuccess('تم حفظ بيانات الحساب وصلاحياته.');
+    } catch (caught) {
+      console.error('Managed user update transport failed:', caught);
+      setError('انقطع الاتصال بعد الحفظ. جاري تحديث الحسابات للتأكد من النتيجة.');
+      onSuccess('جاري مزامنة بيانات الحساب بعد انقطاع الاتصال.');
+    } finally {
+      setPending(false);
     }
-    onOpenChange(false);
-    onSuccess('تم حفظ بيانات الحساب وصلاحياته.');
   }
 
   async function remove() {
     if (!window.confirm(`حذف حساب "${profile.display_name}" نهائياً؟`)) return;
     setPending(true);
     setError('');
-    const result = await deleteManagedUser(profile.id);
-    setPending(false);
-    if (!result.success) {
-      setError(result.message);
-      return;
+    try {
+      const result = await deleteManagedUser(profile.id);
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
+      onOpenChange(false);
+      onSuccess('تم حذف الحساب.');
+    } catch (caught) {
+      console.error('Managed user delete transport failed:', caught);
+      setError('انقطع الاتصال بعد طلب الحذف. جاري تحديث الحسابات للتأكد من النتيجة.');
+      onSuccess('جاري مزامنة قائمة الحسابات بعد انقطاع الاتصال.');
+    } finally {
+      setPending(false);
     }
-    onOpenChange(false);
-    onSuccess('تم حذف الحساب.');
   }
 
   return (

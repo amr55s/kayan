@@ -110,6 +110,37 @@ test('driver contact actions use a distinct managed field without exposing login
   assert.match(publicCard, /formatPhoneForTel\(driver\.phone\)/);
 });
 
+test('login resolution is server-side and can repair an incomplete driver link', () => {
+  const loginForm = read('components/auth/LoginForm.tsx');
+  const authActions = read('lib/auth/actions.ts');
+  const migration = read(
+    'supabase/migrations/20260729133447_repair_driver_account_activation.sql',
+  );
+  const adminManager = read('components/admin/DriverManager.tsx');
+
+  assert.match(loginForm, /loginWithPhone/);
+  assert.doesNotMatch(loginForm, /\.from\('profiles'\)/);
+  assert.match(authActions, /signInWithPassword/);
+  assert.match(authActions, /\.from\('driver_profiles'\)[\s\S]*\.insert\(/);
+  assert.match(migration, /admin_repair_driver_account/);
+  assert.match(migration, /on conflict \(profile_id\) do nothing/);
+  assert.match(migration, /revoke all[\s\S]*from public, anon, authenticated/);
+  assert.match(adminManager, /تنشيط وربط الحساب/);
+});
+
+test('post-mutation refresh failures do not turn committed writes into errors', () => {
+  const safeRevalidate = read('lib/cache/safe-revalidate.ts');
+  const operations = read('lib/operations/actions.ts');
+  const driverWorkspace = read('components/operations/DriverWorkspace.tsx');
+  const adminWorkspace = read('components/operations/AdminWorkspace.tsx');
+
+  assert.match(safeRevalidate, /Cache refresh is best-effort after a committed mutation/);
+  assert.doesNotMatch(operations, /\brevalidatePath\(/);
+  assert.match(operations, /metadata update was deferred/);
+  assert.match(driverWorkspace, /transport failed/);
+  assert.match(adminWorkspace, /recoverFromActionError/);
+});
+
 test('PWA caches only public shell data and provides an iOS-safe install path', () => {
   const serviceWorker = read('public/sw.js');
   const installer = read('components/layout/PwaInstaller.tsx');

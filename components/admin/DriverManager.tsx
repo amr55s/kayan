@@ -8,13 +8,13 @@ import {
   CardHeader,
   Chip,
   Input,
-  Switch,
   Tooltip,
 } from '@heroui/react';
 import {
   Bike,
   CheckCircle2,
   Clock3,
+  PauseCircle,
   MessageCircle,
   Pencil,
   Phone,
@@ -40,6 +40,7 @@ type ManagedDriver = {
   is_available: boolean;
   active_until?: string | null;
   created_at: string;
+  profile_complete?: boolean;
   source: 'public' | 'account';
 };
 
@@ -78,23 +79,34 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
   const activeDrivers = drivers.filter((driver) => driver.is_active).length;
   const availableDrivers = drivers.filter((driver) => driver.is_available).length;
   const incompleteDrivers = drivers.filter(
-    (driver) => !driver.phone || !driver.whatsapp || !driver.vehicle_type,
+    (driver) =>
+      driver.profile_complete === false
+      || !driver.phone
+      || !driver.whatsapp
+      || !driver.vehicle_type,
   ).length;
 
   async function handleToggle(driver: ManagedDriver) {
     setPendingId(driver.id);
     setErrorMsg('');
-    const result = await serverToggleDriverStatus(
-      driver.id,
-      driver.is_active,
-      driver.source,
-    );
-    setPendingId('');
-    if (!result.success) {
-      setErrorMsg(result.message || 'تعذر تحديث حالة الكابتن.');
-      return;
+    try {
+      const result = await serverToggleDriverStatus(
+        driver.id,
+        driver.is_active,
+        driver.source,
+      );
+      if (!result.success) {
+        setErrorMsg(result.message || 'تعذر تحديث حالة الكابتن.');
+        return;
+      }
+      onRefresh();
+    } catch (error) {
+      console.error('Driver activation transport failed:', error);
+      setErrorMsg('انقطع الاتصال بعد إرسال التحديث. جاري مزامنة حالة الكابتن.');
+      onRefresh();
+    } finally {
+      setPendingId('');
     }
-    onRefresh();
   }
 
   function beginEdit(driver: ManagedDriver) {
@@ -113,14 +125,21 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
     if (!editing) return;
     setPendingId(editing.id);
     setErrorMsg('');
-    const result = await serverUpdateDriver(editing.id, editForm, editing.source);
-    setPendingId('');
-    if (!result.success) {
-      setErrorMsg(result.message || 'تعذر تحديث بيانات الكابتن.');
-      return;
+    try {
+      const result = await serverUpdateDriver(editing.id, editForm, editing.source);
+      if (!result.success) {
+        setErrorMsg(result.message || 'تعذر تحديث بيانات الكابتن.');
+        return;
+      }
+      setEditing(null);
+      onRefresh();
+    } catch (error) {
+      console.error('Driver edit transport failed:', error);
+      setErrorMsg('انقطع الاتصال بعد الحفظ. جاري تحديث القائمة للتأكد من النتيجة.');
+      onRefresh();
+    } finally {
+      setPendingId('');
     }
-    setEditing(null);
-    onRefresh();
   }
 
   async function handleDelete(driver: ManagedDriver) {
@@ -128,13 +147,20 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
     if (!window.confirm('هل تريد حذف بطاقة الكابتن القديمة نهائيًا؟')) return;
     setPendingId(driver.id);
     setErrorMsg('');
-    const result = await serverDeleteDriver(driver.id);
-    setPendingId('');
-    if (!result.success) {
-      setErrorMsg(result.message || 'تعذر حذف بطاقة الكابتن.');
-      return;
+    try {
+      const result = await serverDeleteDriver(driver.id);
+      if (!result.success) {
+        setErrorMsg(result.message || 'تعذر حذف بطاقة الكابتن.');
+        return;
+      }
+      onRefresh();
+    } catch (error) {
+      console.error('Driver delete transport failed:', error);
+      setErrorMsg('انقطع الاتصال بعد الحذف. جاري تحديث القائمة للتأكد من النتيجة.');
+      onRefresh();
+    } finally {
+      setPendingId('');
     }
-    onRefresh();
   }
 
   return (
@@ -283,19 +309,17 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
                         >
                           {driver.source === 'account' ? 'حساب' : 'بطاقة قديمة'}
                         </Chip>
+                        {driver.profile_complete === false && (
+                          <Chip size="sm" className="bg-amber-100 text-[10px] text-amber-900">
+                            يحتاج ربط
+                          </Chip>
+                        )}
                       </div>
                       <p className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
                         <Bike className="size-3.5 shrink-0" aria-hidden="true" />
                         <span className="truncate">{driver.vehicle_type || 'المركبة غير محددة'}</span>
                       </p>
                     </div>
-                    <Switch
-                      size="sm"
-                      aria-label={`${driver.is_active ? 'تعطيل' : 'تفعيل'} ${driver.name || 'الكابتن'}`}
-                      isSelected={driver.is_active}
-                      disabled={Boolean(pendingId)}
-                      onValueChange={() => handleToggle(driver)}
-                    />
                   </div>
 
                   <dl className="mt-3 grid gap-1.5 rounded-xl bg-zinc-50 p-2.5 text-xs">
@@ -315,45 +339,74 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
                     </div>
                   </dl>
 
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <Chip
+                  <div className="mt-3 grid gap-2">
+                    <Button
                       size="sm"
+                      isLoading={pendingId === driver.id}
+                      isDisabled={Boolean(pendingId) && pendingId !== driver.id}
+                      onPress={() => handleToggle(driver)}
+                      startContent={
+                        pendingId !== driver.id
+                        && (driver.is_active
+                          ? <PauseCircle className="size-4" aria-hidden="true" />
+                          : <UserRoundCheck className="size-4" aria-hidden="true" />)
+                      }
                       className={
-                        driver.is_available
-                          ? 'bg-emerald-50 text-emerald-800'
-                          : 'bg-zinc-100 text-zinc-600'
+                        driver.is_active
+                          ? 'min-h-11 border border-zinc-200 bg-white font-bold text-zinc-800'
+                          : 'min-h-11 bg-emerald-600 font-black text-white'
                       }
                     >
-                      {driver.is_available ? 'متاح الآن' : driver.is_active ? 'غير متواجد' : 'موقوف'}
-                    </Chip>
-                    <div className="flex gap-1">
-                      <Tooltip content="تعديل البيانات">
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="flat"
-                          aria-label={`تعديل بيانات ${driver.name || 'الكابتن'}`}
-                          onPress={() => beginEdit(driver)}
-                        >
-                          <Pencil className="size-4" aria-hidden="true" />
-                        </Button>
-                      </Tooltip>
-                      {driver.source === 'public' && (
-                        <Tooltip content="حذف البطاقة القديمة" color="danger">
+                      {driver.is_active
+                        ? 'إيقاف الحساب'
+                        : driver.profile_complete === false
+                          ? 'تنشيط وربط الحساب'
+                          : 'تنشيط الحساب'}
+                    </Button>
+                    <div className="flex items-center justify-between gap-2">
+                      <Chip
+                        size="sm"
+                        className={
+                          driver.is_available
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : 'bg-zinc-100 text-zinc-600'
+                        }
+                      >
+                        {driver.is_available
+                          ? 'متاح الآن'
+                          : driver.is_active
+                            ? 'غير متواجد'
+                            : 'موقوف'}
+                      </Chip>
+                      <div className="flex gap-1">
+                        <Tooltip content="تعديل البيانات">
                           <Button
                             isIconOnly
                             size="sm"
-                            color="danger"
-                            variant="light"
-                            aria-label={`حذف ${driver.name || 'الكابتن'}`}
-                            isDisabled={Boolean(pendingId)}
-                            onPress={() => handleDelete(driver)}
-                            className="text-rose-600"
+                            variant="flat"
+                            aria-label={`تعديل بيانات ${driver.name || 'الكابتن'}`}
+                            onPress={() => beginEdit(driver)}
                           >
-                            <Trash2 className="size-4" aria-hidden="true" />
+                            <Pencil className="size-4" aria-hidden="true" />
                           </Button>
                         </Tooltip>
-                      )}
+                        {driver.source === 'public' && (
+                          <Tooltip content="حذف البطاقة القديمة" color="danger">
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              color="danger"
+                              variant="light"
+                              aria-label={`حذف ${driver.name || 'الكابتن'}`}
+                              isDisabled={Boolean(pendingId)}
+                              onPress={() => handleDelete(driver)}
+                              className="text-rose-600"
+                            >
+                              <Trash2 className="size-4" aria-hidden="true" />
+                            </Button>
+                          </Tooltip>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </article>

@@ -101,6 +101,7 @@ type DirectoryDriver = {
   is_available: boolean;
   active_until: string | null;
   created_at: string;
+  profile_complete?: boolean;
   source: 'public' | 'account';
 };
 type AuditEntry = {
@@ -200,75 +201,95 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
   function createMerchantSubmit(event: FormEvent) {
     event.preventDefault();
     startTransition(async () => {
-      const result = await createMerchant(merchantName);
-      if (!result.success) {
-        setMessage(result.message);
-        return;
+      try {
+        const result = await createMerchant(merchantName);
+        if (!result.success) {
+          setMessage(result.message);
+          return;
+        }
+        setMerchantName('');
+        complete('تم إنشاء سجل المحل.');
+      } catch (error) {
+        recoverFromActionError(error);
       }
-      setMerchantName('');
-      complete('تم إنشاء سجل المحل.');
     });
   }
 
   function createUserSubmit(event: FormEvent) {
     event.preventDefault();
     startTransition(async () => {
-      const result = await provisionUser({
-        ...user,
-        merchantId: user.role === 'merchant' ? user.merchantId || null : null,
-      });
-      if (!result.success) {
-        setMessage(result.message);
-        return;
+      try {
+        const result = await provisionUser({
+          ...user,
+          merchantId: user.role === 'merchant' ? user.merchantId || null : null,
+        });
+        if (!result.success) {
+          setMessage(result.message);
+          return;
+        }
+        setUser({
+          displayName: '',
+          phone: '',
+          password: '',
+          role: 'driver',
+          merchantId: '',
+        });
+        complete('تم إنشاء الحساب بكلمة المرور المؤقتة.');
+      } catch (error) {
+        recoverFromActionError(error);
       }
-      setUser({
-        displayName: '',
-        phone: '',
-        password: '',
-        role: 'driver',
-        merchantId: '',
-      });
-      complete('تم إنشاء الحساب بكلمة المرور المؤقتة.');
     });
   }
 
   function createBranchSubmit(event: FormEvent) {
     event.preventDefault();
     startTransition(async () => {
-      const result = await createMerchantBranch({
-        ...branch,
-        placeId: branch.placeId || null,
-        isDefault: false,
-      });
-      if (!result.success) {
-        setMessage(result.message);
-        return;
+      try {
+        const result = await createMerchantBranch({
+          ...branch,
+          placeId: branch.placeId || null,
+          isDefault: false,
+        });
+        if (!result.success) {
+          setMessage(result.message);
+          return;
+        }
+        setBranch({
+          merchantId: '',
+          placeId: '',
+          name: '',
+          phone: '',
+          address: '',
+          area: '',
+        });
+        complete('تم إنشاء الفرع وربطه ببطاقة الخدمة.');
+      } catch (error) {
+        recoverFromActionError(error);
       }
-      setBranch({
-        merchantId: '',
-        placeId: '',
-        name: '',
-        phone: '',
-        address: '',
-        area: '',
-      });
-      complete('تم إنشاء الفرع وربطه ببطاقة الخدمة.');
     });
   }
 
   function toggleProfile(profile: Profile) {
     startTransition(async () => {
-      const result = await setUserActive(profile.id, !profile.is_active);
-      if (result.success) complete('تم تحديث حالة الحساب.');
-      else setMessage(result.message);
+      try {
+        const result = await setUserActive(profile.id, !profile.is_active);
+        if (result.success) complete('تم تحديث حالة الحساب.');
+        else setMessage(result.message);
+      } catch (error) {
+        recoverFromActionError(error);
+      }
     });
   }
 
   function updateBranchLink(branchId: string, placeId: string) {
     startTransition(async () => {
-      const result = await linkBranchToPlace(branchId, placeId || null);
-      if (result.success) complete('تم تحديث ارتباط الفرع بكيان سيتي سبوت.');
-      else setMessage(result.message);
+      try {
+        const result = await linkBranchToPlace(branchId, placeId || null);
+        if (result.success) complete('تم تحديث ارتباط الفرع بكيان سيتي سبوت.');
+        else setMessage(result.message);
+      } catch (error) {
+        recoverFromActionError(error);
+      }
     });
   }
 

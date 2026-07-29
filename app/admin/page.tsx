@@ -74,7 +74,7 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: false })),
     safeAdminQuery('profiles', (supabase as any)
       .from('profiles')
-      .select('id, display_name, phone, role, is_active, merchant_id, must_change_password')
+      .select('id, display_name, phone, role, is_active, merchant_id, must_change_password, created_at')
       .order('created_at', { ascending: false })),
     safeAdminQuery('delivery_orders', (supabase as any)
       .from('delivery_orders')
@@ -155,32 +155,31 @@ export default async function AdminDashboard() {
       shares: 0,
     }),
   }));
+  const registeredByProfile = new Map(
+    (registeredDrivers ?? []).map((driver: any) => [driver.profile_id, driver]),
+  );
   const linkedLegacyIds = new Set(
-    (registeredDrivers ?? [])
-      .map((driver: any) => driver.legacy_driver_id)
-      .filter(Boolean),
+    (registeredDrivers ?? []).map((driver: any) => driver.legacy_driver_id).filter(Boolean),
   );
   const adminRenderedAt = marketingHomeData.renderedAt;
   const managedDrivers = [
-    ...(registeredDrivers ?? [])
-      .filter((driver: any) => {
-        const account = Array.isArray(driver.profile) ? driver.profile[0] : driver.profile;
-        return account?.role === 'driver';
-      })
-      .map((driver: any) => {
-        const account = Array.isArray(driver.profile) ? driver.profile[0] : driver.profile;
+    ...(profiles ?? [])
+      .filter((account: any) => account.role === 'driver')
+      .map((account: any) => {
+        const driver: any = registeredByProfile.get(account.id);
         return {
-          id: driver.profile_id,
+          id: account.id,
           name: account?.display_name ?? 'كابتن توصيل',
-          phone: driver.contact_phone ?? account?.phone ?? '',
-          whatsapp: driver.whatsapp,
-          vehicle_type: driver.vehicle_type,
+          phone: driver?.contact_phone ?? account?.phone ?? '',
+          whatsapp: driver?.whatsapp,
+          vehicle_type: driver?.vehicle_type,
           is_active: Boolean(account?.is_active),
-          is_available: Boolean(driver.is_available)
-            && Boolean(driver.active_until)
+          is_available: Boolean(driver?.is_available)
+            && Boolean(driver?.active_until)
             && new Date(driver.active_until).getTime() > adminRenderedAt,
-          active_until: driver.active_until,
-          created_at: account?.created_at ?? driver.created_at,
+          active_until: driver?.active_until ?? null,
+          created_at: account?.created_at ?? driver?.created_at,
+          profile_complete: Boolean(driver),
           source: 'account' as const,
         };
       }),
@@ -192,6 +191,7 @@ export default async function AdminDashboard() {
         is_available: Boolean(driver.is_active)
           && Boolean(driver.active_until)
           && new Date(driver.active_until).getTime() > adminRenderedAt,
+        profile_complete: true,
         source: 'public' as const,
       })),
   ];

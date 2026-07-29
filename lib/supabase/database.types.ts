@@ -1183,6 +1183,10 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: string
       }
+      admin_repair_driver_account: {
+        Args: { p_is_active?: boolean; p_profile_id: string }
+        Returns: boolean
+      }
       approve_pending_place: { Args: { p_request_id: string }; Returns: string }
       claim_delivery_order: {
         Args: { p_order_id: string }

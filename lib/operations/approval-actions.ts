@@ -1,11 +1,11 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import type { FeedbackImageMode } from '@/types';
 import { getCurrentProfile } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
 
 type ApprovalResult =
   | { success: true; message: string; placeId?: string }
@@ -17,9 +17,7 @@ const feedbackApprovalSchema = z.object({
 });
 
 function refreshDirectory() {
-  revalidatePath('/');
-  revalidatePath('/admin');
-  revalidatePath('/merchant');
+  safeRevalidatePaths('/', '/admin', '/merchant');
 }
 
 async function requireAdmin() {
@@ -148,7 +146,7 @@ export async function rejectPendingPlace(
     if (error) throw error;
     if (!data) throw new Error('request_already_processed');
 
-    revalidatePath('/admin');
+    safeRevalidatePaths('/admin');
     return { success: true, message: 'تم رفض طلب الإضافة.' };
   } catch (error) {
     return approvalError(error);
