@@ -7,6 +7,7 @@ import {
   approveAccountRequest,
   rejectAccountRequest,
 } from '@/lib/operations/actions';
+import { formatCairoDateTime } from '@/lib/format-date';
 import type { AccountRequest, Place } from '@/types';
 
 export function AccountRequestManager({
@@ -121,7 +122,7 @@ export function AccountRequestManager({
                       </p>
                     )}
                     <p className="mt-1 text-xs text-zinc-400">
-                      {new Date(request.created_at).toLocaleString('ar-EG')}
+                      {formatCairoDateTime(request.created_at)}
                     </p>
                   </div>
 

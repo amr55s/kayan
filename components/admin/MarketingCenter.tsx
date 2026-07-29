@@ -39,6 +39,7 @@ import {
   marketingText,
   marketingTemplateLabels,
 } from '@/lib/marketing/content';
+import { formatCairoDate } from '@/lib/format-date';
 import {
   prepareMarketingCampaign,
   recordMarketingPublication,
@@ -399,7 +400,7 @@ export function MarketingCenter({
                     <Chip className="mb-2 bg-zinc-100 text-[10px] font-bold">{item.subtitle}</Chip>
                     <h3 className="truncate font-black">{item.title}</h3>
                     <time className="mt-1 block text-xs text-zinc-500" dateTime={item.createdAt}>
-                      {new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium' }).format(new Date(item.createdAt))}
+                      {formatCairoDate(item.createdAt)}
                     </time>
                   </div>
                   <Chip className={itemCampaign?.status === 'published'

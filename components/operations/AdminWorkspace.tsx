@@ -60,6 +60,7 @@ import type { AccountRequest, FeedbackRequest, PendingRequest, Place } from '@/t
 import type { Driver, MarketingCampaign, MarketingChannel } from '@/types';
 import type { BehaviorAnalyticsSummary } from '@/lib/analytics/admin';
 import { MarketingCenter } from '@/components/admin/MarketingCenter';
+import { formatCairoDateTime, formatUtcDayMonth } from '@/lib/format-date';
 
 type Merchant = { id: string; display_name: string; is_active: boolean };
 type Profile = {
@@ -393,10 +394,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                 <div className="text-start font-bold tabular-nums sm:text-end">
                   <p>{item.occurrences} مرة</p>
                   <time dateTime={item.last_seen_at}>
-                    {new Intl.DateTimeFormat('ar-EG', {
-                      dateStyle: 'short',
-                      timeStyle: 'short',
-                    }).format(new Date(item.last_seen_at))}
+                    {formatCairoDateTime(item.last_seen_at)}
                   </time>
                 </div>
               </article>
@@ -1125,11 +1123,7 @@ function BehaviorAnalyticsOverview({
                       dateTime={day.date}
                       className="text-[9px] font-bold text-zinc-500"
                     >
-                      {new Intl.DateTimeFormat('ar-EG', {
-                        day: 'numeric',
-                        month: 'numeric',
-                        timeZone: 'UTC',
-                      }).format(new Date(`${day.date}T00:00:00Z`))}
+                      {formatUtcDayMonth(day.date)}
                     </time>
                   </div>
                 ))}
@@ -1377,10 +1371,7 @@ function auditActionLabel(action: string) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat('ar-EG', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  return formatCairoDateTime(value);
 }
 
 function EmptyState({ text }: { text: string }) {
