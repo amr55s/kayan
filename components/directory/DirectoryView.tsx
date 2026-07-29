@@ -197,7 +197,6 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
     setClosingDetailKey(selectedDetailKey);
     detailOpenedFromDirectory.current = false;
     window.history.replaceState(window.history.state, '', cleanUrl);
-    router.replace(cleanUrl, { scroll: false });
   }
 
   function suggestDetails(placeId: string) {

@@ -23,7 +23,11 @@ test('place details are deep-linked without creating a fragile dynamic route', (
   assert.match(directory, /currentState\[DIRECT_DETAIL_STATE\]/);
   assert.match(
     directory,
-    /function closeDetails[\s\S]*window\.history\.replaceState\(window\.history\.state, '', cleanUrl\)[\s\S]*router\.replace\(cleanUrl, \{ scroll: false \}\)/,
+    /function closeDetails[\s\S]*window\.history\.replaceState\(window\.history\.state, '', cleanUrl\)/,
+  );
+  assert.doesNotMatch(
+    directory,
+    /function closeDetails[\s\S]{0,500}router\.replace\(cleanUrl/,
   );
   assert.doesNotMatch(directory, /function closeDetails[\s\S]{0,500}router\.back\(\)/);
 });
