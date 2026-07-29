@@ -54,8 +54,8 @@ export function DriverModal({
       setErrorMsg('أدخل رقم هاتف مصري صحيحاً، مثال: 01012345678.');
       return;
     }
-    if (whatsapp && !isValidEgyptianPhone(whatsapp)) {
-      setErrorMsg('رقم واتساب غير صحيح.');
+    if (!isValidEgyptianPhone(whatsapp)) {
+      setErrorMsg('أدخل رقم واتساب مصري صحيحاً، مثال: 01012345678.');
       return;
     }
     if (password.length < 12) {
@@ -72,7 +72,7 @@ export function DriverModal({
       kind: 'driver',
       displayName: name,
       phone,
-      whatsapp: whatsapp || phone,
+      whatsapp,
       vehicleType,
       password,
     });
@@ -158,17 +158,19 @@ export function DriverModal({
                     autoComplete="tel"
                     type="tel"
                     inputMode="tel"
-                    label="رقم الهاتف"
-                    placeholder="01012345678"
+                    label="رقم للتواصل"
+                    placeholder="مثال: 01012345678"
                     value={phone}
                     onValueChange={setPhone}
                   />
                   <Input
+                    isRequired
                     name="whatsapp"
                     autoComplete="tel"
                     type="tel"
                     inputMode="tel"
-                    label="رقم واتساب"
+                    label="رقم للواتس"
+                    placeholder="مثال: 01012345678"
                     value={whatsapp}
                     onValueChange={setWhatsapp}
                   />

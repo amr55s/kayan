@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { Button, Chip } from '@heroui/react';
-import { Bike, ChevronLeft, RefreshCw, UserPlus } from 'lucide-react';
+import { Bike, ChevronLeft, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Driver } from '@/types';
 import { createClient } from '@/lib/supabase/client';
@@ -12,13 +12,11 @@ import { DriverCard } from './DriverCard';
 export function DeliveryBar({
   drivers,
   renderedAt,
-  onOpenRegistration,
   driverHref,
   onOpenDriverDetails,
 }: {
   drivers: Driver[];
   renderedAt: number;
-  onOpenRegistration: () => void;
   driverHref: (driverId: string) => string;
   onOpenDriverDetails: () => void;
 }) {
@@ -104,7 +102,7 @@ export function DeliveryBar({
           </div>
 
           <div className="flex flex-col items-start gap-1 sm:items-end">
-            {isDriverAccount ? (
+            {isDriverAccount && (
               <Button
                 onPress={renewPresence}
                 isLoading={pending}
@@ -112,14 +110,6 @@ export function DeliveryBar({
                 className="self-start border border-zinc-700 bg-white px-3 text-xs font-bold text-zinc-950 sm:self-auto"
               >
                 جدّد تواجدي لساعتين
-              </Button>
-            ) : (
-              <Button
-                onPress={onOpenRegistration}
-                startContent={<UserPlus className="size-4" />}
-                className="self-start border border-zinc-700 bg-white px-3 text-xs font-bold text-zinc-950 sm:self-auto"
-              >
-                اطلب حساب كابتن
               </Button>
             )}
             {renewalMessage && (
@@ -150,7 +140,7 @@ export function DeliveryBar({
           </div>
         ) : (
           <div className="mx-3 rounded-2xl border border-dashed border-zinc-700 bg-zinc-900/60 p-4 text-sm text-zinc-400 sm:mx-4">
-            لا توجد بطاقات كباتن منشورة بعد. يمكنك إضافة بطاقتك الآن.
+            لا توجد بطاقات كباتن منشورة بعد. يمكن للكابتن التسجيل من زر «انضم» أعلى الصفحة.
           </div>
         )}
 

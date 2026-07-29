@@ -21,7 +21,11 @@ test('place details are deep-linked without creating a fragile dynamic route', (
   assert.match(directory, /History\.prototype\.replaceState\.call/);
   assert.match(directory, /History\.prototype\.pushState\.call/);
   assert.match(directory, /currentState\[DIRECT_DETAIL_STATE\]/);
-  assert.match(directory, /hasInAppBaseEntry[\s\S]*router\.back\(\)/);
+  assert.match(
+    directory,
+    /function closeDetails[\s\S]*window\.history\.replaceState\(window\.history\.state, '', cleanUrl\)[\s\S]*router\.replace\(cleanUrl, \{ scroll: false \}\)/,
+  );
+  assert.doesNotMatch(directory, /function closeDetails[\s\S]{0,500}router\.back\(\)/);
 });
 
 test('native place sharing includes the direct URL only once', () => {

@@ -1,9 +1,7 @@
 'use client';
 
 import { trackSiteEvent } from '@/lib/analytics/client';
-
-const WHATSAPP_GROUP_URL =
-  'https://chat.whatsapp.com/JTuPs9xv0CZAZhpzxttU3R?s=cl&p=i&ilr=0';
+import { WHATSAPP_GROUP_URL } from '@/lib/community';
 
 function WhatsAppIcon() {
   return (
@@ -28,12 +26,12 @@ export function WhatsAppGroupButton() {
         targetKey: 'support_whatsapp',
       })}
       aria-label="الانضمام إلى جروب KAYAN CITY SPOT عبر واتساب"
-      className="kayan-support-fab group fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] end-3 z-50 inline-flex min-h-14 items-center gap-2.5 rounded-full border border-white/30 bg-[#25D366] py-2 pe-4 ps-2.5 text-white shadow-[0_12px_35px_rgba(37,211,102,0.38)] transition-[transform,background-color,box-shadow] hover:-translate-y-1 hover:bg-[#20bd5a] hover:shadow-[0_16px_40px_rgba(37,211,102,0.48)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transform-none sm:end-5"
+      className="kayan-support-fab group fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] end-3 z-50 inline-flex size-12 touch-manipulation items-center justify-center rounded-full border border-white/30 bg-emerald-600 p-0 text-white shadow-lg transition-[transform,background-color,box-shadow] hover:-translate-y-1 hover:bg-emerald-700 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transform-none sm:end-5 sm:size-auto sm:min-h-14 sm:gap-2.5 sm:py-2 sm:pe-4 sm:ps-2.5"
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white text-[#20bd5a] shadow-sm">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-full text-white sm:size-10 sm:bg-white sm:text-emerald-600 sm:shadow-sm">
         <WhatsAppIcon />
       </span>
-      <span className="flex flex-col text-right leading-tight max-[480px]:hidden">
+      <span className="hidden flex-col text-right leading-tight sm:flex">
         <strong className="text-sm font-black">جروب KAYAN CITY SPOT</strong>
         <span className="mt-0.5 text-[11px] font-semibold text-white/90">
           انضم عبر واتساب

@@ -34,6 +34,9 @@ test('marketing cards resolve real entities and encode a direct QR link', () => 
   assert.doesNotMatch(route, /driver\.phone|place\.phone/);
   assert.match(route, /cache-control/);
   assert.match(route, /Too many card requests/);
+  assert.match(route, /renderSize = isPreview \? 540 : 1080/);
+  assert.match(route, /width: isPreview \? 130 : 260/);
+  assert.match(route, /Promise\.all/);
 });
 
 test('drivers have shareable deep links with resilient back navigation', () => {
@@ -59,6 +62,21 @@ test('public guide and share kit cover residents, merchants, and drivers', () =>
   assert.match(share, /PublicShareHub/);
   assert.match(hub, /marketing_share_click/);
   assert.match(hub, /card_download/);
+  assert.match(hub, /loading="eager"/);
+  assert.match(hub, /IntersectionObserver/);
+  assert.match(hub, /content-visibility:auto/);
+  assert.match(share, /sharePlaces/);
+  assert.match(share, /shareDrivers/);
+});
+
+test('official community group link is updated in app and marketing data', () => {
+  const community = read('lib/community.ts');
+  const migration = read(
+    'supabase/migrations/20260729112345_update_official_whatsapp_group_link.sql',
+  );
+  assert.match(community, /\?mode=gi_t/);
+  assert.match(migration, /where slug = 'kayan-main'/);
+  assert.match(migration, /\?mode=gi_t/);
 });
 
 test('campaign attribution is anonymous and survives safe in-app navigation', () => {

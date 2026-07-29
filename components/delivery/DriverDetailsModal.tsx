@@ -42,7 +42,7 @@ export function DriverDetailsModal({
       }}
     >
       <ModalContent>
-        {(onClose) => (
+        {() => (
           <>
             <ModalHeader className="flex items-center justify-between gap-3 border-b border-zinc-100 p-4">
               <div className="min-w-0">
@@ -53,7 +53,12 @@ export function DriverDetailsModal({
                 <Button isIconOnly variant="light" aria-label="مشاركة الكابتن" onPress={share}>
                   <Share2 className="size-5" />
                 </Button>
-                <Button isIconOnly variant="light" aria-label="إغلاق تفاصيل الكابتن" onPress={onClose}>
+                <Button
+                  isIconOnly
+                  variant="light"
+                  aria-label="إغلاق تفاصيل الكابتن"
+                  onPress={() => onOpenChange(false)}
+                >
                   <X className="size-5" />
                 </Button>
               </div>
@@ -75,7 +80,16 @@ export function DriverDetailsModal({
                     {driver.is_available ? 'متاح الآن' : 'غير متاح حاليًا'}
                   </Chip>
                 </div>
-                <p className="dir-ltr mt-5 text-right font-mono text-lg text-zinc-200">{driver.phone}</p>
+                <dl className="mt-5 grid gap-2 text-sm">
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-zinc-900 px-3 py-2">
+                    <dt className="text-zinc-400">رقم للتواصل</dt>
+                    <dd className="dir-ltr font-mono text-zinc-100">{driver.phone}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-zinc-900 px-3 py-2">
+                    <dt className="text-zinc-400">رقم للواتس</dt>
+                    <dd className="dir-ltr font-mono text-zinc-100">{driver.whatsapp || driver.phone}</dd>
+                  </div>
+                </dl>
               </div>
               <p className="text-sm leading-7 text-zinc-600">
                 التواصل مباشر مع الكابتن. اتفقوا على تفاصيل الطلب والتكلفة قبل بدء التوصيل.
@@ -97,7 +111,7 @@ export function DriverDetailsModal({
                 })}
                 className="min-h-12 bg-emerald-600 font-black text-white"
               >
-                WhatsApp
+                واتساب
               </Button>
               <Button
                 as="a"

@@ -129,19 +129,42 @@ test('WhatsApp support link stays visible across the whole site', () => {
   assert.match(layout, /<WhatsAppGroupButton \/>/);
   assert.match(
     groupButton,
-    /https:\/\/chat\.whatsapp\.com\/JTuPs9xv0CZAZhpzxttU3R\?s=cl&p=i&ilr=0/,
+    /WHATSAPP_GROUP_URL/,
   );
+  assert.match(
+    read('lib/community.ts'),
+    /https:\/\/chat\.whatsapp\.com\/JTuPs9xv0CZAZhpzxttU3R\?mode=gi_t/,
+  );
+  assert.match(groupButton, /size-12/);
+  assert.match(groupButton, /sm:size-auto/);
   assert.match(groupButton, /fixed bottom-/);
   assert.match(groupButton, /جروب KAYAN CITY SPOT/);
   assert.match(groupButton, /انضم عبر واتساب/);
   assert.doesNotMatch(groupButton, /01094552421/);
-  assert.match(groupButton, /chat\.whatsapp\.com/);
+  assert.match(read('lib/community.ts'), /chat\.whatsapp\.com/);
   assert.match(groupButton, /target="_blank"/);
   assert.match(groupButton, /rel="noopener noreferrer"/);
   assert.match(
     installer,
     /bottom-\[calc\(5\.5rem\+env\(safe-area-inset-bottom\)\)\][\s\S]*sm:bottom-4/,
   );
+});
+
+test('driver signup and public cards keep contact and WhatsApp numbers explicit', () => {
+  const modal = read('components/delivery/DriverModal.tsx');
+  const card = read('components/delivery/DriverCard.tsx');
+  const bar = read('components/delivery/DeliveryBar.tsx');
+
+  assert.match(modal, /label="رقم للتواصل"/);
+  assert.match(modal, /label="رقم للواتس"/);
+  assert.match(modal, /name="whatsapp"[\s\S]*isRequired|isRequired[\s\S]*name="whatsapp"/);
+  assert.match(card, /للتواصل:/);
+  assert.match(card, /للواتس:/);
+  assert.match(card, /whatsapp_click/);
+  assert.match(card, /phone_click/);
+  assert.doesNotMatch(card, />\s*التفاصيل\s*</);
+  assert.doesNotMatch(bar, /اطلب حساب كابتن/);
+  assert.doesNotMatch(bar, /onOpenRegistration/);
 });
 
 test('listing images are optimized before storage without sacrificing menu resolution', () => {

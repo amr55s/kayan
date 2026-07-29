@@ -18,6 +18,7 @@ import { DriverDetailsModal } from '@/components/delivery/DriverDetailsModal';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { FeedbackType } from '@/types';
 import { trackSiteEvent } from '@/lib/analytics/client';
+import { WHATSAPP_GROUP_URL } from '@/lib/community';
 
 interface DirectoryViewProps {
   initialPlaces: Place[];
@@ -50,6 +51,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   const [isDriverOpen, setIsDriverOpen] = useState(false);
   const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [invalidDetail, setInvalidDetail] = useState(false);
+  const [closingDetailKey, setClosingDetailKey] = useState<string | null>(null);
   const [feedbackInitialPlaceId, setFeedbackInitialPlaceId] = useState<string>();
   const [feedbackInitialType, setFeedbackInitialType] = useState<FeedbackType>();
 
@@ -79,6 +81,10 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   const selectedDriver = selectedDriverId
     ? initialDrivers.find((driver) => driver.id === selectedDriverId) ?? null
     : null;
+  const selectedDetailKey = selectedPlaceId || selectedDriverId;
+  const isDetailClosing = Boolean(
+    selectedDetailKey && closingDetailKey === selectedDetailKey,
+  );
 
   useEffect(() => {
     if (searchQuery.trim().length < 2) return;
@@ -187,20 +193,11 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
 
   function closeDetails(open: boolean) {
     if (open) return;
-    const currentState =
-      window.history.state && typeof window.history.state === 'object'
-        ? window.history.state as Record<string, unknown>
-        : {};
-    const hasInAppBaseEntry = Boolean(
-      detailOpenedFromDirectory.current || currentState[DIRECT_DETAIL_STATE],
-    );
-    if (hasInAppBaseEntry && window.history.length > 1) {
-      detailOpenedFromDirectory.current = false;
-      router.back();
-      return;
-    }
+    const cleanUrl = removePlaceFromUrl();
+    setClosingDetailKey(selectedDetailKey);
     detailOpenedFromDirectory.current = false;
-    router.replace(removePlaceFromUrl(), { scroll: false });
+    window.history.replaceState(window.history.state, '', cleanUrl);
+    router.replace(cleanUrl, { scroll: false });
   }
 
   function suggestDetails(placeId: string) {
@@ -279,7 +276,6 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
       <DeliveryBar
         drivers={initialDrivers}
         renderedAt={renderedAt}
-        onOpenRegistration={() => setIsDriverOpen(true)}
         driverHref={driverHref}
         onOpenDriverDetails={() => {
           detailOpenedFromDirectory.current = true;
@@ -289,16 +285,16 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
       {/* Main Directory Body */}
       <main id="main-content" className="flex-1 pb-12">
         {/* Compact Hero Banner */}
-        <div className="bg-gradient-to-b from-zinc-200/50 via-zinc-100/20 to-transparent dark:from-zinc-900/40 dark:via-zinc-900/10 py-5 sm:py-7 px-4 text-center border-b border-zinc-200/60 dark:border-zinc-800/60">
-          <div className="max-w-2xl mx-auto space-y-1">
-            <h1 className="text-xl sm:text-3xl font-black tracking-tight text-zinc-900 dark:text-white">
+        <section className="border-b border-zinc-200/70 bg-white px-4 py-6 text-center sm:py-10">
+          <div className="mx-auto max-w-3xl">
+            <h1 className="text-balance text-xl font-extrabold tracking-tight text-zinc-900 sm:text-3xl">
               KAYAN CITY SPOT… كل ما تحتاجه في مكان واحد
             </h1>
-            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 font-semibold">
+            <p className="mx-auto mt-2 max-w-2xl text-pretty text-sm font-normal text-zinc-500 sm:text-base">
               مطاعم ومحلات وصيدليات وخدمات وتوصيل ومنيوهات، مع تواصل مباشر وسهل.
             </p>
           </div>
-        </div>
+        </section>
 
         {/* Filter Controls & Search */}
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
@@ -307,7 +303,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               isClearable
               size="lg"
               radius="lg"
-              placeholder="ابحث عن اسم مكان، محل، صيدلية، أو هاتف..."
+              placeholder="ابحث عن اسم مكان، محل، صيدلية، أو هاتف…"
               aria-label="البحث في الأماكن والخدمات"
               name="directorySearch"
               autoComplete="off"
@@ -483,7 +479,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
             </a>
           </div>
           <a
-            href="https://chat.whatsapp.com/JTuPs9xv0CZAZhpzxttU3R?s=cl&p=i&ilr=0"
+            href={WHATSAPP_GROUP_URL}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => trackSiteEvent('support_click', {
@@ -502,14 +498,14 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
 
       <PlaceDetailsModal
         key={selectedPlace?.id ?? 'closed'}
-        isOpen={Boolean(selectedPlace)}
+        isOpen={Boolean(selectedPlace) && !isDetailClosing}
         onOpenChange={closeDetails}
         onSuggestDetails={suggestDetails}
         place={selectedPlace}
       />
       <DriverDetailsModal
         key={selectedDriver?.id ?? 'driver-closed'}
-        isOpen={Boolean(selectedDriver)}
+        isOpen={Boolean(selectedDriver) && !isDetailClosing}
         onOpenChange={closeDetails}
         driver={selectedDriver}
       />

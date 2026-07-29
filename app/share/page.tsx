@@ -13,6 +13,17 @@ export const metadata: Metadata = {
 
 export default async function SharePage() {
   const { places, drivers } = await fetchHomePageData();
+  const sharePlaces = places.slice(0, 6).map(({ id, title, category }) => ({
+    id,
+    title,
+    category,
+  }));
+  const shareDrivers = drivers.slice(0, 4).map(({ id, name, vehicle_type }) => ({
+    id,
+    name,
+    vehicle_type,
+  }));
+
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950">
       <GuideAnalytics page="share" />
@@ -28,7 +39,7 @@ export default async function SharePage() {
           </p>
         </section>
         <div className="mx-auto max-w-7xl px-3 py-10 sm:px-6">
-          <PublicShareHub places={places} drivers={drivers} />
+          <PublicShareHub places={sharePlaces} drivers={shareDrivers} />
         </div>
       </main>
     </div>

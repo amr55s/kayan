@@ -13,11 +13,13 @@ import {
   ModalContent,
   ModalHeader,
 } from '@heroui/react';
-import { Bike, BookOpen, Building2, LayoutDashboard, LogIn, MessageSquareText, Share2, UserPlus } from 'lucide-react';
+import { Bike, BookOpen, Building2, LayoutDashboard, LogIn, MessageCircle, MessageSquareText, Share2, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
 import { SITE_NAME, SITE_NAME_AR } from '@/lib/brand';
+import { WHATSAPP_GROUP_URL } from '@/lib/community';
+import { trackSiteEvent } from '@/lib/analytics/client';
 
 interface HeaderProps {
   isJoinOpen: boolean;
@@ -109,6 +111,21 @@ export const Header: React.FC<HeaderProps> = ({
               <Share2 className="size-4" />
               شارك كيان
             </Link>
+          </NavbarItem>
+          <NavbarItem className="hidden lg:block">
+            <a
+              href={WHATSAPP_GROUP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackSiteEvent('support_click', {
+                targetType: 'feature',
+                targetKey: 'header_whatsapp_group',
+              })}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            >
+              <MessageCircle className="size-4" aria-hidden="true" />
+              جروب واتساب
+            </a>
           </NavbarItem>
           {onOpenFeedbackModal && (
             <NavbarItem>

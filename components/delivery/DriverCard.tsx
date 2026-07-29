@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Avatar, Button, Card, CardBody, Chip } from '@heroui/react';
-import { Bike, ExternalLink, MessageCircle, Phone, Share2 } from 'lucide-react';
+import { Bike, MessageCircle, Phone, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import type { Driver } from '@/types';
 import { formatPhoneForTel, formatWhatsAppUrl } from '@/lib/utils';
@@ -81,10 +81,15 @@ export function DriverCard({
                 {displayName}
               </Link>
               <p className="dir-ltr mt-0.5 text-right font-mono text-xs text-zinc-300">
+                <span className="font-sans text-zinc-400">للتواصل: </span>
                 {driver.phone}
               </p>
+              <p className="dir-ltr mt-0.5 text-right font-mono text-xs text-zinc-300">
+                <span className="font-sans text-zinc-400">للواتس: </span>
+                {driver.whatsapp || driver.phone}
+              </p>
               <p className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
-                <Bike className="size-3.5" />
+                <Bike className="size-3.5" aria-hidden="true" />
                 {driver.vehicle_type || 'نوع المركبة غير محدد'}
               </p>
             </div>
@@ -106,20 +111,11 @@ export function DriverCard({
             onPress={share}
             className="size-9 min-w-9 text-zinc-300"
           >
-            <Share2 className="size-4" />
+            <Share2 className="size-4" aria-hidden="true" />
           </Button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 border-t border-zinc-800 pt-2.5">
-          <Button
-            as={Link}
-            href={detailsHref}
-            onPress={onOpenDetails}
-            startContent={<ExternalLink className="size-4" />}
-            className="border border-zinc-700 bg-zinc-900 text-xs font-bold text-white"
-          >
-            التفاصيل
-          </Button>
+        <div className="grid grid-cols-2 gap-2 border-t border-zinc-800 pt-2.5">
           <Button
             as="a"
             href={formatWhatsAppUrl(
@@ -128,7 +124,11 @@ export function DriverCard({
             )}
             target="_blank"
             rel="noopener noreferrer"
-            startContent={<MessageCircle className="size-4" />}
+            onPress={() => trackSiteEvent('whatsapp_click', {
+              targetType: 'driver',
+              targetKey: driver.id,
+            })}
+            startContent={<MessageCircle className="size-4" aria-hidden="true" />}
             className="border border-zinc-700 bg-zinc-800 text-xs font-bold text-white"
           >
             واتساب
@@ -136,7 +136,11 @@ export function DriverCard({
           <Button
             as="a"
             href={`tel:${formatPhoneForTel(driver.phone)}`}
-            startContent={<Phone className="size-4" />}
+            onPress={() => trackSiteEvent('phone_click', {
+              targetType: 'driver',
+              targetKey: driver.id,
+            })}
+            startContent={<Phone className="size-4" aria-hidden="true" />}
             className="bg-white text-xs font-extrabold text-zinc-950"
           >
             اتصال

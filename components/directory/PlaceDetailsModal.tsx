@@ -252,7 +252,7 @@ export function PlaceDetailsModal({
       }}
     >
       <ModalContent>
-        {(onClose) => (
+        {() => (
           <div data-place-details className="relative flex min-h-0 flex-1 flex-col">
             <ModalHeader className="relative flex min-w-0 items-center justify-between gap-2">
               <span
@@ -269,9 +269,9 @@ export function PlaceDetailsModal({
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <ShareButton title={place.title} phone={place.phone} placeId={place.id} />
-                <Button
-                  variant="light"
-                  onClick={onClose}
+                  <Button
+                    variant="light"
+                    onPress={() => onOpenChange(false)}
                   aria-label="إغلاق تفاصيل المكان"
                   className="min-h-11 min-w-11 gap-1 rounded-xl bg-zinc-100 px-3 font-black text-zinc-900 hover:bg-zinc-200"
                 >

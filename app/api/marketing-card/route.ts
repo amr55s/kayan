@@ -74,7 +74,10 @@ function splitTitle(value: string, maxLength = 28): [string, string?] {
   return [first || value.slice(0, maxLength), words.join(' ').slice(0, maxLength)];
 }
 
-async function safeImageBuffer(url: string | null | undefined): Promise<Buffer | null> {
+async function safeImageBuffer(
+  url: string | null | undefined,
+  preview: boolean,
+): Promise<Buffer | null> {
   if (!url) return null;
   try {
     const parsed = new URL(url);
@@ -99,10 +102,17 @@ async function safeImageBuffer(url: string | null | undefined): Promise<Buffer |
     if (contentLength > 6_000_000) return null;
     const bytes = Buffer.from(await response.arrayBuffer());
     if (bytes.byteLength > 6_000_000) return null;
-    return await sharp(bytes)
-      .rotate()
-      .resize(920, 470, { fit: 'cover', position: 'attention' })
-      .png()
+    const image = sharp(bytes).rotate();
+    const metadata = await image.metadata();
+    if (!['jpeg', 'png', 'webp', 'avif'].includes(metadata.format || '')) return null;
+    if (!metadata.width || !metadata.height) return null;
+    if (metadata.width * metadata.height > 25_000_000) return null;
+    return image
+      .resize(preview ? 460 : 920, preview ? 235 : 470, {
+        fit: 'cover',
+        position: 'attention',
+      })
+      .jpeg({ quality: 84, chromaSubsampling: '4:4:4' })
       .toBuffer();
   } catch {
     return null;
@@ -174,20 +184,22 @@ export async function GET(request: Request) {
       })()
     : marketingUrl(type, id, ref);
   const [titleLineOne, titleLineTwo] = splitTitle(title);
-  const qr = await QRCode.toBuffer(targetUrl, {
-    type: 'png',
-    width: 260,
-    margin: 1,
-    color: { dark: '#09090b', light: '#ffffff' },
-    errorCorrectionLevel: 'M',
-  });
-  const photo = await safeImageBuffer(entity.image);
-  const photoMarkup = photo
-    ? `<image x="80" y="92" width="920" height="470" preserveAspectRatio="xMidYMid slice" href="data:image/png;base64,${photo.toString('base64')}" clip-path="url(#photo)"/>`
-    : '';
+  const isPreview = preview === '1';
+  const renderScale = isPreview ? 0.5 : 1;
+  const renderSize = isPreview ? 540 : 1080;
+  const [qr, photo] = await Promise.all([
+    QRCode.toBuffer(targetUrl, {
+      type: 'png',
+      width: isPreview ? 130 : 260,
+      margin: 1,
+      color: { dark: '#09090b', light: '#ffffff' },
+      errorCorrectionLevel: 'M',
+    }),
+    safeImageBuffer(entity.image, isPreview),
+  ]);
 
   const svg = Buffer.from(`
-    <svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+    <svg width="${renderSize}" height="${renderSize}" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stop-color="#09090b"/>
@@ -198,7 +210,6 @@ export async function GET(request: Request) {
       <rect width="1080" height="1080" fill="#f4f4f5"/>
       <rect x="44" y="44" width="992" height="992" rx="64" fill="white"/>
       ${photo ? '' : '<rect x="80" y="92" width="920" height="470" rx="42" fill="url(#bg)"/>'}
-      ${photoMarkup}
       <rect x="80" y="92" width="920" height="470" rx="42" fill="none" stroke="#e4e4e7" stroke-width="3"/>
       <rect x="112" y="116" width="250" height="56" rx="28" fill="#09090b"/>
       <text x="237" y="153" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="700">KAYAN CITY SPOT</text>
@@ -216,15 +227,41 @@ export async function GET(request: Request) {
   `);
 
   let card = sharp(svg);
-  const composites: OverlayOptions[] = [
-    { input: qr, left: 725, top: 675 },
-  ];
-  card = card.composite(composites);
-  let output = card.png({ compressionLevel: 9, adaptiveFiltering: true });
-  if (preview) {
-    output = output.resize(540, 540);
+  const composites: OverlayOptions[] = [];
+  if (photo) {
+    const frameOverlay = Buffer.from(`
+      <svg width="${renderSize}" height="${renderSize}" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M80 92H1000V562H80Z M122 92H958A42 42 0 0 1 1000 134V520A42 42 0 0 1 958 562H122A42 42 0 0 1 80 520V134A42 42 0 0 1 122 92Z"
+          fill="white"
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+        />
+        <rect x="80" y="92" width="920" height="470" rx="42" fill="none" stroke="#e4e4e7" stroke-width="3"/>
+        <rect x="112" y="116" width="250" height="56" rx="28" fill="#09090b"/>
+        <text x="237" y="153" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="700">KAYAN CITY SPOT</text>
+      </svg>
+    `);
+    composites.push(
+      {
+        input: photo,
+        left: Math.round(80 * renderScale),
+        top: Math.round(92 * renderScale),
+      },
+      { input: frameOverlay, left: 0, top: 0 },
+    );
   }
-  const png = await output.toBuffer();
+  composites.push(
+    {
+      input: qr,
+      left: Math.round(725 * renderScale),
+      top: Math.round(675 * renderScale),
+    },
+  );
+  card = card.composite(composites);
+  const png = await card
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer();
   const safeName = `${type}-${id || template}`.replace(/[^a-z0-9-]/gi, '');
 
   return new Response(new Uint8Array(png), {
