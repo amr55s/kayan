@@ -58,6 +58,8 @@ test('native select options submit stable values and legacy labels are normalize
   assert.equal(listingCategorySchema.parse('pharmacy'), 'pharmacy');
   assert.equal(listingCategorySchema.parse('صيدليات وطب'), 'pharmacy');
   assert.equal(listingCategorySchema.parse('💊 صيدليات وطب'), 'pharmacy');
+  assert.equal(listingCategorySchema.parse('متجر'), 'stores');
+  assert.equal(listingCategorySchema.parse('🛍️ متجر'), 'stores');
   assert.throws(
     () => listingCategorySchema.parse('تصنيف غير موجود'),
     /اختر تصنيفاً صحيحاً من القائمة/,

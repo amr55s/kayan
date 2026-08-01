@@ -35,6 +35,31 @@ test('store coupons are public-read-only and open a prefilled WhatsApp order', (
   assert.match(manager, /serverUpsertStoreCoupon/);
 });
 
+test('all modals render in a body portal and coupons stay viewport-bound', () => {
+  const compatibilityLayer = read('components/ui/heroui-compat.tsx');
+  const couponOffer = read('components/directory/CouponOffer.tsx');
+  const globalStyles = read('app/globals.css');
+
+  assert.match(compatibilityLayer, /createPortal\(/);
+  assert.match(compatibilityLayer, /document\.body/);
+  assert.match(compatibilityLayer, /data-kayan-portal="modal"/);
+  assert.match(couponOffer, /max-h-\[min\(88dvh,720px\)\]/);
+  assert.match(globalStyles, /\.kayan-modal-wrapper[\s\S]{0,180}position:\s*fixed\s*!important/);
+});
+
+test('store category follows restaurants and supports product-focused listings', () => {
+  const constants = read('lib/constants.ts');
+  const validation = read('lib/operations/validation.ts');
+  const migration = read('supabase/migrations/20260801110838_add_store_directory_category.sql');
+  const merchantModal = read('components/modals/AddListingModal.tsx');
+
+  assert.match(constants, /id: 'restaurants'[\s\S]{0,260}id: 'stores'/);
+  assert.match(constants, /label: 'متجر'/);
+  assert.match(validation, /'stores'/);
+  assert.match(migration, /place_category in \([\s\S]*'stores'/);
+  assert.match(merchantModal, /أشهر الماركات، نطاق الأسعار/);
+});
+
 test('native place sharing includes the direct URL only once', () => {
   const share = read('lib/share.ts');
   assert.match(share, /const text = `\$\{title\}\\n\$\{phone\}\\nعبر كيان سيتي سبوت`/);
@@ -155,7 +180,7 @@ test('PWA caches only public shell data and provides an iOS-safe install path', 
   assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\)/);
   assert.match(serviceWorker, /isNextDataRequest/);
   assert.match(serviceWorker, /offline\.html/);
-  assert.match(serviceWorker, /kayan-v6-coupons-navigation/);
+  assert.match(serviceWorker, /kayan-v7-modal-portal-stores/);
   assert.match(serviceWorker, /event\.waitUntil\(self\.skipWaiting\(\)\)/);
   assert.match(installer, /إضافة إلى الشاشة الرئيسية/);
   assert.match(installer, /updateViaCache: 'none'/);

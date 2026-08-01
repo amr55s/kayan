@@ -19,6 +19,8 @@ export type ClientErrorKind =
 let currentRelease = 'local';
 const recentlySent = new Map<string, number>();
 const recentlyObserved = new Map<string, number>();
+const RUNTIME_RECOVERY_KEY = 'kayan_runtime_recovery';
+const RUNTIME_RECOVERY_WINDOW = 10 * 60 * 1_000;
 
 export function setClientErrorRelease(release: string) {
   currentRelease = release.replace(/[^a-zA-Z0-9._-]/g, '').slice(0, 64) || 'local';
@@ -83,6 +85,39 @@ export function classifyClientError(error: unknown): ClientErrorKind {
   if (name === 'RangeError') return 'RangeError';
   if (name === 'SyntaxError') return 'SyntaxError';
   return 'Unknown';
+}
+
+export function scheduleRuntimeRecovery(error: unknown): number | null {
+  if (typeof window === 'undefined') return null;
+  const kind = classifyClientError(error);
+  const message = error instanceof Error ? error.message : String(error || '');
+  const isRecoverable = kind === 'ChunkLoadError'
+    || (kind === 'ReactError' && /insertBefore|removeChild|minified React error/i.test(message))
+    || (kind === 'RangeError' && /maximum call stack/i.test(message));
+  if (!isRecoverable) return null;
+
+  try {
+    const recoveryId = `${window.location.pathname}|${kind}`;
+    const previous = JSON.parse(
+      window.sessionStorage.getItem(RUNTIME_RECOVERY_KEY) || 'null',
+    ) as { id?: string; at?: number } | null;
+    const now = Date.now();
+    if (
+      previous?.id === recoveryId
+      && typeof previous.at === 'number'
+      && previous.at > now - RUNTIME_RECOVERY_WINDOW
+    ) {
+      return null;
+    }
+    window.sessionStorage.setItem(
+      RUNTIME_RECOVERY_KEY,
+      JSON.stringify({ id: recoveryId, at: now }),
+    );
+  } catch {
+    return null;
+  }
+
+  return window.setTimeout(() => window.location.reload(), 350);
 }
 
 export function normalizeWindowError(

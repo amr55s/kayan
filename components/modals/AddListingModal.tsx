@@ -30,7 +30,11 @@ import {
   LISTING_IMAGE_ACCEPT,
   uploadOptimizedImages,
 } from '@/lib/images/client';
-import { CATEGORY_OPTIONS } from '@/lib/categories';
+import {
+  CATEGORY_OPTIONS,
+  getListingDescriptionLabel,
+  getListingImageLabel,
+} from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
 import type { Place } from '@/types';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
@@ -368,10 +372,18 @@ export function AddListingModal({
                       />
                       <Textarea
                         name="description"
-                        label="وصف مختصر أو مواعيد العمل"
+                        label={getListingDescriptionLabel(category)}
+                        placeholder={category === 'stores'
+                          ? 'مثال: عطور أصلية، شنط وهدايا، الماركات المتاحة ونطاق الأسعار…'
+                          : undefined}
                         value={description}
                         onValueChange={setDescription}
                       />
+                      {category === 'stores' && (
+                        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold leading-6 text-amber-900 sm:col-span-2">
+                          للحصول على بطاقة متجر واضحة: أضف صورًا حقيقية للمنتجات، أشهر الماركات، نطاق الأسعار، وطريقة الاستلام أو التوصيل.
+                        </p>
+                      )}
                       <Input
                         name="whatsappGroupUrl"
                         type="url"
@@ -428,7 +440,7 @@ export function AddListingModal({
                           onPress={() => fileInputRef.current?.click()}
                           isDisabled={selectedFiles.length + uploadedImageUrls.length >= 3}
                         >
-                          رفع صور المكان أو المنيو ({selectedFiles.length + uploadedImageUrls.length}/3)
+                          رفع {getListingImageLabel(category)} ({selectedFiles.length + uploadedImageUrls.length}/3)
                         </Button>
                         {uploadedImageUrls.length > 0 && (
                           <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">

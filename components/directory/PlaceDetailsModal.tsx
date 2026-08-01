@@ -414,6 +414,11 @@ export function PlaceDetailsModal({
                       <h1 className="mt-3 break-words text-balance text-2xl font-black leading-tight text-zinc-950 sm:text-3xl">
                         {place.title}
                       </h1>
+                      {place.category === 'stores' && (
+                        <h2 className="mt-5 text-base font-black text-zinc-900 sm:text-lg">
+                          المنتجات وما يميز المتجر
+                        </h2>
+                      )}
                       {place.description ? (
                         <p className="mt-4 whitespace-pre-wrap break-words text-pretty text-sm leading-8 text-zinc-600 sm:text-base">
                           {place.description}

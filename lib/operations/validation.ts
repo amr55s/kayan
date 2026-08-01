@@ -14,6 +14,7 @@ const money = z.coerce.number().min(0).max(9_999_999).optional().nullable();
 
 const LISTING_CATEGORY_IDS = [
   'restaurants',
+  'stores',
   'home_made',
   'market',
   'veggies',
@@ -24,6 +25,8 @@ const LISTING_CATEGORY_IDS = [
 
 const CATEGORY_ALIASES: Record<string, (typeof LISTING_CATEGORY_IDS)[number]> = {
   'مطاعم وكافيهات': 'restaurants',
+  'متجر': 'stores',
+  'متاجر': 'stores',
   'صنع يدي وأكل بيتي': 'home_made',
   'سوبر ماركت': 'market',
   'خضار وفاكهة': 'veggies',

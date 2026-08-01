@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'kayan-v6-coupons-navigation';
+const CACHE_VERSION = 'kayan-v7-modal-portal-stores';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;

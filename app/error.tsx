@@ -4,7 +4,10 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
 import * as Sentry from '@sentry/nextjs';
-import { reportClientError } from '@/lib/observability/client-errors';
+import {
+  reportClientError,
+  scheduleRuntimeRecovery,
+} from '@/lib/observability/client-errors';
 
 export default function Error({
   error,
@@ -17,6 +20,10 @@ export default function Error({
     console.error('Application error:', error);
     Sentry.captureException(error);
     void reportClientError(error, 'react_boundary');
+    const recoveryTimer = scheduleRuntimeRecovery(error);
+    return () => {
+      if (recoveryTimer !== null) window.clearTimeout(recoveryTimer);
+    };
   }, [error]);
 
   const isNetworkOrTimeout = /fetch|timeout|network/i.test(error?.message || '');

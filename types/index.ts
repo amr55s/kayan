@@ -6,6 +6,7 @@
 export type CategoryType =
   | 'all'
   | 'restaurants'
+  | 'stores'
   | 'home_made'
   | 'market'
   | 'veggies'

@@ -11,6 +11,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Card as HeroCard,
   CardContent,
@@ -737,13 +738,14 @@ export function Modal({
     };
   }, [close, isOpen]);
 
-  if (!isOpen) return null;
-  return (
+  if (!isOpen || typeof document === 'undefined') return null;
+  return createPortal(
     <ModalContext.Provider value={{ close, classNames }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
+        data-kayan-portal="modal"
         data-modal-closing={isClosing || undefined}
         className={cx(
           'kayan-modal-wrapper fixed inset-0 z-[100] flex items-center justify-center overscroll-contain p-3 sm:p-6',
@@ -770,7 +772,8 @@ export function Modal({
           {children}
         </div>
       </div>
-    </ModalContext.Provider>
+    </ModalContext.Provider>,
+    document.body,
   );
 }
 

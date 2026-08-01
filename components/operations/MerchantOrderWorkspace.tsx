@@ -35,7 +35,11 @@ import {
 } from '@/lib/operations/actions';
 import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
 import type { Place } from '@/types';
-import { CATEGORY_OPTIONS } from '@/lib/categories';
+import {
+  CATEGORY_OPTIONS,
+  getListingDescriptionLabel,
+  getListingImageLabel,
+} from '@/lib/categories';
 import { uploadOptimizedImages } from '@/lib/images/client';
 
 type Branch = {
@@ -557,7 +561,10 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
             onValueChange={(instapayVfcash) => setForm({ ...form, instapayVfcash })}
           />
           <Textarea
-            label="وصف المكان"
+            label={getListingDescriptionLabel(String(form.category))}
+            placeholder={form.category === 'stores'
+              ? 'أهم المنتجات والماركات، نطاق الأسعار، وخيارات الاستلام أو التوصيل…'
+              : undefined}
             className="sm:col-span-2"
             minRows={3}
             value={form.description}
@@ -599,7 +606,7 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
 
           <div className="space-y-3 sm:col-span-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-bold">صور المكان والمنيو</span>
+              <span className="text-sm font-bold">{getListingImageLabel(String(form.category))}</span>
               <Chip className="bg-zinc-100 text-zinc-700">{images.length} صورة</Chip>
             </div>
             {images.length > 0 && (

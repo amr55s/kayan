@@ -236,6 +236,14 @@ body.place-details-open .kayan-support-fab {
   animation: kayan-modal-panel-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.kayan-modal-wrapper {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw;
+  height: 100dvh;
+  isolation: isolate;
+}
+
 .kayan-modal-backdrop {
   animation: kayan-modal-backdrop-in 180ms ease-out;
 }

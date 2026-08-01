@@ -21,6 +21,7 @@ import {
   Images,
   MessageCircle,
   Phone,
+  ShoppingBag,
   Star,
 } from 'lucide-react';
 import type { Place } from '@/types';
@@ -191,9 +192,20 @@ export function PlaceCard({
         <CouponOffer place={place} />
 
         {place.description && (
-          <p className="line-clamp-2 break-words text-xs leading-relaxed text-zinc-600">
-            {place.description}
-          </p>
+          <div className={place.category === 'stores'
+            ? 'rounded-xl border border-amber-200/70 bg-amber-50/70 p-2.5'
+            : undefined}
+          >
+            {place.category === 'stores' && (
+              <span className="mb-1 flex items-center gap-1.5 text-[11px] font-black text-amber-900">
+                <ShoppingBag className="size-3.5" aria-hidden="true" />
+                المنتجات وما يميز المتجر
+              </span>
+            )}
+            <p className="line-clamp-2 break-words text-xs leading-relaxed text-zinc-600">
+              {place.description}
+            </p>
+          </div>
         )}
 
         {place.instapay_vfcash && (
