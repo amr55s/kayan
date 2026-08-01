@@ -654,6 +654,7 @@ export function Modal({
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const onOpenChangeRef = useRef(onOpenChange);
   const closeTimerRef = useRef<number | null>(null);
+  const isClosingRef = useRef(false);
   const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
@@ -661,14 +662,16 @@ export function Modal({
   }, [onOpenChange]);
 
   const close = useCallback(() => {
-    if (isClosing) return;
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
     setIsClosing(true);
     closeTimerRef.current = window.setTimeout(() => {
       onOpenChangeRef.current?.(false);
       setIsClosing(false);
+      isClosingRef.current = false;
       closeTimerRef.current = null;
     }, 160);
-  }, [isClosing]);
+  }, []);
 
   useEffect(() => () => {
     if (closeTimerRef.current !== null) {
@@ -727,7 +730,9 @@ export function Modal({
       activeModalCount = Math.max(0, activeModalCount - 1);
       if (activeModalCount === 0) {
         document.body.style.overflow = bodyOverflowBeforeModals;
-        restoreFocusRef.current?.focus({ preventScroll: true });
+        if (restoreFocusRef.current?.isConnected) {
+          restoreFocusRef.current.focus({ preventScroll: true });
+        }
       }
     };
   }, [close, isOpen]);

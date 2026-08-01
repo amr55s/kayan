@@ -34,6 +34,7 @@ import { ShareButton } from './ShareButton';
 import { UpvoteButton } from './UpvoteButton';
 import { useFavorites } from '@/hooks/useFavorites';
 import { trackSiteEvent } from '@/lib/analytics/client';
+import { CouponOffer } from './CouponOffer';
 
 type PlaceCardProps = {
   detailsHref: string;
@@ -142,6 +143,13 @@ export function PlaceCard({
             {place.title}
           </Link>
         </h2>
+        <span
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500"
+          aria-label={`${place.view_count ?? 0} مشاهدة للمكان`}
+        >
+          <Eye className="size-3.5" aria-hidden="true" />
+          {(place.view_count ?? 0).toLocaleString('ar-EG')} مشاهدة
+        </span>
       </CardHeader>
 
       {images.length > 0 && (
@@ -180,6 +188,8 @@ export function PlaceCard({
       )}
 
       <CardBody className="space-y-2 p-3 pt-2 sm:px-3.5">
+        <CouponOffer place={place} />
+
         {place.description && (
           <p className="line-clamp-2 break-words text-xs leading-relaxed text-zinc-600">
             {place.description}

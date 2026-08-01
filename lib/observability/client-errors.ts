@@ -64,6 +64,9 @@ export function classifyClientError(error: unknown): ClientErrorKind {
     : typeof error === 'string'
       ? error
       : '';
+  if (/insertBefore.*not a child|removeChild.*not a child/i.test(message)) {
+    return 'ReactError';
+  }
   if (/minified React error #\d+/i.test(message)) return 'ReactError';
   if (
     name === 'ChunkLoadError'

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Input, Button, Skeleton, Card } from '@heroui/react';
-import { Search, MapPinOff, RefreshCw, Heart, MessageCircle } from 'lucide-react';
+import { BadgePercent, Bike, Search, MapPinOff, RefreshCw, Heart, MessageCircle } from 'lucide-react';
 import { Place, Driver, CategoryType } from '@/types';
 import { Header } from '@/components/layout/Header';
 import { DeliveryBar } from '@/components/delivery/DeliveryBar';
@@ -27,9 +27,6 @@ interface DirectoryViewProps {
   renderedAt: number;
 }
 
-const DIRECT_DETAIL_STATE = '__kayanDirectPlaceDetail';
-const DIRECT_DETAIL_BASE_STATE = '__kayanDirectPlaceBase';
-
 export const DirectoryView: React.FC<DirectoryViewProps> = ({
   initialPlaces,
   initialDrivers,
@@ -39,8 +36,6 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
 }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const detailOpenedFromDirectory = useRef(false);
-  const directDetailHistoryPrepared = useRef(false);
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -66,12 +61,16 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
       const nextUrl = params.size
         ? `${window.location.pathname}?${params.toString()}`
         : window.location.pathname;
-      window.history.replaceState({}, '', nextUrl);
+      router.replace(nextUrl, { scroll: false });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [router]);
 
   const { favorites, favoritesCount } = useFavorites();
+  const activeOffersCount = useMemo(
+    () => initialPlaces.reduce((total, place) => total + (place.coupons?.length ?? 0), 0),
+    [initialPlaces],
+  );
   const selectedPlaceId = searchParams.get('place');
   const selectedDriverId = selectedPlaceId ? null : searchParams.get('driver');
   const selectedPlace = selectedPlaceId
@@ -104,58 +103,11 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   }, [searchParams]);
 
   useEffect(() => {
-    if (
-      (!selectedPlaceId && !selectedDriverId)
-      || (!selectedPlace && !selectedDriver)
-      || detailOpenedFromDirectory.current
-      || directDetailHistoryPrepared.current
-    ) {
-      return;
-    }
-
-    const currentState =
-      window.history.state && typeof window.history.state === 'object'
-        ? window.history.state as Record<string, unknown>
-        : {};
-    if (currentState[DIRECT_DETAIL_STATE]) {
-      directDetailHistoryPrepared.current = true;
-      return;
-    }
-
-    const detailUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    const baseUrl = removePlaceFromUrl();
-
-    // A shared URL starts without an in-app page behind it. Seed one base
-    // entry without notifying Next.js, then keep the visible detail URL on top.
-    // The next real Back/Forward event is handled normally by the router.
-    History.prototype.replaceState.call(
-      window.history,
-      { ...currentState, [DIRECT_DETAIL_BASE_STATE]: true },
-      '',
-      baseUrl,
-    );
-    History.prototype.pushState.call(
-      window.history,
-      { ...currentState, [DIRECT_DETAIL_STATE]: true },
-      '',
-      detailUrl,
-    );
-    directDetailHistoryPrepared.current = true;
-  }, [
-    removePlaceFromUrl,
-    selectedDriver,
-    selectedDriverId,
-    selectedPlace,
-    selectedPlaceId,
-  ]);
-
-  useEffect(() => {
     const requestedId = selectedPlaceId || selectedDriverId;
     const selectedDetail = selectedPlace || selectedDriver;
     if (!requestedId || selectedDetail) return;
     const frame = window.requestAnimationFrame(() => {
       setInvalidDetail(true);
-      detailOpenedFromDirectory.current = false;
       router.replace(removePlaceFromUrl(), { scroll: false });
     });
     return () => window.cancelAnimationFrame(frame);
@@ -194,8 +146,11 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
     if (open) return;
     const cleanUrl = removePlaceFromUrl();
     setClosingDetailKey(selectedDetailKey);
-    detailOpenedFromDirectory.current = false;
-    window.history.replaceState(window.history.state, '', cleanUrl);
+    router.replace(cleanUrl, { scroll: false });
+  }
+
+  function prepareOpenDetails() {
+    setClosingDetailKey(null);
   }
 
   function suggestDetails(placeId: string) {
@@ -275,9 +230,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         drivers={initialDrivers}
         renderedAt={renderedAt}
         driverHref={driverHref}
-        onOpenDriverDetails={() => {
-          detailOpenedFromDirectory.current = true;
-        }}
+        onOpenDriverDetails={prepareOpenDetails}
       />
 
       {/* Main Directory Body */}
@@ -291,6 +244,24 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
             <p className="mx-auto mt-2 max-w-2xl text-pretty text-sm font-normal text-zinc-500 sm:text-base">
               مطاعم ومحلات وصيدليات وخدمات وتوصيل ومنيوهات، مع تواصل مباشر وسهل.
             </p>
+            <div className="mx-auto mt-4 flex max-w-xl flex-wrap items-center justify-center gap-2 text-[11px] font-bold text-zinc-700">
+              <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3">
+                <MessageCircle className="size-3.5 text-emerald-600" aria-hidden="true" />
+                تواصل مباشر مع المتجر
+              </span>
+              <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3">
+                <Bike className="size-3.5" aria-hidden="true" />
+                كباتن توصيل متاحون
+              </span>
+              {activeOffersCount > 0 && (
+                <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 text-amber-900">
+                  <BadgePercent className="size-3.5" aria-hidden="true" />
+                  {activeOffersCount === 1
+                    ? 'عرض واحد متاح'
+                    : `${activeOffersCount.toLocaleString('ar-EG')} عروض وكوبونات`}
+                </span>
+              )}
+            </div>
           </div>
         </section>
 
@@ -410,9 +381,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                   key={place.id}
                   place={place}
                   detailsHref={detailHref(place.id)}
-                  onOpenDetails={() => {
-                    detailOpenedFromDirectory.current = true;
-                  }}
+                  onOpenDetails={prepareOpenDetails}
                 />
               ))}
             </div>

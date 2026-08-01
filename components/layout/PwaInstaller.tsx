@@ -14,6 +14,7 @@ const DISMISS_KEY = 'kayan_pwa_dismissed_at';
 const RELOAD_KEY = 'kayan_pwa_reloading';
 const DISMISS_DURATION = 7 * 24 * 60 * 60 * 1_000;
 const INSTALL_ROUTES = new Set(['/', '/driver', '/guide', '/share']);
+const UPDATE_CHECK_INTERVAL = 10 * 60 * 1_000;
 
 function readDismissedRecently() {
   try {
@@ -46,13 +47,26 @@ export function PwaInstaller() {
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
+    if (process.env.NODE_ENV !== 'production') {
+      void navigator.serviceWorker.getRegistrations().then((registrations) =>
+        Promise.all(registrations.map((registration) => registration.unregister())),
+      ).catch(() => undefined);
+      if ('caches' in window) {
+        void window.caches.keys().then((keys) =>
+          Promise.all(keys
+            .filter((key) => key.startsWith('kayan-'))
+            .map((key) => window.caches.delete(key))),
+        ).catch(() => undefined);
+      }
+      return;
+    }
     let registration: ServiceWorkerRegistration | undefined;
     let disposed = false;
 
     const markUpdateReady = () => {
       if (!disposed) {
         setUpdateReady(true);
-        if (INSTALL_ROUTES.has(window.location.pathname)) setShowBanner(true);
+        setShowBanner(true);
       }
     };
 
@@ -98,10 +112,21 @@ export function PwaInstaller() {
       window.location.reload();
     };
     navigator.serviceWorker.addEventListener('controllerchange', reloadAfterUpdate);
+    const checkForUpdate = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        void registration?.update().catch(() => undefined);
+      }
+    };
+    const updateTimer = window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL);
+    window.addEventListener('pageshow', checkForUpdate);
+    document.addEventListener('visibilitychange', checkForUpdate);
 
     return () => {
       disposed = true;
+      window.clearInterval(updateTimer);
       window.removeEventListener('load', register);
+      window.removeEventListener('pageshow', checkForUpdate);
+      document.removeEventListener('visibilitychange', checkForUpdate);
       navigator.serviceWorker.removeEventListener('controllerchange', reloadAfterUpdate);
     };
   }, []);
@@ -148,7 +173,12 @@ export function PwaInstaller() {
         // The update can still be activated without session storage.
       }
       const registration = await navigator.serviceWorker?.getRegistration('/');
-      registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+      if (registration?.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        window.setTimeout(() => window.location.reload(), 2_000);
+      } else {
+        window.location.reload();
+      }
       return;
     }
     if (isIos) {
@@ -183,7 +213,7 @@ export function PwaInstaller() {
 
   return (
     <>
-      {INSTALL_ROUTES.has(pathname) && showBanner && canInstall && (
+      {(updateReady || INSTALL_ROUTES.has(pathname)) && showBanner && canInstall && (
         <aside
           aria-label={updateReady ? 'تحديث التطبيق متاح' : 'تثبيت التطبيق'}
           className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-3 right-3 z-[60] mx-auto flex max-w-md items-center justify-between gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 p-3 text-white shadow-2xl sm:bottom-4"

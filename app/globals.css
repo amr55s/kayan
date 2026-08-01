@@ -27,6 +27,7 @@
 @source "./not-found.tsx";
 @source "./providers.tsx";
 @source "../components/admin/DriverManager.tsx";
+@source "../components/admin/CouponManager.tsx";
 @source "../components/admin/EditPlaceModal.tsx";
 @source "../components/admin/EditRequestModal.tsx";
 @source "../components/admin/FeedbackDetailsModal.tsx";
@@ -36,6 +37,7 @@
 @source "../components/delivery/DriverModal.tsx";
 @source "../components/directory/CategoryBar.tsx";
 @source "../components/directory/CategoryTabs.tsx";
+@source "../components/directory/CouponOffer.tsx";
 @source "../components/directory/DirectoryView.tsx";
 @source "../components/directory/PlaceCard.tsx";
 @source "../components/directory/PlaceDetailsModal.tsx";
@@ -43,6 +45,7 @@
 @source "../components/directory/UpvoteButton.tsx";
 @source "../components/layout/Header.tsx";
 @source "../components/layout/PwaInstaller.tsx";
+@source "../components/layout/WhatsAppGroupButton.tsx";
 @source "../components/modals/AddListingModal.tsx";
 @source "../components/modals/FeedbackModal.tsx";
 @source "../components/operations/AdminWorkspace.tsx";

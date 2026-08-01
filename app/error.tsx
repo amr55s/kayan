@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Home, RefreshCw } from 'lucide-react';
+import * as Sentry from '@sentry/nextjs';
 import { reportClientError } from '@/lib/observability/client-errors';
 
 export default function Error({
@@ -14,6 +15,7 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error('Application error:', error);
+    Sentry.captureException(error);
     void reportClientError(error, 'react_boundary');
   }, [error]);
 

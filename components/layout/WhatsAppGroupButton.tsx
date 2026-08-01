@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { trackSiteEvent } from '@/lib/analytics/client';
 import { WHATSAPP_GROUP_URL } from '@/lib/community';
 
@@ -16,6 +17,11 @@ function WhatsAppIcon() {
 }
 
 export function WhatsAppGroupButton() {
+  const pathname = usePathname();
+  if (['/admin', '/merchant', '/driver', '/login'].some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )) return null;
+
   return (
     <a
       href={WHATSAPP_GROUP_URL}

@@ -1,6 +1,6 @@
 import { createPublicClient } from './public';
 import { createAdminClient } from './admin';
-import type { Driver, Place } from '@/types';
+import type { Driver, Place, StoreCoupon } from '@/types';
 
 type QueryOutcome<T> =
   | { status: 'fulfilled'; value: T }
@@ -112,16 +112,37 @@ export function mergePublicDrivers(
 
 async function fetchPlaces(): Promise<Place[]> {
   const supabase = createPublicClient();
-  const result: any = await withTimeout(
+  let result: any = await withTimeout(
     supabase
       .from('places')
-      .select('*')
+      .select('*, store_coupons(*)')
       .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false }),
   );
 
+  // Keep the directory available during a staged deployment where the app
+  // reaches production a few seconds before the additive coupon migration.
+  if (result.error) {
+    result = await withTimeout(
+      supabase
+        .from('places')
+        .select('*')
+        .order('is_featured', { ascending: false })
+        .order('created_at', { ascending: false }),
+    );
+  }
+
   if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []) as Place[];
+  return (result.data ?? []).map((row: Place & { store_coupons?: StoreCoupon[] }) => {
+    const { store_coupons: coupons, ...place } = row;
+    return {
+      ...place,
+      coupons: (coupons ?? []).sort((left, right) =>
+        Number(right.is_featured) - Number(left.is_featured)
+        || left.display_order - right.display_order,
+      ),
+    } as Place;
+  });
 }
 
 async function fetchLegacyDrivers(): Promise<LegacyDriverRow[]> {

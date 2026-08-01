@@ -17,6 +17,7 @@ import {
 } from '@heroui/react';
 import {
   Building2,
+  BadgePercent,
   BarChart3,
   ClipboardCheck,
   Eye,
@@ -60,6 +61,7 @@ import type { AccountRequest, FeedbackRequest, PendingRequest, Place } from '@/t
 import type { Driver, MarketingCampaign, MarketingChannel } from '@/types';
 import type { BehaviorAnalyticsSummary } from '@/lib/analytics/admin';
 import { MarketingCenter } from '@/components/admin/MarketingCenter';
+import { CouponManager } from '@/components/admin/CouponManager';
 import { formatCairoDateTime, formatUtcDayMonth } from '@/lib/format-date';
 
 type Merchant = { id: string; display_name: string; is_active: boolean };
@@ -153,6 +155,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackRequest | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [activeSection, setActiveSection] = useState('directory');
   const [merchantName, setMerchantName] = useState('');
   const [user, setUser] = useState({
     displayName: '',
@@ -344,6 +347,19 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
   const selectedTargetPlace = selectedFeedback?.target_place_id
     ? props.places.find((place) => place.id === selectedFeedback.target_place_id) ?? null
     : null;
+  const adminSections = [
+    { key: 'directory', label: 'واجهة الموقع والخدمات', icon: <Store className="size-4" />, count: props.places.length },
+    { key: 'coupons', label: 'الكوبونات والعروض', icon: <BadgePercent className="size-4" />, count: props.places.reduce((total, place) => total + (place.coupons?.length ?? 0), 0) },
+    { key: 'marketing', label: 'التسويق والنشر', icon: <Megaphone className="size-4" /> },
+    { key: 'account-requests', label: 'طلبات الحسابات', icon: <UserCog className="size-4" />, count: pendingAccounts.length },
+    { key: 'orders', label: 'طلبات التوصيل', icon: <ClipboardCheck className="size-4" />, count: props.orders.length },
+    { key: 'merchant-changes', label: 'تعديلات المحلات', icon: <Utensils className="size-4" />, count: merchantChanges.length },
+    { key: 'directory-reports', label: 'بلاغات التعديل', icon: <MessageSquareText className="size-4" />, count: directoryReports.length },
+    { key: 'additions', label: 'إضافات جديدة', icon: <Plus className="size-4" />, count: pendingAdditions.length },
+    { key: 'suggestions', label: 'الاقتراحات والتقييمات', icon: <Lightbulb className="size-4" />, count: suggestions.length },
+    { key: 'accounts', label: 'الحسابات والربط', icon: <Users className="size-4" />, count: props.profiles.length },
+    { key: 'audit', label: 'سجل الإدارة', icon: <History className="size-4" /> },
+  ];
 
   return (
     <main id="main-content" className="dir-rtl mx-auto max-w-7xl space-y-5 overflow-x-clip px-3 py-5 sm:px-6">
@@ -498,16 +514,64 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
           </CardBody>
         </Card>
 
-      <Tabs
-        aria-label="إدارة المنصة"
-        className="kayan-admin-tabs min-w-0"
-        classNames={{
-          tabList: 'max-w-full overflow-x-auto rounded-2xl bg-zinc-100 p-1 no-scrollbar',
-          tab: 'min-h-11 shrink-0 px-4 font-bold',
-          cursor: 'bg-zinc-950',
-          panel: 'px-0 pt-4',
-        }}
-      >
+      <div className="grid items-start gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
+        <aside className="sticky top-20 hidden max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-3xl border border-zinc-200 bg-white p-3 shadow-sm lg:block">
+          <div className="border-b border-zinc-100 px-2 pb-3 pt-1">
+            <p className="text-sm font-black text-zinc-950">أقسام الإدارة</p>
+            <p className="mt-1 text-[11px] font-semibold text-zinc-500">انتقل مباشرة لأي جزء من المنصة</p>
+          </div>
+          <nav className="mt-3 space-y-1" aria-label="أقسام لوحة الإدارة">
+            {adminSections.map((section) => (
+              <button
+                key={section.key}
+                type="button"
+                onClick={() => setActiveSection(section.key)}
+                aria-current={activeSection === section.key ? 'page' : undefined}
+                className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-3 text-start text-xs font-bold transition-colors ${
+                  activeSection === section.key
+                    ? 'bg-zinc-950 text-white shadow-sm'
+                    : 'text-zinc-700 hover:bg-zinc-100'
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  {section.icon}
+                  <span className="truncate">{section.label}</span>
+                </span>
+                {typeof section.count === 'number' && (
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${activeSection === section.key ? 'bg-white/15' : 'bg-zinc-100 text-zinc-600'}`}>
+                    {section.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <section className="min-w-0">
+          <Select
+            aria-label="اختر قسم الإدارة"
+            label="قسم لوحة الإدارة"
+            selectedKeys={[activeSection]}
+            onChange={(event) => setActiveSection(event.target.value)}
+            className="mb-4 lg:hidden"
+          >
+            {adminSections.map((section) => (
+              <SelectItem key={section.key} value={section.key}>
+                {section.label}{typeof section.count === 'number' ? ` (${section.count})` : ''}
+              </SelectItem>
+            ))}
+          </Select>
+
+          <Tabs
+            aria-label="إدارة المنصة"
+            selectedKey={activeSection}
+            onSelectionChange={(key) => setActiveSection(String(key))}
+            className="kayan-admin-tabs min-w-0"
+            classNames={{
+              tabList: 'sr-only',
+              panel: 'px-0 pt-0',
+            }}
+          >
         <Tab
           id="marketing"
           key="marketing"
@@ -523,6 +587,17 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
             drivers={props.marketingDrivers}
             channels={props.marketingChannels}
             campaigns={props.marketingCampaigns}
+          />
+        </Tab>
+        <Tab
+          id="coupons"
+          key="coupons"
+          title="الكوبونات والعروض"
+        >
+          <CouponManager
+            places={props.places}
+            onRefresh={() => router.refresh()}
+            onMessage={setMessage}
           />
         </Tab>
         <Tab
@@ -1056,7 +1131,9 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
             </CardBody>
           </Card>
         </Tab>
-      </Tabs>
+          </Tabs>
+        </section>
+      </div>
 
       {selectedFeedback && (
         <FeedbackDetailsModal
@@ -1513,6 +1590,9 @@ function auditActionLabel(action: string) {
     user_deleted: 'تم حذف حساب',
     merchant_change_request_created: 'أرسل محل طلب تعديل',
     merchant_change_request_updated: 'حدّث محل طلب تعديل معلق',
+    store_coupon_created: 'تم إنشاء كوبون متجر',
+    store_coupon_updated: 'تم تحديث كوبون متجر',
+    store_coupon_deleted: 'تم حذف كوبون متجر',
   };
   return labels[action] ?? action;
 }

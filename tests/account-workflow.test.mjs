@@ -200,6 +200,11 @@ test('listing images are optimized before storage without sacrificing menu resol
   assert.match(storageAction, /STORAGE_UPLOAD_ATTEMPTS = 2/);
   assert.match(storageAction, /ALLOWED_IMAGE_TYPES/);
   assert.match(storageAction, /صيغة الصورة غير مدعومة/);
+  assert.match(storageAction, /createSignedUploadUrl\(path\)/);
+  assert.match(clientPipeline, /uploadToSignedUrl\(/);
+  assert.match(clientPipeline, /MAX_PREPARED_UPLOAD_BYTES/);
+  assert.match(clientPipeline, /canvasToJpeg/);
+  assert.match(clientPipeline, /createBrowserSupabaseClient/);
   assert.match(nextConfig, /bodySizeLimit: '4mb'/);
   for (const form of imageForms) {
     assert.match(read(form), /uploadOptimizedImages/);

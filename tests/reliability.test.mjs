@@ -12,24 +12,27 @@ test('driver availability hydrates from a server-provided timestamp', () => {
   assert.match(page, /renderedAt/);
 });
 
-test('place details are deep-linked without creating a fragile dynamic route', () => {
+test('place details are deep-linked through Next navigation without patching browser history', () => {
   const directory = read('components/directory/DirectoryView.tsx');
   assert.match(directory, /params\.set\('place', placeId\)/);
   assert.match(directory, /البطاقة المطلوبة غير موجودة/);
   assert.match(directory, /router\.replace\(removePlaceFromUrl\(\)/);
-  assert.match(directory, /DIRECT_DETAIL_STATE/);
-  assert.match(directory, /History\.prototype\.replaceState\.call/);
-  assert.match(directory, /History\.prototype\.pushState\.call/);
-  assert.match(directory, /currentState\[DIRECT_DETAIL_STATE\]/);
-  assert.match(
-    directory,
-    /function closeDetails[\s\S]*window\.history\.replaceState\(window\.history\.state, '', cleanUrl\)/,
-  );
-  assert.doesNotMatch(
-    directory,
-    /function closeDetails[\s\S]{0,500}router\.replace\(cleanUrl/,
-  );
-  assert.doesNotMatch(directory, /function closeDetails[\s\S]{0,500}router\.back\(\)/);
+  assert.match(directory, /function closeDetails[\s\S]{0,500}router\.replace\(cleanUrl/);
+  assert.doesNotMatch(directory, /router\.back\(\)|History\.prototype|window\.history\.(?:pushState|replaceState)/);
+});
+
+test('store coupons are public-read-only and open a prefilled WhatsApp order', () => {
+  const migration = read('supabase/migrations/20260801080152_add_store_coupons.sql');
+  const offer = read('components/directory/CouponOffer.tsx');
+  const manager = read('components/admin/CouponManager.tsx');
+  assert.match(migration, /alter table public\.store_coupons enable row level security/);
+  assert.match(migration, /grant select on public\.store_coupons to anon, authenticated/);
+  assert.match(migration, /grant select, insert, update, delete on public\.store_coupons to service_role/);
+  assert.match(migration, /'KAYAN10'/);
+  assert.match(migration, /where p\.title = 'أكل بيتي مميز'/);
+  assert.match(offer, /استخدم الكوبون على واتساب/);
+  assert.match(offer, /whatsAppMessage\(place, selected\)/);
+  assert.match(manager, /serverUpsertStoreCoupon/);
 });
 
 test('native place sharing includes the direct URL only once', () => {
@@ -152,6 +155,8 @@ test('PWA caches only public shell data and provides an iOS-safe install path', 
   assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\)/);
   assert.match(serviceWorker, /isNextDataRequest/);
   assert.match(serviceWorker, /offline\.html/);
+  assert.match(serviceWorker, /kayan-v6-coupons-navigation/);
+  assert.match(serviceWorker, /event\.waitUntil\(self\.skipWaiting\(\)\)/);
   assert.match(installer, /إضافة إلى الشاشة الرئيسية/);
   assert.match(installer, /updateViaCache: 'none'/);
   assert.match(installer, /SKIP_WAITING/);
