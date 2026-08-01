@@ -19,6 +19,7 @@ import {
   CardHeader as HeroCardHeader,
 } from '@heroui/react/card';
 import { Chip as HeroChip } from '@heroui/react/chip';
+import { Input as HeroInput } from '@heroui/react/input';
 import { Skeleton as HeroSkeleton } from '@heroui/react/skeleton';
 
 function cx(...values: Array<string | undefined | null | false>): string {
@@ -364,20 +365,20 @@ export function Input({
 
   return (
     <label className={cx('block', className)}>
-      {label && <span className={cx('mb-1 block text-sm font-medium', classNames?.label)}>{label}</span>}
+      {label && <span className={cx('mb-1.5 block text-sm font-bold text-zinc-800 dark:text-zinc-100', classNames?.label)}>{label}</span>}
       <span
         className={cx(
-          'flex min-h-[46px] items-center gap-2 rounded-xl border border-zinc-300 bg-white px-3 text-zinc-950 transition-colors focus-within:border-zinc-500 focus-within:ring-2 focus-within:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus-within:border-zinc-500 dark:focus-within:ring-zinc-800',
+          'flex min-h-[50px] items-center gap-2.5 rounded-2xl border border-zinc-200 bg-zinc-50/70 px-3.5 text-zinc-950 shadow-sm transition-[background-color,border-color,box-shadow] hover:border-zinc-300 hover:bg-white focus-within:border-zinc-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus-within:border-zinc-400 dark:focus-within:ring-white/15',
           classNames?.inputWrapper,
         )}
       >
         {startContent}
-        <input
+        <HeroInput
           {...props}
           value={value}
           required={isRequired}
           className={cx(
-            'h-full min-h-[44px] min-w-0 flex-1 border-0 bg-transparent p-0 text-base text-inherit outline-none placeholder:text-zinc-400 focus:outline-none focus:ring-0 sm:text-sm',
+            'h-full min-h-[48px] min-w-0 flex-1 border-0 !bg-transparent p-0 text-base font-medium text-inherit !shadow-none outline-none placeholder:font-normal placeholder:text-zinc-400 focus:outline-none focus:ring-0 sm:text-sm',
             classNames?.input,
           )}
           onChange={handleChange}
@@ -386,7 +387,7 @@ export function Input({
           <button
             type="button"
             aria-label="مسح الحقل"
-            className="flex size-11 items-center justify-center text-zinc-500"
+            className="flex size-11 items-center justify-center rounded-xl text-zinc-500 transition-colors hover:bg-zinc-200/70 focus-visible:ring-2 focus-visible:ring-zinc-950"
             onClick={() => onValueChange('')}
           >
             ×
@@ -426,13 +427,13 @@ export function Textarea({
 }: LegacyTextareaProps) {
   return (
     <label className={cx('block', className)}>
-      {label && <span className={cx('mb-1 block text-sm font-medium', classNames?.label)}>{label}</span>}
+      {label && <span className={cx('mb-1.5 block text-sm font-bold text-zinc-800 dark:text-zinc-100', classNames?.label)}>{label}</span>}
       <textarea
         {...props}
         required={isRequired}
         rows={minRows}
         className={cx(
-          'min-h-24 w-full rounded-xl border border-zinc-300 bg-white p-3 text-base text-zinc-950 outline-none transition-colors placeholder:text-zinc-400 focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus:ring-zinc-800 sm:text-sm',
+          'min-h-28 w-full resize-y rounded-2xl border border-zinc-200 bg-zinc-50/70 p-3.5 text-base font-medium text-zinc-950 outline-none shadow-sm transition-[background-color,border-color,box-shadow] placeholder:font-normal placeholder:text-zinc-400 hover:border-zinc-300 hover:bg-white focus:border-zinc-500 focus:bg-white focus:ring-4 focus:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus:border-zinc-400 dark:focus:ring-white/15 sm:text-sm',
           classNames?.inputWrapper,
           classNames?.input,
         )}
@@ -491,7 +492,7 @@ export function Select({
   const selectedValue = selectedKeys ? Array.from(selectedKeys)[0] : undefined;
   return (
     <label className={cx('block', className)}>
-      {label && <span className={cx('mb-1 block text-sm font-medium', classNames?.label)}>{label}</span>}
+      {label && <span className={cx('mb-1.5 block text-sm font-bold text-zinc-800 dark:text-zinc-100', classNames?.label)}>{label}</span>}
       <span className="relative flex items-center">
         {startContent && <span className="pointer-events-none absolute start-3 z-10">{startContent}</span>}
         <select
@@ -499,7 +500,7 @@ export function Select({
           required={isRequired}
           value={selectedValue}
           className={cx(
-            'min-h-[46px] w-full appearance-none rounded-xl border border-zinc-300 bg-white px-3 text-base text-zinc-950 outline-none transition-colors focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus:ring-zinc-800 sm:text-sm',
+            'min-h-[50px] w-full appearance-none rounded-2xl border border-zinc-200 bg-zinc-50/70 px-3.5 pe-10 text-base font-medium text-zinc-950 outline-none shadow-sm transition-[background-color,border-color,box-shadow] hover:border-zinc-300 hover:bg-white focus:border-zinc-500 focus:bg-white focus:ring-4 focus:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:focus:border-zinc-400 dark:focus:ring-white/15 sm:text-sm',
             Boolean(startContent) && 'ps-10',
             classNames?.trigger,
           )}
@@ -510,6 +511,7 @@ export function Select({
         >
           {children}
         </select>
+        <span aria-hidden="true" className="pointer-events-none absolute end-3.5 text-sm font-black text-zinc-500">⌄</span>
       </span>
     </label>
   );
@@ -748,7 +750,7 @@ export function Modal({
         data-kayan-portal="modal"
         data-modal-closing={isClosing || undefined}
         className={cx(
-          'kayan-modal-wrapper fixed inset-0 z-[100] flex items-center justify-center overscroll-contain p-3 sm:p-6',
+          'kayan-modal-wrapper fixed inset-0 z-[100] flex items-end justify-center overscroll-contain p-0 sm:items-center sm:p-6',
           classNames?.wrapper,
         )}
       >
@@ -758,14 +760,14 @@ export function Modal({
           aria-hidden="true"
           tabIndex={-1}
           disabled={isClosing}
-          className="kayan-modal-backdrop absolute inset-0 cursor-default bg-zinc-950/50 backdrop-blur-sm"
+          className="kayan-modal-backdrop absolute inset-0 cursor-default bg-zinc-950/60 backdrop-blur-md"
           onClick={close}
         />
         <div
           ref={dialogRef}
           tabIndex={-1}
           className={cx(
-            'kayan-modal-panel relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl',
+            'kayan-modal-panel relative z-10 flex max-h-[94dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[30px] border border-zinc-200 bg-white shadow-[0_-24px_80px_-28px_rgba(0,0,0,.55)] sm:max-h-[92dvh] sm:rounded-[32px] sm:shadow-2xl',
             classNames?.base,
           )}
         >
@@ -793,7 +795,7 @@ export function ModalContent({ children, className }: LegacyModalContentProps) {
 export function ModalHeader({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   const { classNames } = useContext(ModalContext);
   return (
-    <div className={cx('shrink-0 p-4', classNames?.header, className)} {...props}>
+    <div className={cx('shrink-0 px-4 pb-3 pt-6 sm:p-5', classNames?.header, className)} {...props}>
       {children}
     </div>
   );
@@ -801,7 +803,7 @@ export function ModalHeader({ children, className, ...props }: React.HTMLAttribu
 export function ModalBody({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   const { classNames } = useContext(ModalContext);
   return (
-    <div className={cx('min-h-0 flex-1 overflow-y-auto px-4', classNames?.body, className)} {...props}>
+    <div className={cx('min-h-0 flex-1 overscroll-contain overflow-y-auto px-4 sm:px-5', classNames?.body, className)} {...props}>
       {children}
     </div>
   );
@@ -809,7 +811,7 @@ export function ModalBody({ children, className, ...props }: React.HTMLAttribute
 export function ModalFooter({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   const { classNames } = useContext(ModalContext);
   return (
-    <div className={cx('shrink-0 p-4', classNames?.footer, className)} {...props}>
+    <div className={cx('shrink-0 border-t border-zinc-100 bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:p-5', classNames?.footer, className)} {...props}>
       {children}
     </div>
   );
@@ -823,6 +825,40 @@ export function useDisclosure() {
     onClose: () => setOpen(false),
     onOpenChange: (value?: boolean) => setOpen(Boolean(value)),
   };
+}
+
+type OverlayStateProps = {
+  defaultOpen?: boolean;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
+
+/**
+ * State adapter for HeroUI v3 compound overlays such as Drawer.
+ * Keeping it here lets legacy components and new v3 components share one import path.
+ */
+export function useOverlayState({
+  defaultOpen = false,
+  isOpen: controlledOpen,
+  onOpenChange,
+}: OverlayStateProps = {}) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const isOpen = controlledOpen ?? uncontrolledOpen;
+  const setOpen = useCallback((open: boolean) => {
+    if (controlledOpen === undefined) setUncontrolledOpen(open);
+    onOpenChange?.(open);
+  }, [controlledOpen, onOpenChange]);
+  const open = useCallback(() => setOpen(true), [setOpen]);
+  const close = useCallback(() => setOpen(false), [setOpen]);
+  const toggle = useCallback(() => setOpen(!isOpen), [isOpen, setOpen]);
+
+  return useMemo(() => ({ isOpen, setOpen, open, close, toggle }), [
+    close,
+    isOpen,
+    open,
+    setOpen,
+    toggle,
+  ]);
 }
 
 export const Dropdown = Box;

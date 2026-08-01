@@ -38,7 +38,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ title, phone, pageUrl,
         onClick={handleShare}
         aria-label="مشاركة المكان"
         className={`size-11 min-w-11 bg-transparent p-0 hover:bg-transparent ${
-          shared ? 'text-emerald-600' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+          shared ? 'text-zinc-950' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
         }`}
       >
         <Share2 className="size-4" />

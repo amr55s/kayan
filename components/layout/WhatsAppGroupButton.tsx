@@ -32,9 +32,9 @@ export function WhatsAppGroupButton() {
         targetKey: 'support_whatsapp',
       })}
       aria-label="الانضمام إلى جروب KAYAN CITY SPOT عبر واتساب"
-      className="kayan-support-fab group fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] end-3 z-50 inline-flex size-12 touch-manipulation items-center justify-center rounded-full border border-white/30 bg-emerald-600 p-0 text-white shadow-lg transition-[transform,background-color,box-shadow] hover:-translate-y-1 hover:bg-emerald-700 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transform-none sm:end-5 sm:size-auto sm:min-h-14 sm:gap-2.5 sm:py-2 sm:pe-4 sm:ps-2.5"
+      className="kayan-support-fab group fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] end-3 z-50 inline-flex size-12 touch-manipulation items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 p-0 text-white shadow-lg transition-[transform,background-color,box-shadow] hover:-translate-y-1 hover:bg-zinc-800 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-zinc-400/40 motion-reduce:transform-none motion-reduce:transition-none sm:end-5 sm:size-auto sm:min-h-14 sm:gap-2.5 sm:py-2 sm:pe-4 sm:ps-2.5"
     >
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-full text-white sm:size-10 sm:bg-white sm:text-emerald-600 sm:shadow-sm">
+      <span className="relative flex size-12 shrink-0 items-center justify-center rounded-full text-white sm:size-10 sm:bg-white/10 sm:shadow-sm">
         <WhatsAppIcon />
       </span>
       <span className="hidden flex-col text-right leading-tight sm:flex">

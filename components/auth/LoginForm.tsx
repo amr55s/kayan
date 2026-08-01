@@ -3,11 +3,12 @@
 import { FormEvent, useState } from 'react';
 import Image from 'next/image';
 import { Button, Card, CardBody, CardHeader, Input } from '@heroui/react';
-import { ArrowRight, KeyRound, Phone, UserPlus } from 'lucide-react';
+import { ArrowRight, KeyRound, Phone, ShieldCheck, UserPlus } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { completeInitialPassword, loginWithPhone } from '@/lib/auth/actions';
 import { isEgyptianPhone } from '@/lib/auth/phone';
 import Link from 'next/link';
+import { SITE_NAME } from '@/lib/brand';
 
 export function LoginForm() {
   const router = useRouter();
@@ -51,38 +52,65 @@ export function LoginForm() {
   }
 
   return (
-    <main className="dir-rtl flex min-h-screen items-center justify-center bg-zinc-950 px-4 py-8 text-white">
-      <Card className="w-full max-w-md border border-zinc-800 bg-zinc-900 text-white shadow-2xl">
-        <CardHeader className="flex flex-col items-center gap-3 pb-2 text-center">
-          <div className="flex size-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg">
+    <main className="dir-rtl relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-gradient-to-br from-white via-zinc-50 to-zinc-200/70 px-4 py-10 text-zinc-900">
+      {/* Decorative ambient light gradients */}
+      <div className="pointer-events-none absolute -right-32 -top-32 size-96 rounded-full bg-zinc-300/45 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 -left-32 size-96 rounded-full bg-zinc-300/35 blur-3xl" />
+
+      <Card className="relative z-10 w-full max-w-md rounded-[32px] border border-zinc-200/80 bg-white/90 p-2 text-zinc-900 shadow-2xl shadow-zinc-200/60 backdrop-blur-xl sm:p-4">
+        <CardHeader className="flex flex-col items-center gap-3 pb-2 text-center pt-6 sm:pt-8">
+          <div className="flex size-20 items-center justify-center overflow-hidden rounded-2xl bg-white p-2.5 shadow-md ring-1 ring-zinc-200/80">
             <Image
               src="/kayan-services-logo.png"
-              alt="شعار KAYAN CITY SPOT"
-              width={80}
-              height={80}
-              className="size-20 object-contain"
+              alt={`شعار ${SITE_NAME}`}
+              width={72}
+              height={72}
+              className="size-full object-contain"
               priority
             />
           </div>
-          <div>
-            <h1 className="text-xl font-black">دخول KAYAN CITY SPOT</h1>
-            <p className="mt-1 text-sm text-zinc-400">للكباتن وأصحاب الأنشطة والإدارة</p>
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-100 px-3 py-0.5 text-[11px] font-bold text-zinc-800">
+              <ShieldCheck className="size-3.5" aria-hidden="true" />
+              <span>منصة كيان سيتي سبوت</span>
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-zinc-950">
+              {changePassword ? 'تغيير كلمة المرور' : `دخول ${SITE_NAME}`}
+            </h1>
+            <p className="text-xs font-semibold text-zinc-500">
+              {changePassword
+                ? 'يرجى تعيين كلمة مرور جديدة لحسابك'
+                : 'بوابة الكباتن وأصحاب المحلات والإدارة'}
+            </p>
           </div>
         </CardHeader>
-        <CardBody>
+        <CardBody className="px-4 py-6 sm:px-6">
           <form className="space-y-4" onSubmit={submit}>
-            {error && <p role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
+            {error && (
+              <p
+                role="alert"
+                className="rounded-2xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs font-bold text-rose-700 shadow-xs"
+              >
+                {error}
+              </p>
+            )}
             {!changePassword && (
               <Input
                 isRequired
                 name="phone"
                 autoComplete="tel"
                 type="tel"
+                inputMode="tel"
                 label="رقم الهاتف"
                 placeholder="01012345678"
                 value={phone}
                 onValueChange={setPhone}
-                startContent={<Phone className="size-4 text-zinc-400" />}
+                startContent={<Phone className="size-4 text-zinc-400" aria-hidden="true" />}
+                classNames={{
+                  label: 'text-xs font-bold text-zinc-700',
+                  inputWrapper:
+                    'bg-zinc-50 border-zinc-200 focus-within:!border-zinc-500 focus-within:!bg-white rounded-2xl shadow-xs transition-colors',
+                }}
               />
             )}
             <Input
@@ -93,31 +121,62 @@ export function LoginForm() {
               label={changePassword ? 'كلمة المرور الجديدة' : 'كلمة المرور'}
               value={password}
               onValueChange={setPassword}
-              startContent={<KeyRound className="size-4 text-zinc-400" />}
+              startContent={<KeyRound className="size-4 text-zinc-400" aria-hidden="true" />}
+              classNames={{
+                label: 'text-xs font-bold text-zinc-700',
+                inputWrapper:
+                  'bg-zinc-50 border-zinc-200 focus-within:!border-zinc-500 focus-within:!bg-white rounded-2xl shadow-xs transition-colors',
+              }}
             />
             {changePassword && (
-              <Input isRequired name="confirm-password" autoComplete="new-password" type="password" label="تأكيد كلمة المرور" value={confirmPassword} onValueChange={setConfirmPassword} />
+              <Input
+                isRequired
+                name="confirm-password"
+                autoComplete="new-password"
+                type="password"
+                label="تأكيد كلمة المرور"
+                value={confirmPassword}
+                onValueChange={setConfirmPassword}
+                startContent={<KeyRound className="size-4 text-zinc-400" aria-hidden="true" />}
+                classNames={{
+                  label: 'text-xs font-bold text-zinc-700',
+                  inputWrapper:
+                    'bg-zinc-50 border-zinc-200 focus-within:!border-zinc-500 focus-within:!bg-white rounded-2xl shadow-xs transition-colors',
+                }}
+              />
             )}
-            <Button type="submit" isLoading={loading} className="w-full bg-white font-extrabold text-zinc-950">
+
+            <Button
+              type="submit"
+              isLoading={loading}
+              className="mt-2 min-h-12 w-full rounded-2xl bg-zinc-950 font-black text-white shadow-lg shadow-zinc-950/10 transition-[background-color,transform,box-shadow] hover:bg-zinc-800 active:scale-[0.99] motion-reduce:transform-none"
+            >
               {changePassword ? 'حفظ كلمة المرور' : 'تسجيل الدخول'}
             </Button>
+
             {!changePassword && (
-              <div className="border-t border-zinc-800 pt-4 text-center">
-                <p className="mb-2 text-xs text-zinc-400">لسه معندكش تسجيل؟</p>
+              <div className="space-y-3 border-t border-zinc-100 pt-5 text-center">
+                <p className="text-xs font-semibold text-zinc-500">ليس لديك حساب بعد؟</p>
                 <Button
                   as={Link}
                   href="/?register=join"
-                  startContent={<UserPlus className="size-4" />}
-                  className="w-full border border-zinc-700 bg-zinc-800 text-sm font-bold text-white hover:bg-zinc-700"
+                  startContent={<UserPlus className="size-4 text-zinc-700" aria-hidden="true" />}
+                  className="min-h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900 transition-colors hover:bg-zinc-100"
                 >
-                  إنشاء تسجيل جديد
+                  تقديم طلب انضمام جديد
                 </Button>
               </div>
             )}
-            <Link href="/" className="flex min-h-[44px] items-center justify-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-white">
-              <ArrowRight className="size-4" />
-              العودة إلى كيان سيتي سبوت
-            </Link>
+
+            <div className="pt-2 text-center">
+              <Link
+                href="/"
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 text-xs font-bold text-zinc-500 transition-colors hover:text-zinc-950"
+              >
+                <ArrowRight className="size-4" aria-hidden="true" />
+                العودة إلى الصفحة الرئيسية
+              </Link>
+            </div>
           </form>
         </CardBody>
       </Card>

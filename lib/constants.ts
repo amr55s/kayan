@@ -43,8 +43,8 @@ export const CATEGORIES: CategoryItem[] = [
   },
   {
     id: 'home_made',
-    label: 'صنع يدي وأكل بيتي',
-    subtitle: 'مشغولات وأكل منزلية',
+    label: 'أكل منزلي',
+    subtitle: 'وجبات بيتية جاهزة',
     icon: ChefHat,
     emoji: '👩‍🍳',
   },

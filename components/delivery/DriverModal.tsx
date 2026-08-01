@@ -220,7 +220,7 @@ export function DriverModal({
                   form="driver-account-form"
                   isLoading={isSubmitting}
                   startContent={!isSubmitting && <Send className="size-4" />}
-                  className="bg-zinc-950 font-bold text-white"
+                  className="bg-zinc-950 font-black text-white hover:bg-zinc-800"
                 >
                   إرسال طلب الحساب
                 </Button>

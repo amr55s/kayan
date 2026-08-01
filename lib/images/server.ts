@@ -104,3 +104,36 @@ export async function processImageForStorage(
     height: verified.height,
   };
 }
+
+/** Produces a compact, metadata-free square portrait for public driver cards. */
+export async function processAvatarForStorage(input: Buffer): Promise<ProcessedImage> {
+  const source = await inspectImage(input);
+  if (!source.width || !source.height) {
+    throw new Error('invalid_image_dimensions');
+  }
+
+  const result = await sharp(input, {
+    failOn: 'error',
+    limitInputPixels: MAX_INPUT_PIXELS,
+    sequentialRead: true,
+  })
+    .rotate()
+    .resize(640, 640, {
+      fit: 'cover',
+      position: 'attention',
+      withoutEnlargement: false,
+      kernel: sharp.kernel.lanczos3,
+    })
+    .toColourspace('srgb')
+    .sharpen({ sigma: 0.35 })
+    .webp({ quality: 84, alphaQuality: 88, effort: 5, smartSubsample: true })
+    .toBuffer();
+
+  return {
+    buffer: Buffer.from(result),
+    contentType: 'image/webp',
+    extension: 'webp',
+    width: 640,
+    height: 640,
+  };
+}

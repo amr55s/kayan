@@ -86,8 +86,8 @@ export function PlaceCard({
               {getCategoryLabel(place.category)}
             </Chip>
             {place.is_featured && (
-              <Chip className="h-6 border border-amber-300/30 bg-amber-500/10 text-[10px] font-semibold text-amber-700">
-                <Star className="me-1 size-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+              <Chip className="h-6 border border-zinc-300 bg-white text-[10px] font-semibold text-zinc-700">
+                <Star className="me-1 size-3 text-zinc-600" aria-hidden="true" />
                 مميز
               </Chip>
             )}
@@ -125,7 +125,7 @@ export function PlaceCard({
                   aria-hidden="true"
                   className={`size-4 transition-[color,fill,transform] ${
                     isFavorite(place.id)
-                      ? 'scale-110 fill-rose-800 text-rose-800'
+                      ? 'scale-110 fill-rose-500 text-rose-500 drop-shadow-[0_2px_5px_rgba(244,63,94,.28)]'
                       : 'text-zinc-400'
                   }`}
                 />
@@ -193,16 +193,16 @@ export function PlaceCard({
 
         {place.description && (
           <div className={place.category === 'stores'
-            ? 'rounded-xl border border-amber-200/70 bg-amber-50/70 p-2.5'
+            ? 'rounded-xl border border-zinc-200 bg-zinc-50 p-2.5'
             : undefined}
           >
             {place.category === 'stores' && (
-              <span className="mb-1 flex items-center gap-1.5 text-[11px] font-black text-amber-900">
+              <span className="mb-1 flex items-center gap-1.5 text-[11px] font-black text-zinc-800">
                 <ShoppingBag className="size-3.5" aria-hidden="true" />
                 المنتجات وما يميز المتجر
               </span>
             )}
-            <p className="line-clamp-2 break-words text-xs leading-relaxed text-zinc-600">
+            <p className="line-clamp-1 break-words text-xs leading-relaxed text-zinc-600 sm:line-clamp-2">
               {place.description}
             </p>
           </div>
@@ -277,7 +277,7 @@ export function PlaceCard({
             targetKey: place.id,
           })}
           startContent={<Phone className="size-4 fill-current" aria-hidden="true" />}
-          className="min-w-0 flex-1 rounded-xl bg-zinc-900 px-2 text-xs font-bold text-white hover:bg-zinc-800 sm:text-sm"
+          className="min-w-0 flex-1 rounded-xl bg-zinc-950 px-2 text-xs font-black text-white hover:bg-zinc-800 sm:text-sm"
         >
           اتصال
         </Button>

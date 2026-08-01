@@ -28,6 +28,7 @@ export interface Driver {
   phone: string;
   whatsapp?: string | null;
   vehicle_type?: string | null;
+  avatar_url?: string | null;
   is_active: boolean;
   is_available: boolean;
   active_until?: string | null;

@@ -28,6 +28,7 @@ const CATEGORY_ALIASES: Record<string, (typeof LISTING_CATEGORY_IDS)[number]> = 
   'متجر': 'stores',
   'متاجر': 'stores',
   'صنع يدي وأكل بيتي': 'home_made',
+  'أكل منزلي': 'home_made',
   'سوبر ماركت': 'market',
   'خضار وفاكهة': 'veggies',
   'صيدليات وطب': 'pharmacy',

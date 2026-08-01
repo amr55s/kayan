@@ -23,6 +23,7 @@ type RegisteredDriverRow = {
   phone: string;
   whatsapp: string | null;
   vehicle_type: string | null;
+  avatar_url: string | null;
   is_available: boolean;
   active_until: string | null;
   created_at: string;
@@ -93,6 +94,7 @@ export function mergePublicDrivers(
       phone: row.phone,
       whatsapp: row.whatsapp || legacy?.whatsapp || row.phone,
       vehicle_type: row.vehicle_type || legacy?.vehicle_type || null,
+      avatar_url: row.avatar_url,
       is_active: true,
       is_available: row.is_available,
       active_until: row.active_until,

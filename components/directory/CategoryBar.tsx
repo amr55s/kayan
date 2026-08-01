@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Button } from '@heroui/react';
 import { CATEGORIES, CategoryItem } from '@/lib/constants';
 import { CategoryType } from '@/types';
 
@@ -16,62 +17,39 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
   counts,
 }) => {
   return (
-    <div className="w-full max-w-full overflow-x-auto no-scrollbar pb-3 pt-1 touch-pan-x dir-rtl">
-      <div className="flex gap-2.5 min-w-max px-1">
-        {CATEGORIES.map((cat: CategoryItem) => {
+    <div className="dir-rtl w-full max-w-full">
+      <div className="grid grid-cols-4 gap-1.5 px-1 sm:grid-cols-8 sm:gap-3">
+        {CATEGORIES.filter((cat) => cat.id !== 'all').map((cat: CategoryItem) => {
           const Icon = cat.icon;
           const isSelected = selectedCategory === cat.id;
           const count = counts?.[cat.id];
 
           return (
-            <button
+            <Button
               key={cat.id}
-              onClick={() => onCategoryChange(cat.id as CategoryType)}
-              className={`shrink-0 flex-shrink-0 min-w-[125px] sm:min-w-[150px] max-w-[160px] p-3 rounded-2xl border transition-[background-color,border-color,color,box-shadow,transform] duration-200 text-right flex flex-col justify-between gap-2.5 cursor-pointer select-none ${
+              size="md"
+              variant="flat"
+              aria-pressed={isSelected}
+              onPress={() => onCategoryChange(isSelected ? 'all' : cat.id as CategoryType)}
+              className={`relative h-16 min-h-0 w-full min-w-0 flex-col gap-1 rounded-2xl border px-1 py-1.5 text-center text-[10px] font-black leading-tight shadow-[0_1px_2px_rgba(0,0,0,.035)] transition-[background-color,border-color,color,box-shadow,transform] motion-reduce:transition-none sm:h-[116px] sm:gap-1.5 sm:rounded-[22px] sm:text-xs ${
                 isSelected
-                  ? 'bg-zinc-900 border-zinc-900 dark:bg-white dark:border-white text-white dark:text-zinc-900 shadow-sm scale-[1.02]'
-                  : 'bg-white/80 dark:bg-zinc-900/80 border-zinc-200/60 dark:border-zinc-800/60 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/90'
+                  ? 'border-zinc-950 bg-zinc-950 text-white shadow-[0_2px_5px_rgba(0,0,0,.09)]'
+                  : 'border-zinc-200 bg-zinc-50 text-zinc-800 hover:border-zinc-300 hover:bg-white hover:shadow-[0_2px_5px_rgba(0,0,0,.06)]'
               }`}
             >
-              {/* Icon & Count Badge Row */}
-              <div className="flex items-center justify-between w-full">
-                <div
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
-                    isSelected
-                      ? 'bg-white/15 text-white dark:bg-zinc-900/15 dark:text-zinc-900'
-                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
-
-                {typeof count === 'number' && (
-                  <span
-                    className={`text-[11px] font-bold px-2 py-0.5 rounded-full transition-colors ${
-                      isSelected
-                        ? 'bg-white/20 text-white dark:bg-zinc-900/20 dark:text-zinc-900'
-                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                )}
-              </div>
-
-              {/* Category Title & Subtitle */}
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-xs sm:text-sm leading-snug">
-                  {cat.label}
+              <span className={`flex size-7 items-center justify-center rounded-[10px] sm:size-9 sm:rounded-xl ${isSelected ? 'bg-white/10 text-white' : 'bg-white text-zinc-950 ring-1 ring-zinc-200'}`}>
+                <Icon className="size-4 sm:size-5" aria-hidden="true" />
+              </span>
+              <span className="line-clamp-2">{cat.label}</span>
+              <span className={`hidden max-w-full truncate text-[10px] font-semibold sm:block ${isSelected ? 'text-zinc-300' : 'text-zinc-400'}`}>
+                {cat.subtitle}
+              </span>
+              {typeof count === 'number' && (
+                <span className={`absolute start-2 top-2 hidden rounded-full px-1.5 py-0.5 text-[10px] sm:inline ${isSelected ? 'bg-white/10 text-zinc-200' : 'bg-zinc-100 text-zinc-500'}`}>
+                  {count.toLocaleString('ar-EG')}
                 </span>
-                <span
-                  className={`text-[10px] line-clamp-1 font-normal ${
-                    isSelected ? 'text-white dark:text-zinc-950' : 'text-zinc-400 dark:text-zinc-500'
-                  }`}
-                >
-                  {cat.subtitle}
-                </span>
-              </div>
-            </button>
+              )}
+            </Button>
           );
         })}
       </div>

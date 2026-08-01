@@ -452,6 +452,8 @@ export type Database = {
       driver_profiles: {
         Row: {
           active_until: string | null
+          avatar_path: string | null
+          avatar_url: string | null
           contact_phone: string | null
           created_at: string
           is_available: boolean
@@ -464,6 +466,8 @@ export type Database = {
         }
         Insert: {
           active_until?: string | null
+          avatar_path?: string | null
+          avatar_url?: string | null
           contact_phone?: string | null
           created_at?: string
           is_available?: boolean
@@ -476,6 +480,8 @@ export type Database = {
         }
         Update: {
           active_until?: string | null
+          avatar_path?: string | null
+          avatar_url?: string | null
           contact_phone?: string | null
           created_at?: string
           is_available?: boolean

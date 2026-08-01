@@ -238,7 +238,7 @@ export function PwaInstaller() {
               size="sm"
               onPress={handleInstall}
               isLoading={installing}
-              className="min-h-9 bg-white px-3 text-xs font-extrabold text-zinc-950"
+              className="min-h-9 bg-white px-3 text-xs font-black text-zinc-950 hover:bg-zinc-100"
             >
               {updateReady ? 'تحديث' : 'تثبيت'}
             </Button>
@@ -294,7 +294,7 @@ export function PwaInstaller() {
             </p>
             <Button
               onPress={() => setShowIosGuide(false)}
-              className="min-h-11 bg-zinc-950 font-bold text-white"
+              className="min-h-11 bg-zinc-950 font-black text-white hover:bg-zinc-800"
             >
               فهمت
             </Button>

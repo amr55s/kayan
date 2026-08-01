@@ -8,16 +8,7 @@ import type { Driver } from '@/types';
 import { formatPhoneForTel, formatWhatsAppUrl } from '@/lib/utils';
 import { shareDirectoryItem } from '@/lib/share';
 import { trackSiteEvent } from '@/lib/analytics/client';
-
-function availabilityLabel(activeUntil: string | null | undefined, now: number): string {
-  if (!activeUntil) return 'خامل';
-  const remainingMinutes = Math.ceil((new Date(activeUntil).getTime() - now) / 60_000);
-  if (remainingMinutes <= 0) return 'خامل';
-  if (remainingMinutes < 60) return `متاح ${remainingMinutes} دقيقة`;
-  const hours = Math.floor(remainingMinutes / 60);
-  const minutes = remainingMinutes % 60;
-  return `متاح ${hours}س${minutes ? ` ${minutes}د` : ''}`;
-}
+import { driverAvatarTone } from '@/lib/driver-avatar';
 
 export function DriverCard({
   driver,
@@ -48,7 +39,6 @@ export function DriverCard({
       new Date(driver.active_until as string).getTime() > now,
     [driver.active_until, driver.is_available, now],
   );
-  const label = availabilityLabel(driver.active_until, now);
   const displayName = driver.name?.trim() || 'كابتن توصيل';
 
   const share = async () => {
@@ -64,52 +54,53 @@ export function DriverCard({
   };
 
   return (
-    <Card className="w-full min-w-0 snap-start border border-zinc-700 bg-zinc-900 text-white shadow-none">
-      <CardBody className="flex flex-col gap-2.5 p-3">
+    <Card className="w-full min-w-0 snap-start border border-zinc-200/90 bg-gradient-to-br from-white via-zinc-50 to-zinc-200/90 text-zinc-950 shadow-[0_7px_18px_-16px_rgba(0,0,0,.78)]">
+      <CardBody className="flex flex-col gap-2 p-2.5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
             <Avatar
+              src={driver.avatar_url || undefined}
               name={displayName}
-              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-800 text-sm font-bold text-white"
+              className={`flex size-9 shrink-0 items-center justify-center rounded-xl border text-xs font-black ${driverAvatarTone(driver.id)}`}
+              classNames={{ img: 'object-cover' }}
             />
             <div className="min-w-0">
               <Link
                 href={detailsHref}
                 onClick={onOpenDetails}
-                className="block truncate text-sm font-extrabold hover:underline"
+                className="block truncate text-sm font-black hover:underline"
               >
                 {displayName}
               </Link>
-              <p className="mt-1 flex items-center gap-1 text-xs text-zinc-400">
-                <Bike className="size-3.5" aria-hidden="true" />
-                {driver.vehicle_type || 'نوع المركبة غير محدد'}
-              </p>
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold text-zinc-500">
+                <span className="flex min-w-0 items-center gap-1 truncate">
+                  <Bike className="size-3 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{driver.vehicle_type || 'مركبة غير محددة'}</span>
+                </span>
+              </div>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Chip
-              className={`max-w-24 shrink-0 px-1.5 text-[10px] ${
-                isAvailable
-                  ? 'border border-emerald-700/40 bg-emerald-500/10 text-emerald-300'
-                  : 'border border-zinc-700 bg-zinc-800 text-zinc-300'
-              }`}
-            >
-              {isAvailable ? label : 'خامل'}
-            </Chip>
+          <div className="flex shrink-0 items-center gap-0.5">
+            {isAvailable && (
+              <Chip className="h-6 border border-zinc-800 bg-zinc-950 px-2 text-[9px] font-black text-white">
+                <span className="me-1 inline-block size-1.5 rounded-full bg-sky-300" aria-hidden="true" />
+                متصل
+              </Chip>
+            )}
             <Button
               isIconOnly
               size="sm"
               variant="light"
               aria-label={`مشاركة ${displayName}`}
               onPress={share}
-              className="size-9 min-w-9 text-zinc-300"
+              className="size-9 min-w-9 text-zinc-500"
             >
               <Share2 className="size-4" aria-hidden="true" />
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 border-t border-zinc-800 pt-2.5">
+        <div className="grid grid-cols-2 gap-1.5 border-t border-zinc-200 pt-2">
           <Button
             as="a"
             href={formatWhatsAppUrl(
@@ -123,7 +114,7 @@ export function DriverCard({
               targetKey: driver.id,
             })}
             startContent={<MessageCircle className="size-4" aria-hidden="true" />}
-            className="min-h-11 border border-zinc-700 bg-zinc-800 text-xs font-bold text-white"
+            className="min-h-11 border border-zinc-200 bg-white/80 text-xs font-bold text-zinc-800 backdrop-blur-sm"
           >
             واتساب
           </Button>
@@ -135,7 +126,7 @@ export function DriverCard({
               targetKey: driver.id,
             })}
             startContent={<Phone className="size-4" aria-hidden="true" />}
-            className="min-h-11 bg-white text-xs font-extrabold text-zinc-950"
+            className="min-h-11 bg-zinc-950 text-xs font-black text-white hover:bg-zinc-800"
           >
             اتصال
           </Button>

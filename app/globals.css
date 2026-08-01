@@ -19,6 +19,7 @@
 @source "./driver/page.tsx";
 @source "./error.tsx";
 @source "./global-error.tsx";
+@source "./guide/page.tsx";
 @source "./layout.tsx";
 @source "./loading.tsx";
 @source "./login/page.tsx";
@@ -26,14 +27,19 @@
 @source "./page.tsx";
 @source "./not-found.tsx";
 @source "./providers.tsx";
+@source "./share/page.tsx";
+@source "../components/admin/AccountRequestManager.tsx";
 @source "../components/admin/DriverManager.tsx";
 @source "../components/admin/CouponManager.tsx";
 @source "../components/admin/EditPlaceModal.tsx";
 @source "../components/admin/EditRequestModal.tsx";
 @source "../components/admin/FeedbackDetailsModal.tsx";
+@source "../components/admin/MarketingCenter.tsx";
+@source "../components/admin/UserEditorModal.tsx";
 @source "../components/auth/LoginForm.tsx";
 @source "../components/delivery/DeliveryBar.tsx";
 @source "../components/delivery/DriverCard.tsx";
+@source "../components/delivery/DriverDetailsModal.tsx";
 @source "../components/delivery/DriverModal.tsx";
 @source "../components/directory/CategoryBar.tsx";
 @source "../components/directory/CategoryTabs.tsx";
@@ -44,11 +50,15 @@
 @source "../components/directory/ShareButton.tsx";
 @source "../components/directory/UpvoteButton.tsx";
 @source "../components/layout/Header.tsx";
+@source "../components/layout/PublicPageHeader.tsx";
 @source "../components/layout/PwaInstaller.tsx";
 @source "../components/layout/WhatsAppGroupButton.tsx";
+@source "../components/marketing/GuideAnalytics.tsx";
+@source "../components/marketing/PublicShareHub.tsx";
 @source "../components/modals/AddListingModal.tsx";
 @source "../components/modals/FeedbackModal.tsx";
 @source "../components/operations/AdminWorkspace.tsx";
+@source "../components/operations/DashboardHeader.tsx";
 @source "../components/operations/DriverWorkspace.tsx";
 @source "../components/operations/MerchantOrderWorkspace.tsx";
 @source "../components/operations/PushSubscriptionButton.tsx";
@@ -108,8 +118,8 @@
 .soft-card {
   background-color: #ffffff;
   border: 1px solid rgba(228, 228, 231, 0.7);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03);
-  border-radius: 1.25rem; /* 20px */
+  box-shadow: 0 14px 34px -26px rgba(0, 0, 0, 0.45);
+  border-radius: 1.5rem;
   transition:
     border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
@@ -118,7 +128,7 @@
 
 .soft-card:hover {
   border-color: rgba(212, 212, 216, 1);
-  box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 22px 42px -28px rgba(0, 0, 0, 0.5);
   transform: translateY(-2px);
 }
 
@@ -234,6 +244,21 @@ body.place-details-open .kayan-support-fab {
 
 .kayan-modal-panel {
   animation: kayan-modal-panel-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (max-width: 639px) {
+  .kayan-modal-panel::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0.55rem;
+    z-index: 30;
+    width: 2.75rem;
+    height: 0.25rem;
+    border-radius: 999px;
+    background: #d4d4d8;
+    transform: translateX(-50%);
+  }
 }
 
 .kayan-modal-wrapper {

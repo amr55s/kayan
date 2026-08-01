@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Input, Button, Skeleton, Card } from '@heroui/react';
-import { BadgePercent, Bike, Search, MapPinOff, RefreshCw, Heart, MessageCircle } from 'lucide-react';
+import { BadgePercent, Search, MapPinOff, RefreshCw, Heart, MessageCircle } from 'lucide-react';
 import { Place, Driver, CategoryType } from '@/types';
 import { Header } from '@/components/layout/Header';
 import { DeliveryBar } from '@/components/delivery/DeliveryBar';
@@ -225,103 +225,124 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         }}
       />
 
-      {/* Live Active Delivery Drivers Bar */}
-      <DeliveryBar
-        drivers={initialDrivers}
-        renderedAt={renderedAt}
-        driverHref={driverHref}
-        onOpenDriverDetails={prepareOpenDetails}
-      />
-
       {/* Main Directory Body */}
       <main id="main-content" className="flex-1 pb-12">
-        {/* Compact Hero Banner */}
-        <section className="border-b border-zinc-200/70 bg-white px-4 py-6 text-center sm:py-10">
-          <div className="mx-auto max-w-3xl">
-            <h1 className="text-balance text-xl font-extrabold tracking-tight text-zinc-900 sm:text-3xl">
-              KAYAN CITY SPOT… كل ما تحتاجه في مكان واحد
-            </h1>
-            <p className="mx-auto mt-2 max-w-2xl text-pretty text-sm font-normal text-zinc-500 sm:text-base">
-              مطاعم ومحلات وصيدليات وخدمات وتوصيل ومنيوهات، مع تواصل مباشر وسهل.
-            </p>
-            <div className="mx-auto mt-4 flex max-w-xl flex-wrap items-center justify-center gap-2 text-[11px] font-bold text-zinc-700">
-              <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3">
-                <MessageCircle className="size-3.5 text-emerald-600" aria-hidden="true" />
-                تواصل مباشر مع المتجر
+        <section className="border-b border-zinc-800 bg-zinc-950 px-3 py-2.5 text-white sm:px-4 sm:py-8">
+          <div className="mx-auto grid max-w-7xl items-center gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(420px,600px)] lg:gap-14">
+            <div className="min-w-0 max-w-2xl">
+              <span className="inline-flex min-h-7 items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 text-[10px] font-black tracking-wide text-white sm:min-h-8 sm:text-xs">
+                KAYAN CITY SPOT
               </span>
-              <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3">
-                <Bike className="size-3.5" aria-hidden="true" />
-                كباتن توصيل متاحون
-              </span>
-              {activeOffersCount > 0 && (
-                <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 text-amber-900">
-                  <BadgePercent className="size-3.5" aria-hidden="true" />
-                  {activeOffersCount === 1
-                    ? 'عرض واحد متاح'
-                    : `${activeOffersCount.toLocaleString('ar-EG')} عروض وكوبونات`}
-                </span>
-              )}
+              <h1 className="mt-2 text-balance text-[1.35rem] font-black leading-[1.35] tracking-tight text-white min-[360px]:text-[1.5rem] sm:mt-3 sm:text-4xl sm:leading-[1.2]">
+                كل اللي تحتاجه في كيان، في مكان واحد.
+              </h1>
+              <p className="mt-1.5 text-xs font-medium leading-5 text-zinc-300 sm:mt-3 sm:max-w-xl sm:text-base sm:leading-8">
+                مطاعم ومحلات وصيدليات وخدمات وكباتن توصيل.
+              </p>
+              <div className="mt-4 hidden flex-wrap gap-2 text-xs font-bold text-zinc-300 sm:flex">
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">بيانات واضحة</span>
+                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">تواصل بدون وسيط</span>
+                {activeOffersCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                    <BadgePercent className="size-3.5" aria-hidden="true" />
+                    {activeOffersCount.toLocaleString('ar-EG')} {activeOffersCount === 1 ? 'عرض' : 'عروض'}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div id="directory-search" className="w-full scroll-mt-20 lg:justify-self-end">
+              <Input
+                isClearable
+                size="lg"
+                radius="lg"
+                placeholder="دور على مكان أو خدمة…"
+                aria-label="البحث في الأماكن والخدمات"
+                name="directorySearch"
+                autoComplete="off"
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+                startContent={(
+                  <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white">
+                    <Search className="size-4.5" aria-hidden="true" />
+                  </span>
+                )}
+                classNames={{
+                  inputWrapper: 'h-[52px] rounded-2xl border border-zinc-200 !bg-white px-2 text-zinc-950 shadow-[0_8px_24px_-18px_rgba(0,0,0,.9)] focus-within:border-zinc-400 focus-within:ring-4 focus-within:ring-white/20',
+                  input: '!bg-transparent !shadow-none text-base font-bold placeholder:font-medium placeholder:!text-zinc-500',
+                }}
+              />
+              <div className="mt-3 hidden items-center justify-between gap-3 sm:flex">
+                <p className="text-xs font-semibold text-zinc-400">اكتب الاسم، نوع الخدمة، أو رقم الهاتف.</p>
+                <Button
+                  as="a"
+                  href={WHATSAPP_GROUP_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackSiteEvent('support_click', {
+                    targetType: 'feature',
+                    targetKey: 'hero_whatsapp_group',
+                  })}
+                  startContent={<MessageCircle className="size-4" aria-hidden="true" />}
+                  className="shrink-0 border border-white/15 bg-white px-4 text-xs font-black text-zinc-950 hover:bg-zinc-100"
+                >
+                  اسأل جروب كيان
+                </Button>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Filter Controls & Search */}
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-          <div className="w-full space-y-3 sm:space-y-4">
-            <Input
-              isClearable
-              size="lg"
-              radius="lg"
-              placeholder="ابحث عن اسم مكان، محل، صيدلية، أو هاتف…"
-              aria-label="البحث في الأماكن والخدمات"
-              name="directorySearch"
-              autoComplete="off"
-              value={searchQuery}
-              onValueChange={setSearchQuery}
-              startContent={<Search className="w-5 h-5 text-zinc-400 shrink-0" />}
-              classNames={{
-                inputWrapper: "h-12 border-zinc-300 bg-white shadow-none",
-                input: "text-base font-medium",
+        <div className="mx-auto max-w-7xl space-y-2.5 px-3 py-3 sm:space-y-5 sm:px-4 sm:py-6">
+          <section aria-labelledby="daily-categories-title" className="space-y-2 rounded-[24px] bg-white py-1 sm:space-y-3 sm:rounded-[28px]">
+            <div className="px-1">
+              <h2 id="daily-categories-title" className="text-sm font-black text-zinc-950 sm:text-base">اختار القسم</h2>
+              <p className="mt-0.5 hidden text-xs font-semibold text-zinc-500 sm:block">اضغط على القسم مرة تانية لإلغاء التصفية.</p>
+            </div>
+            <CategoryTabs
+              selectedCategory={selectedCategory}
+              onCategoryChange={(cat) => {
+                setSelectedCategory(cat);
+                setShowFavoritesOnly(false);
+                trackSiteEvent('category_select', {
+                  targetType: 'category',
+                  targetKey: cat,
+                });
               }}
+              counts={categoryCounts}
             />
+          </section>
 
-            {/* Category Filter Tabs + Favorites Toggle */}
-            <div className="flex flex-col gap-3">
-              <CategoryTabs
-                selectedCategory={selectedCategory}
-                onCategoryChange={(cat) => {
-                  setSelectedCategory(cat);
-                  setShowFavoritesOnly(false);
-                  trackSiteEvent('category_select', {
-                    targetType: 'category',
-                    targetKey: cat,
-                  });
-                }}
-                counts={categoryCounts}
-              />
+          <DeliveryBar
+            drivers={initialDrivers}
+            renderedAt={renderedAt}
+            driverHref={driverHref}
+            onOpenDriverDetails={prepareOpenDetails}
+          />
 
-              {/* Favorites Toggle */}
+          <section aria-labelledby="directory-results-title" className="space-y-3 sm:space-y-5">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <div>
+                <h2 id="directory-results-title" className="text-sm font-black text-zinc-950 sm:text-base">الأماكن والخدمات</h2>
+                <p className="mt-0.5 text-[11px] font-semibold text-zinc-500">
+                  عرض <strong className="font-black text-zinc-800">{filteredPlaces.length}</strong> مكان
+                </p>
+              </div>
               <Button
                 size="sm"
                 variant={showFavoritesOnly ? 'solid' : 'flat'}
                 onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
                 startContent={<Heart className={`w-3.5 h-3.5 ${showFavoritesOnly ? 'fill-current' : ''}`} />}
-                className={`self-start font-bold text-xs h-8 rounded-full px-3 transition-[background-color,color,box-shadow] ${
+                className={`self-start h-8 rounded-full px-3 text-xs font-bold transition-[background-color,color,box-shadow] ${
                   showFavoritesOnly
-                    ? 'bg-zinc-900 text-white shadow-sm'
+                    ? 'bg-rose-50 text-rose-600 ring-1 ring-rose-200'
                     : 'border border-zinc-200 bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                 }`}
               >
                 المفضلة {favoritesCount > 0 && `(${favoritesCount})`}
               </Button>
             </div>
-          </div>
 
-          {/* Results Summary Header */}
-          <div className="flex items-center justify-between px-1 text-xs font-bold text-zinc-600">
-            <span>
-              عرض <strong className="text-sm font-extrabold text-zinc-950">{filteredPlaces.length}</strong> مكان
-            </span>
             {(searchQuery || showFavoritesOnly) && (
               <Button
                 size="sm"
@@ -336,10 +357,9 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 مسح الفلاتر
               </Button>
             )}
-          </div>
 
           {directoryError && (
-            <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+            <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-zinc-300 bg-white p-4 text-sm text-zinc-800 sm:flex-row sm:items-center sm:justify-between">
               <span>{directoryError}</span>
               <Button size="sm" onClick={() => window.location.reload()} className="bg-zinc-900 font-bold text-white">إعادة المحاولة</Button>
             </div>
@@ -403,6 +423,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               </p>
             </div>
           )}
+          </section>
         </div>
       </main>
 
@@ -472,6 +493,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         isOpen={Boolean(selectedDriver) && !isDetailClosing}
         onOpenChange={closeDetails}
         driver={selectedDriver}
+        renderedAt={renderedAt}
       />
     </div>
   );

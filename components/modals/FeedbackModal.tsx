@@ -485,12 +485,13 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   {!['general_suggestion', 'rating'].includes(feedbackType) && (
                   /* Optional File Upload */
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                    <label htmlFor="feedback-images" className="flex items-center justify-between text-xs font-bold text-zinc-700 dark:text-zinc-300">
                       <span>إرفاق صور جديدة للمنيو أو المكان (اختياري - حتى 3 صور)</span>
                       <span className="text-zinc-400 font-normal text-[11px]">{selectedFiles.length} / 3 صور</span>
                     </label>
 
                     <input
+                      id="feedback-images"
                       type="file"
                       ref={fileInputRef}
                       accept="image/*"
@@ -500,15 +501,16 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     />
 
                     {selectedFiles.length < 3 && (
-                      <div
+                      <button
+                        type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-zinc-800 dark:hover:border-zinc-200 rounded-2xl p-4 text-center cursor-pointer bg-zinc-50/50 dark:bg-zinc-800/40 transition-colors flex flex-col items-center justify-center gap-1.5"
+                        className="flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50/50 p-4 text-center transition-colors hover:border-zinc-800 focus-visible:ring-2 focus-visible:ring-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/40 dark:hover:border-zinc-200"
                       >
-                        <Upload className="w-5 h-5 text-zinc-800 dark:text-zinc-200" />
+                        <Upload className="size-5 text-zinc-800 dark:text-zinc-200" aria-hidden="true" />
                         <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
                           اضغط هنا لإرفاق صور منيو أو إثبات تعديل
                         </span>
-                      </div>
+                      </button>
                     )}
 
                     {filePreviews.length > 0 && (
@@ -552,7 +554,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   form="feedback-form"
                   isLoading={isSubmitting}
                   startContent={!isSubmitting && <Send className="w-4 h-4" />}
-                  className="font-bold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 px-6 h-11 shadow-sm rounded-xl"
+                  className="h-11 rounded-xl bg-zinc-950 px-6 font-black text-white shadow-sm hover:bg-zinc-800"
                 >
                   إرسال الطلب للإدارة
                 </Button>

@@ -9,6 +9,8 @@ import { getCurrentProfile } from '@/lib/auth/guards';
 import { validateListingImageUrls } from '@/lib/images/urls';
 import { authEmailForPhone } from '@/lib/auth/phone';
 import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
+import { processAvatarForStorage } from '@/lib/images/server';
+import { toPlainArrayBuffer } from '@/lib/images/buffer';
 import {
   branchSchema,
   accountRequestSchema,
@@ -21,6 +23,9 @@ import {
 } from './validation';
 
 type ActionResult<T = undefined> = { success: true; data?: T } | { success: false; message: string };
+
+const DRIVER_AVATAR_MAX_BYTES = 3_500_000;
+const DRIVER_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 function actionError(error: unknown): ActionResult {
   if (error instanceof z.ZodError) {
@@ -165,6 +170,75 @@ export async function updateDriverPublicProfile(input: unknown): Promise<ActionR
     safeRevalidatePaths('/', '/driver');
     return { success: true };
   } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updateDriverAvatar(
+  formData: FormData,
+): Promise<ActionResult<{ avatarUrl: string }>> {
+  let uploadedPath: string | null = null;
+  try {
+    const profile = await requireRole('driver');
+    const file = formData.get('avatar');
+    if (!(file instanceof File) || !file.size) {
+      throw new Error('اختر صورة واضحة أولاً.');
+    }
+    if (file.size > DRIVER_AVATAR_MAX_BYTES) {
+      throw new Error('حجم الصورة كبير. اختر صورة أقل من 3.5 ميجابايت.');
+    }
+    if (!DRIVER_AVATAR_TYPES.has(file.type)) {
+      throw new Error('صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WebP.');
+    }
+
+    const processed = await processAvatarForStorage(Buffer.from(await file.arrayBuffer()));
+    const admin = createAdminClient();
+    const { data: current, error: currentError } = await (admin as any)
+      .from('driver_profiles')
+      .select('avatar_path')
+      .eq('profile_id', profile.id)
+      .single();
+    if (currentError) throw currentError;
+
+    uploadedPath = `${profile.id}/${Date.now()}.${processed.extension}`;
+    const { error: uploadError } = await admin.storage
+      .from('driver-avatars')
+      .upload(uploadedPath, toPlainArrayBuffer(processed.buffer), {
+        cacheControl: '31536000',
+        contentType: processed.contentType,
+        upsert: false,
+      });
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = admin.storage
+      .from('driver-avatars')
+      .getPublicUrl(uploadedPath);
+    if (!publicUrlData.publicUrl) throw new Error('تعذر تجهيز رابط الصورة.');
+
+    const { error: updateError } = await (admin as any)
+      .from('driver_profiles')
+      .update({ avatar_path: uploadedPath, avatar_url: publicUrlData.publicUrl })
+      .eq('profile_id', profile.id);
+    if (updateError) throw updateError;
+
+    const previousPath = current?.avatar_path as string | null | undefined;
+    if (previousPath && previousPath !== uploadedPath) {
+      const { error: removeError } = await admin.storage
+        .from('driver-avatars')
+        .remove([previousPath]);
+      if (removeError) console.warn('Previous driver avatar cleanup failed:', removeError);
+    }
+
+    safeRevalidatePaths('/', '/driver');
+    return { success: true, data: { avatarUrl: publicUrlData.publicUrl } };
+  } catch (error) {
+    if (uploadedPath) {
+      try {
+        await createAdminClient().storage.from('driver-avatars').remove([uploadedPath]);
+      } catch (cleanupError) {
+        console.error('Incomplete driver avatar cleanup failed:', cleanupError);
+      }
+    }
     return actionError(error);
   }
 }

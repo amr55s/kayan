@@ -87,8 +87,14 @@ test('selected category text keeps high contrast', () => {
   const globalStyles = read('app/globals.css');
   assert.match(
     categoryBar,
-    /isSelected \? 'text-white dark:text-zinc-950'/,
+    /isSelected[\s\S]{0,180}\? 'border-zinc-950 bg-zinc-950 text-white shadow-\[/,
   );
+  assert.match(categoryBar, /grid-cols-4/);
+  assert.match(categoryBar, /h-16/);
+  assert.match(categoryBar, /sm:h-\[116px\]/);
+  assert.match(categoryBar, /aria-pressed=\{isSelected\}/);
+  assert.match(categoryBar, /filter\(\(cat\) => cat\.id !== 'all'\)/);
+  assert.match(categoryBar, /isSelected \? 'all' : cat\.id/);
   assert.match(merchantModal, /kayan-account-mode-tab/);
   assert.match(
     globalStyles,
@@ -169,6 +175,28 @@ test('driver contact fields stay explicit while public cards expose actions only
   assert.doesNotMatch(card, />\s*التفاصيل\s*</);
   assert.doesNotMatch(bar, /اطلب حساب كابتن/);
   assert.doesNotMatch(bar, /onOpenRegistration/);
+});
+
+test('drivers can manage a safe public avatar from their dashboard', () => {
+  const actions = read('lib/operations/actions.ts');
+  const workspace = read('components/operations/DriverWorkspace.tsx');
+  const card = read('components/delivery/DriverCard.tsx');
+  const migration = read(
+    'supabase/migrations/20260801210704_add_driver_avatar_profiles.sql',
+  );
+
+  assert.match(actions, /export async function updateDriverAvatar/);
+  assert.match(actions, /await requireRole\('driver'\)/);
+  assert.match(actions, /processAvatarForStorage/);
+  assert.match(actions, /\.from\('driver-avatars'\)/);
+  assert.match(workspace, /accept="image\/jpeg,image\/png,image\/webp"/);
+  assert.match(workspace, /تغيير صورة الكابتن|إضافة صورة الكابتن/);
+  assert.match(card, /src=\{driver\.avatar_url \|\| undefined\}/);
+  assert.match(card, /bg-gradient-to-br from-white via-zinc-50 to-zinc-200\/90/);
+  assert.match(migration, /add column if not exists avatar_url text/);
+  assert.match(migration, /'driver-avatars'/);
+  assert.match(migration, /file_size_limit/);
+  assert.match(migration, /allowed_mime_types/);
 });
 
 test('listing images are optimized before storage without sacrificing menu resolution', () => {

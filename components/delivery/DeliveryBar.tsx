@@ -20,7 +20,14 @@ export function DeliveryBar({
   driverHref: (driverId: string) => string;
   onOpenDriverDetails: () => void;
 }) {
-  const availableCount = drivers.filter((driver) => driver.is_available).length;
+  const isConnected = (driver: Driver) =>
+    driver.is_available
+    && Boolean(driver.active_until)
+    && new Date(driver.active_until as string).getTime() > renderedAt;
+  const sortedDrivers = [...drivers].sort(
+    (first, second) => Number(isConnected(second)) - Number(isConnected(first)),
+  );
+  const availableCount = sortedDrivers.filter(isConnected).length;
   const [activeDriver, setActiveDriver] = useState(0);
   const [isDriverAccount, setIsDriverAccount] = useState(false);
   const [renewalMessage, setRenewalMessage] = useState('');
@@ -75,60 +82,59 @@ export function DeliveryBar({
     const gap = Number.parseFloat(getComputedStyle(scroller).columnGap || '0');
     const step = firstCard.offsetWidth + gap;
     const nextIndex = Math.min(
-      drivers.length - 1,
+      sortedDrivers.length - 1,
       Math.max(0, Math.round(Math.abs(scroller.scrollLeft) / Math.max(step, 1))),
     );
     setActiveDriver(nextIndex);
   };
 
   return (
-    <section className="border-b border-zinc-800 bg-zinc-950 py-4 text-white">
-      <div className="mx-auto max-w-7xl space-y-3">
-        <div className="px-3 sm:px-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 text-white">
-              <Bike className="size-4.5" />
+    <section className="overflow-hidden rounded-[22px] border border-zinc-900 bg-zinc-950 py-2.5 text-white shadow-[0_12px_36px_-28px_rgba(0,0,0,.9)] sm:rounded-[26px] sm:py-3.5">
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-3 px-3 sm:px-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="relative flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white">
+              <Bike className="size-4" aria-hidden="true" />
+              <span className="absolute -bottom-0.5 -end-0.5 size-2 rounded-full border-2 border-zinc-950 bg-sky-300" aria-hidden="true" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-extrabold sm:text-base">كباتن التوصيل</h2>
-                <Chip className="border border-zinc-700 bg-zinc-900 text-[11px] text-zinc-200">
-                  {availableCount} متاح الآن
+                <h2 className="text-sm font-black text-white">توصيل سريع</h2>
+                <Chip className="h-6 border border-white/15 bg-white/10 text-[10px] font-black text-white">
+                  {availableCount} متصل
                 </Chip>
               </div>
-              <p className="mt-0.5 text-xs text-zinc-400">تواصل مباشرة مع أقرب كابتن.</p>
+              <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-400">المتصلون أولًا، وكل الكباتن ظاهرون.</p>
             </div>
           </div>
 
-          <div className="flex flex-col items-start gap-1 sm:items-end">
+          <div className="flex shrink-0 flex-col items-end gap-1">
             {isDriverAccount && (
               <Button
                 onPress={renewPresence}
                 isLoading={pending}
                 startContent={!pending && <RefreshCw className="size-4" />}
-                className="self-start border border-zinc-700 bg-white px-3 text-xs font-bold text-zinc-950 sm:self-auto"
+                className="min-h-10 border border-white/15 bg-white px-3 text-xs font-bold text-zinc-950 hover:bg-zinc-100"
               >
-                جدّد تواجدي لساعتين
+                جدّد تواجدي
               </Button>
             )}
             {renewalMessage && (
-              <span role="status" className="text-[11px] font-semibold text-zinc-300">
+              <span role="status" className="text-[10px] font-semibold text-zinc-300">
                 {renewalMessage}
               </span>
             )}
           </div>
         </div>
-        </div>
 
-        {drivers.length > 0 ? (
+        {sortedDrivers.length > 0 ? (
           <div
-            className="no-scrollbar grid w-full auto-cols-[100%] grid-flow-col snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-1 scroll-px-3 scroll-smooth overscroll-x-contain sm:auto-cols-[calc((100%-1rem)/2)] sm:gap-4 sm:px-4 sm:scroll-px-4 lg:auto-cols-[calc((100%-2rem)/3)] xl:auto-cols-[calc((100%-3rem)/4)]"
-            aria-label="كباتن التوصيل في كيان سيتي سبوت"
+            className="no-scrollbar grid w-full auto-cols-[min(80vw,292px)] grid-flow-col snap-x snap-mandatory gap-2 overflow-x-auto px-3 pb-0.5 scroll-px-3 scroll-smooth overscroll-x-contain sm:auto-cols-[292px] sm:px-4 sm:scroll-px-4"
+            aria-label="كل كباتن التوصيل في كيان سيتي سبوت"
             tabIndex={0}
             onScroll={updateActiveDriver}
           >
-            {drivers.map((driver) => (
+            {sortedDrivers.map((driver) => (
               <DriverCard
                 key={`${driver.source}:${driver.id}`}
                 driver={driver}
@@ -139,17 +145,17 @@ export function DeliveryBar({
             ))}
           </div>
         ) : (
-          <div className="mx-3 rounded-2xl border border-dashed border-zinc-700 bg-zinc-900/60 p-4 text-sm text-zinc-400 sm:mx-4">
-            لا توجد بطاقات كباتن منشورة بعد. يمكن للكابتن التسجيل من زر «انضم» أعلى الصفحة.
+          <div className="mx-3 rounded-xl border border-dashed border-white/20 bg-white/5 px-3 py-2.5 text-xs font-semibold text-zinc-300 sm:mx-4">
+            لا توجد بطاقات كباتن منشورة حاليًا.
           </div>
         )}
 
-        {drivers.length > 1 && (
-          <div className="flex items-center justify-center gap-2 px-3 text-[11px] text-zinc-400 sm:hidden">
+        {sortedDrivers.length > 1 && (
+          <div className="flex items-center justify-center gap-2 px-3 text-[10px] font-semibold text-zinc-400 sm:hidden">
             <ChevronLeft className="size-3.5" aria-hidden="true" />
-            <span>اسحب لعرض باقي الكباتن</span>
-            <div className="flex items-center gap-1" aria-label={`${activeDriver + 1} من ${drivers.length}`}>
-              {drivers.map((driver, index) => (
+            <span>اسحب لباقي الكباتن</span>
+            <div className="flex items-center gap-1" aria-label={`${activeDriver + 1} من ${sortedDrivers.length}`}>
+              {sortedDrivers.map((driver, index) => (
                 <span
                   key={`${driver.source}:${driver.id}:dot`}
                   className={`h-1.5 rounded-full transition-[width,background-color] ${

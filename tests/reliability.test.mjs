@@ -12,6 +12,58 @@ test('driver availability hydrates from a server-provided timestamp', () => {
   assert.match(page, /renderedAt/);
 });
 
+test('mobile navigation uses the HeroUI v3 drawer from the physical left edge', () => {
+  const header = read('components/layout/Header.tsx');
+  assert.match(header, /from '@heroui\/react\/drawer'/);
+  assert.match(header, /<Drawer\.Content[\s\S]{0,180}placement="left"[\s\S]{0,180}\[direction:ltr\]/);
+  assert.match(header, /<Drawer\.Dialog[\s\S]{0,180}dir="rtl"/);
+  assert.match(header, /rounded-r-\[28px\]/);
+  assert.match(header, /bg-zinc-950 text-white/);
+  assert.match(header, /aria-label="إغلاق القائمة"/);
+});
+
+test('admin navigation covers overview, revenue, activity, publishing, and mobile drawer access', () => {
+  const workspace = read('components/operations/AdminWorkspace.tsx');
+  const page = read('app/admin/page.tsx');
+  assert.match(workspace, /key: 'overview', label: 'نظرة عامة'/);
+  assert.match(workspace, /key: 'revenue', label: 'الإيرادات والتحصيل'/);
+  assert.match(workspace, /key: 'activity', label: 'النشاط والأداء'/);
+  assert.match(workspace, /key: 'marketing', label: 'التسويق والنشر'/);
+  assert.match(workspace, /أقسام لوحة التحكم/);
+  assert.match(workspace, /<Drawer\.Content placement="left" className="[^"]*\[direction:ltr\]/);
+  assert.match(page, /collection_amount, delivery_fee/);
+});
+
+test('the public hero is actionable and remains anchored to directory search', () => {
+  const directory = read('components/directory/DirectoryView.tsx');
+  const categoryBar = read('components/directory/CategoryBar.tsx');
+  const placeCard = read('components/directory/PlaceCard.tsx');
+  const couponOffer = read('components/directory/CouponOffer.tsx');
+  const deliveryBar = read('components/delivery/DeliveryBar.tsx');
+  const driverCard = read('components/delivery/DriverCard.tsx');
+  assert.match(directory, /كل اللي تحتاجه في كيان، في مكان واحد\./);
+  assert.match(directory, /bg-zinc-950/);
+  assert.doesNotMatch(directory, /FECF34/i);
+  assert.match(directory, /id="directory-search"/);
+  assert.match(directory, /<Input[\s\S]{0,400}value=\{searchQuery\}/);
+  assert.match(directory, /inputWrapper: '[^']*!bg-white/);
+  assert.match(directory, /placeholder:!text-zinc-500/);
+  assert.match(directory, /hero_whatsapp_group/);
+  assert.doesNotMatch(directory, /(?:amber|yellow|orange|emerald)-/);
+  assert.doesNotMatch(placeCard, /(?:amber|yellow|orange)-/);
+  assert.doesNotMatch(couponOffer, /(?:amber|yellow|orange|emerald)-/);
+  assert.match(categoryBar, /CATEGORIES\.filter\(\(cat\) => cat\.id !== 'all'\)/);
+  assert.match(categoryBar, /h-16/);
+  assert.match(categoryBar, /bg-zinc-950 text-white/);
+  assert.match(deliveryBar, /bg-zinc-950/);
+  assert.match(deliveryBar, /sortedDrivers\.map/);
+  assert.match(deliveryBar, /Number\(isConnected\(second\)\) - Number\(isConnected\(first\)\)/);
+  assert.match(driverCard, /isAvailable &&/);
+  assert.match(driverCard, />\s*متصل\s*</);
+  assert.match(driverCard, /bg-zinc-950 text-xs font-black text-white/);
+  assert.doesNotMatch(driverCard, /خامل|غير متاح/);
+});
+
 test('place details are deep-linked through Next navigation without patching browser history', () => {
   const directory = read('components/directory/DirectoryView.tsx');
   assert.match(directory, /params\.set\('place', placeId\)/);

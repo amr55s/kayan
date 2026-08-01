@@ -3,22 +3,19 @@
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import {
-  Navbar,
-  NavbarBrand,
-  NavbarContent,
-  NavbarItem,
   Button,
   Modal,
   ModalBody,
   ModalContent,
   ModalHeader,
+  useOverlayState,
 } from '@heroui/react';
-import { Bike, BookOpen, Building2, Home, LayoutDashboard, LogIn, Menu, MessageCircle, MessageSquareText, Share2, UserPlus, X } from 'lucide-react';
+import { Drawer } from '@heroui/react/drawer';
+import { Bike, BookOpen, Building2, Home, LayoutDashboard, LogIn, Menu, MessageSquareText, Share2, UserPlus, X } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
 import { SITE_NAME, SITE_NAME_AR } from '@/lib/brand';
-import { WHATSAPP_GROUP_URL } from '@/lib/community';
 import { trackSiteEvent } from '@/lib/analytics/client';
 
 interface HeaderProps {
@@ -37,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenFeedbackModal,
 }) => {
   const [dashboardPath, setDashboardPath] = useState<string | null>(null);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuState = useOverlayState();
 
   useEffect(() => {
     let mounted = true;
@@ -70,18 +67,18 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const chooseMenu = (action?: () => void) => {
-    setIsMenuOpen(false);
+    menuState.close();
     action?.();
   };
 
   return (
     <>
-      <Navbar
-        isBordered
-        maxWidth="full"
-        className="sticky top-0 z-50 h-16 max-w-full gap-1 overflow-hidden border-b border-zinc-200/80 bg-white/90 px-2 backdrop-blur-xl sm:px-5"
-      >
-        <NavbarBrand className="w-11 min-w-11 shrink-0 sm:w-auto">
+      <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/90 backdrop-blur-xl">
+        <nav
+          aria-label="التنقل الرئيسي"
+          className="mx-auto flex h-16 w-full max-w-[90rem] items-center justify-between gap-1 overflow-hidden px-2 sm:px-5"
+        >
+        <div className="flex w-11 min-w-11 shrink-0 items-center sm:w-auto">
           <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={`${SITE_NAME} - الصفحة الرئيسية`}>
             <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200 shadow-sm">
               <Image
@@ -97,105 +94,82 @@ export const Header: React.FC<HeaderProps> = ({
               {SITE_NAME}
             </span>
           </Link>
-        </NavbarBrand>
+        </div>
 
-        <NavbarContent justify="end" className="hidden min-w-0 shrink gap-0.5 md:flex md:shrink-0 md:gap-2">
-          <NavbarItem className="hidden md:block">
+        <div className="hidden min-w-0 shrink items-center justify-end gap-0.5 md:flex md:shrink-0 md:gap-2">
+          <div className="hidden md:block">
             <Link
               href="/guide"
               className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-100"
             >
-              <BookOpen className="size-4" />
+              <BookOpen className="size-4" aria-hidden="true" />
               طريقة الاستخدام
             </Link>
-          </NavbarItem>
-          <NavbarItem className="hidden md:block">
+          </div>
+          <div className="hidden md:block">
             <Link
               href="/share"
               className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-100"
             >
-              <Share2 className="size-4" />
+              <Share2 className="size-4" aria-hidden="true" />
               شارك كيان
             </Link>
-          </NavbarItem>
-          <NavbarItem className="hidden lg:block">
-            <a
-              href={WHATSAPP_GROUP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => trackSiteEvent('support_click', {
-                targetType: 'feature',
-                targetKey: 'header_whatsapp_group',
-              })}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 transition-colors hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-            >
-              <MessageCircle className="size-4" aria-hidden="true" />
-              جروب واتساب
-            </a>
-          </NavbarItem>
+          </div>
           {onOpenFeedbackModal && (
-            <NavbarItem>
+            <div>
               <button
                 type="button"
                 onClick={onOpenFeedbackModal}
                 className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 sm:px-3"
               >
-                <MessageSquareText className="size-4" />
+                <MessageSquareText className="size-4" aria-hidden="true" />
                 <span className="hidden sm:inline">اقتراح أو تقييم</span>
                 <span className="max-[359px]:sr-only sm:hidden">رأيك</span>
               </button>
-            </NavbarItem>
+            </div>
           )}
-          <NavbarItem>
+          <div>
             <Link
               href={dashboardPath ?? '/login'}
               className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 sm:px-3"
             >
-              {dashboardPath ? <LayoutDashboard className="size-4" /> : <LogIn className="size-4" />}
+              {dashboardPath ? <LayoutDashboard className="size-4" aria-hidden="true" /> : <LogIn className="size-4" aria-hidden="true" />}
               <span className="max-[359px]:sr-only">
                 {dashboardPath ? 'لوحة التحكم' : 'دخول'}
               </span>
             </Link>
-          </NavbarItem>
-          <NavbarItem>
+          </div>
+          <div>
             <Button
               onClick={() => onJoinOpenChange(true)}
-              startContent={<UserPlus className="size-4" />}
-              className="bg-zinc-950 px-3 text-xs font-bold text-white hover:bg-zinc-800 sm:px-4"
+              startContent={<UserPlus className="size-4" aria-hidden="true" />}
+              className="bg-zinc-950 px-3 text-xs font-black text-white hover:bg-zinc-800 sm:px-4"
             >
               <span className="sm:hidden">انضم</span>
               <span className="hidden sm:inline">انضم إلى {SITE_NAME_AR}</span>
             </Button>
-          </NavbarItem>
-        </NavbarContent>
+          </div>
+        </div>
 
-        <NavbarContent justify="end" className="gap-2 md:hidden">
-          <NavbarItem>
-            <Button
-              isIconOnly
-              variant="flat"
-              onPress={() => setIsMenuOpen(true)}
+        <div className="flex items-center justify-end gap-2 md:hidden">
+          <Drawer state={menuState}>
+            <Drawer.Trigger
               aria-label="فتح قائمة الموقع"
-              className="size-11 min-w-11 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-950"
+              className="inline-flex size-11 min-w-11 items-center justify-center rounded-xl border border-zinc-950 bg-zinc-950 text-white outline-none shadow-sm transition-[background-color,box-shadow,transform] hover:bg-zinc-800 active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none"
             >
               <Menu className="size-5" aria-hidden="true" />
-            </Button>
-          </NavbarItem>
-        </NavbarContent>
-      </Navbar>
-
-      <Modal
-        isOpen={isMenuOpen}
-        onOpenChange={setIsMenuOpen}
-        aria-label="قائمة الموقع"
-        classNames={{
-          wrapper: '!items-stretch !p-0',
-          base: 'me-auto !h-dvh !max-h-dvh !max-w-[22rem] rounded-none rounded-e-[28px] border-e border-zinc-200 bg-white',
-          body: 'overscroll-contain px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]',
-        }}
-      >
-        <ModalContent>
-          <ModalHeader className="flex items-center justify-between border-b border-zinc-100 py-4">
+            </Drawer.Trigger>
+            <Drawer.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+              <Drawer.Content
+                placement="left"
+                className="h-dvh w-full p-0 [direction:ltr]"
+              >
+                <Drawer.Dialog
+                  aria-label="قائمة الموقع"
+                  dir="rtl"
+                  className="flex h-full w-full max-w-[22rem] flex-col rounded-none rounded-r-[28px] border-r border-zinc-200 bg-white shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-300 sm:max-w-[24rem]"
+                >
+          <Drawer.Header className="flex items-center justify-between border-b border-zinc-100 px-4 py-4">
             <div className="flex items-center gap-3">
               <span className="flex size-10 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
                 <Image src="/kayan-services-logo.png" alt="" width={40} height={40} />
@@ -208,14 +182,14 @@ export const Header: React.FC<HeaderProps> = ({
             <Button
               isIconOnly
               variant="light"
-              onPress={() => setIsMenuOpen(false)}
+              onPress={menuState.close}
               aria-label="إغلاق القائمة"
               className="size-11 min-w-11"
             >
               <X className="size-5" aria-hidden="true" />
             </Button>
-          </ModalHeader>
-          <ModalBody className="space-y-5 pt-4">
+          </Drawer.Header>
+          <Drawer.Body className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4">
             <nav aria-label="روابط الموقع" className="space-y-1.5">
               <Link href="/" onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl bg-zinc-950 px-4 text-sm font-black text-white">
                 <Home className="size-5" aria-hidden="true" /> الصفحة الرئيسية
@@ -226,25 +200,13 @@ export const Header: React.FC<HeaderProps> = ({
               <Link href="/share" onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100">
                 <Share2 className="size-5" aria-hidden="true" /> شارك كيان
               </Link>
-              <a
-                href={WHATSAPP_GROUP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => {
-                  chooseMenu();
-                  trackSiteEvent('support_click', { targetType: 'feature', targetKey: 'mobile_whatsapp_group' });
-                }}
-                className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-emerald-800 hover:bg-emerald-50"
-              >
-                <MessageCircle className="size-5" aria-hidden="true" /> جروب واتساب
-              </a>
               {onOpenFeedbackModal && (
                 <button type="button" onClick={() => chooseMenu(onOpenFeedbackModal)} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100">
                   <MessageSquareText className="size-5" aria-hidden="true" /> اقتراح أو تقييم
                 </button>
               )}
               <Link href={dashboardPath ?? '/login'} onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100">
-                {dashboardPath ? <LayoutDashboard className="size-5" /> : <LogIn className="size-5" />}
+                {dashboardPath ? <LayoutDashboard className="size-5" aria-hidden="true" /> : <LogIn className="size-5" aria-hidden="true" />}
                 {dashboardPath ? 'لوحة التحكم' : 'تسجيل الدخول'}
               </Link>
             </nav>
@@ -257,23 +219,28 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="space-y-2">
                 <Button
                   onPress={() => chooseMenu(onOpenDriverModal)}
-                  startContent={<Bike className="size-5" />}
+                  startContent={<Bike className="size-5" aria-hidden="true" />}
                   className="w-full justify-start border border-zinc-200 bg-white px-4 font-bold text-zinc-950"
                 >
                   طلب حساب كابتن توصيل
                 </Button>
                 <Button
                   onPress={() => chooseMenu(onOpenAddModal)}
-                  startContent={<Building2 className="size-5" />}
-                  className="w-full justify-start bg-zinc-950 px-4 font-bold text-white"
+                  startContent={<Building2 className="size-5" aria-hidden="true" />}
+                  className="w-full justify-start bg-zinc-950 px-4 font-black text-white hover:bg-zinc-800"
                 >
                   طلب حساب محل أو خدمة
                 </Button>
               </div>
             </section>
-          </ModalBody>
-        </ModalContent>
-      </Modal>
+          </Drawer.Body>
+                </Drawer.Dialog>
+              </Drawer.Content>
+            </Drawer.Backdrop>
+          </Drawer>
+        </div>
+        </nav>
+      </header>
 
       <Modal isOpen={isJoinOpen} onOpenChange={onJoinOpenChange}>
         <ModalContent>
@@ -291,7 +258,7 @@ export const Header: React.FC<HeaderProps> = ({
                     as={Link}
                     href="/guide"
                     onPress={() => choose()}
-                    startContent={<BookOpen className="size-4" />}
+                    startContent={<BookOpen className="size-4" aria-hidden="true" />}
                     className="border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900"
                   >
                     طريقة الاستخدام
@@ -300,7 +267,7 @@ export const Header: React.FC<HeaderProps> = ({
                     as={Link}
                     href="/share"
                     onPress={() => choose()}
-                    startContent={<Share2 className="size-4" />}
+                    startContent={<Share2 className="size-4" aria-hidden="true" />}
                     className="border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900"
                   >
                     شارك كيان
@@ -308,15 +275,15 @@ export const Header: React.FC<HeaderProps> = ({
                 </div>
                 <Button
                   onClick={() => choose(onOpenDriverModal)}
-                  startContent={<Bike className="size-5" />}
+                  startContent={<Bike className="size-5" aria-hidden="true" />}
                   className="w-full justify-start border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-950 hover:bg-zinc-50"
                 >
                   طلب حساب كابتن توصيل
                 </Button>
                 <Button
                   onClick={() => choose(onOpenAddModal)}
-                  startContent={<Building2 className="size-5" />}
-                  className="w-full justify-start bg-zinc-950 px-4 text-sm font-bold text-white hover:bg-zinc-800"
+                  startContent={<Building2 className="size-5" aria-hidden="true" />}
+                  className="w-full justify-start bg-zinc-950 px-4 text-sm font-black text-white hover:bg-zinc-800"
                 >
                   طلب حساب محل أو خدمة
                 </Button>

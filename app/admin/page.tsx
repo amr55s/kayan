@@ -97,7 +97,7 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: false })),
     safeAdminQuery('delivery_orders', (supabase as any)
       .from('delivery_orders')
-      .select('id, public_code, status, recipient_name, delivery_area, created_at')
+      .select('id, public_code, status, recipient_name, delivery_area, collection_amount, delivery_fee, created_at')
       .order('created_at', { ascending: false })
       .limit(100)),
     safeAdminQuery('merchant_branches', (supabase as any)

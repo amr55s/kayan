@@ -74,7 +74,7 @@ function DetailLink({
   const tones = {
     light: 'border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100',
     dark: 'border-zinc-900 bg-zinc-950 text-white hover:bg-zinc-800',
-    green: 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
+    green: 'border-zinc-900 bg-zinc-950 text-white hover:bg-zinc-800',
     blue: 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100',
   };
   return (
@@ -405,8 +405,8 @@ export function PlaceDetailsModal({
                           {getCategoryLabel(place.category)}
                         </Chip>
                         {place.is_featured && (
-                          <Chip className="border border-amber-200 bg-amber-50 text-xs font-bold text-amber-800">
-                            <Star className="me-1 size-3.5 fill-current" aria-hidden="true" />
+                          <Chip className="border border-zinc-300 bg-white text-xs font-bold text-zinc-700">
+                            <Star className="me-1 size-3.5" aria-hidden="true" />
                             مكان مميز
                           </Chip>
                         )}

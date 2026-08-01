@@ -14,8 +14,12 @@ import {
   Tab,
   Tabs,
   Textarea,
+  useOverlayState,
 } from '@heroui/react';
+import { Drawer } from '@heroui/react/drawer';
 import {
+  Activity,
+  Banknote,
   Building2,
   BadgePercent,
   BarChart3,
@@ -24,6 +28,8 @@ import {
   History,
   Lightbulb,
   Link2,
+  LayoutDashboard,
+  Menu,
   MessageSquareText,
   Megaphone,
   MousePointerClick,
@@ -37,6 +43,8 @@ import {
   Utensils,
   UserCog,
   Users,
+  Wrench,
+  X,
 } from 'lucide-react';
 import {
   createMerchant,
@@ -80,6 +88,8 @@ type Order = {
   status: string;
   recipient_name: string;
   delivery_area: string;
+  collection_amount: number | null;
+  delivery_fee: number | null;
   created_at: string;
 };
 type Branch = {
@@ -155,7 +165,8 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackRequest | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
-  const [activeSection, setActiveSection] = useState('directory');
+  const [activeSection, setActiveSection] = useState('overview');
+  const adminNavigationState = useOverlayState();
   const [merchantName, setMerchantName] = useState('');
   const [user, setUser] = useState({
     displayName: '',
@@ -201,6 +212,17 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
     (total, item) => total + item.occurrences,
     0,
   );
+
+  const chooseAdminSection = (section: string) => {
+    setActiveSection(section);
+    adminNavigationState.close();
+    window.requestAnimationFrame(() => {
+      document.getElementById('admin-section-content')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  };
 
   function complete(successMessage: string) {
     setMessage(successMessage);
@@ -348,173 +370,28 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
     ? props.places.find((place) => place.id === selectedFeedback.target_place_id) ?? null
     : null;
   const adminSections = [
+    { key: 'overview', label: 'نظرة عامة', icon: <LayoutDashboard className="size-4" /> },
     { key: 'directory', label: 'واجهة الموقع والخدمات', icon: <Store className="size-4" />, count: props.places.length },
-    { key: 'coupons', label: 'الكوبونات والعروض', icon: <BadgePercent className="size-4" />, count: props.places.reduce((total, place) => total + (place.coupons?.length ?? 0), 0) },
-    { key: 'marketing', label: 'التسويق والنشر', icon: <Megaphone className="size-4" /> },
+    { key: 'accounts', label: 'الحسابات والربط', icon: <Users className="size-4" />, count: props.profiles.length },
     { key: 'account-requests', label: 'طلبات الحسابات', icon: <UserCog className="size-4" />, count: pendingAccounts.length },
     { key: 'orders', label: 'طلبات التوصيل', icon: <ClipboardCheck className="size-4" />, count: props.orders.length },
+    { key: 'revenue', label: 'الإيرادات والتحصيل', icon: <Banknote className="size-4" /> },
+    { key: 'coupons', label: 'الكوبونات والعروض', icon: <BadgePercent className="size-4" />, count: props.places.reduce((total, place) => total + (place.coupons?.length ?? 0), 0) },
+    { key: 'activity', label: 'النشاط والأداء', icon: <Activity className="size-4" /> },
+    { key: 'marketing', label: 'التسويق والنشر', icon: <Megaphone className="size-4" /> },
     { key: 'merchant-changes', label: 'تعديلات المحلات', icon: <Utensils className="size-4" />, count: merchantChanges.length },
     { key: 'directory-reports', label: 'بلاغات التعديل', icon: <MessageSquareText className="size-4" />, count: directoryReports.length },
     { key: 'additions', label: 'إضافات جديدة', icon: <Plus className="size-4" />, count: pendingAdditions.length },
     { key: 'suggestions', label: 'الاقتراحات والتقييمات', icon: <Lightbulb className="size-4" />, count: suggestions.length },
-    { key: 'accounts', label: 'الحسابات والربط', icon: <Users className="size-4" />, count: props.profiles.length },
+    { key: 'health', label: 'سلامة النظام', icon: <Wrench className="size-4" />, count: currentErrorCount },
     { key: 'audit', label: 'سجل الإدارة', icon: <History className="size-4" /> },
   ];
+  const activeSectionLabel = adminSections.find((section) => section.key === activeSection)?.label
+    ?? 'نظرة عامة';
 
   return (
-    <main id="main-content" className="dir-rtl mx-auto max-w-7xl space-y-5 overflow-x-clip px-3 py-5 sm:px-6">
-      <section>
-        <h1 className="flex items-center gap-2 text-2xl font-black">
-          <ShieldCheck className="size-6 text-zinc-900" />
-          لوحة الإدارة
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          إدارة كيان سيتي سبوت والحسابات وعمليات التوصيل من مساحة واحدة.
-        </p>
-      </section>
-
-      {message && (
-        <p
-          role="status"
-          className="rounded-xl border border-zinc-200 bg-zinc-100 p-3 text-sm font-semibold"
-        >
-          {message}
-        </p>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <Metric
-          label="طلبات الحسابات"
-          value={pendingAccounts.length}
-          icon={<UserCog className="size-5" />}
-        />
-        <Metric
-          label="الحسابات النشطة"
-          value={props.profiles.filter((profile) => profile.is_active).length}
-          icon={<Users className="size-5" />}
-        />
-        <Metric
-          label="الأماكن العامة"
-          value={props.places.length}
-          icon={<Building2 className="size-5" />}
-        />
-        <Metric
-          label="طلبات الإضافة"
-          value={pendingAdditions.length}
-          icon={<ClipboardCheck className="size-5" />}
-        />
-        <Metric
-          label="تعديلات المحلات"
-          value={merchantChanges.length}
-          icon={<MessageSquareText className="size-5" />}
-        />
-        <Metric
-          label="الاقتراحات والتقييمات"
-          value={suggestions.length}
-          icon={<Lightbulb className="size-5" />}
-        />
-      </div>
-
-      <BehaviorAnalyticsOverview
-        analytics={props.behaviorAnalytics}
-        places={props.places}
-        drivers={props.marketingDrivers}
-      />
-
-      <Card
-        className={
-          currentClientErrors.length > 0
-            ? 'border border-amber-200 bg-amber-50/50'
-            : 'border border-emerald-200 bg-emerald-50/50'
-        }
-      >
-          <CardHeader className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <span className="font-black">سلامة الإصدار الحالي</span>
-              <p className="mt-1 truncate text-xs text-zinc-500" dir="ltr">
-                {props.currentRelease.slice(0, 12)}
-              </p>
-            </div>
-            <Chip
-              className={
-                currentClientErrors.length > 0
-                  ? 'bg-amber-100 text-amber-900'
-                  : 'bg-emerald-100 text-emerald-900'
-              }
-            >
-              {currentErrorCount > 0 ? `${currentErrorCount} حدث` : 'سليم'}
-            </Chip>
-          </CardHeader>
-          <CardBody className="gap-2">
-            {currentClientErrors.length === 0 && (
-              <p className="rounded-xl border border-emerald-200 bg-white p-3 text-sm font-bold text-emerald-900">
-                لا توجد أخطاء مسجلة على الإصدار الحالي.
-              </p>
-            )}
-            {currentClientErrors.slice(0, 10).map((item) => (
-              <article
-                key={item.id}
-                className="grid gap-2 rounded-xl border border-amber-200 bg-white p-3 text-xs sm:grid-cols-[1fr_auto]"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-black">
-                    {item.event_type} · {item.route}
-                  </p>
-                  <p className="mt-1 text-zinc-500">
-                    {item.error_kind} · {item.browser_family} / {item.os_family} · بصمة {item.fingerprint.slice(0, 10)}
-                  </p>
-                </div>
-                <div className="text-start font-bold tabular-nums sm:text-end">
-                  <p>{item.occurrences} مرة</p>
-                  <time dateTime={item.last_seen_at}>
-                    {formatCairoDateTime(item.last_seen_at)}
-                  </time>
-                </div>
-              </article>
-            ))}
-            {historicalClientErrors.length > 0 && (
-              <details className="group rounded-xl border border-zinc-200 bg-white">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-bold">
-                  <span>أخطاء إصدارات سابقة — للرجوع فقط</span>
-                  <Chip size="sm" variant="flat">
-                    {historicalClientErrors.reduce(
-                      (total, item) => total + item.occurrences,
-                      0,
-                    )} حدث
-                  </Chip>
-                </summary>
-                <div className="space-y-2 border-t border-zinc-100 p-3">
-                  {historicalClientErrors.slice(0, 10).map((item) => (
-                    <article
-                      key={item.id}
-                      className="grid gap-2 rounded-xl bg-zinc-50 p-3 text-xs sm:grid-cols-[1fr_auto]"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-black">
-                          {item.event_type} · {item.route}
-                        </p>
-                        <p className="mt-1 text-zinc-500">
-                          {item.error_kind} · {item.browser_family} / {item.os_family}
-                        </p>
-                        <p className="mt-1 text-zinc-400" dir="ltr">
-                          {item.release.slice(0, 12)} · {item.fingerprint.slice(0, 10)}
-                        </p>
-                      </div>
-                      <div className="text-start font-bold tabular-nums sm:text-end">
-                        <p>{item.occurrences} مرة</p>
-                        <time dateTime={item.last_seen_at}>
-                          {formatCairoDateTime(item.last_seen_at)}
-                        </time>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </details>
-            )}
-          </CardBody>
-        </Card>
-
-      <div className="grid items-start gap-5 lg:grid-cols-[250px_minmax(0,1fr)]">
+    <main id="main-content" className="dir-rtl mx-auto w-full max-w-[90rem] overflow-x-clip px-3 py-4 sm:px-6 sm:py-6">
+      <div className="grid items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="sticky top-20 hidden max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-3xl border border-zinc-200 bg-white p-3 shadow-sm lg:block">
           <div className="border-b border-zinc-100 px-2 pb-3 pt-1">
             <p className="text-sm font-black text-zinc-950">أقسام الإدارة</p>
@@ -525,7 +402,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
               <button
                 key={section.key}
                 type="button"
-                onClick={() => setActiveSection(section.key)}
+                onClick={() => chooseAdminSection(section.key)}
                 aria-current={activeSection === section.key ? 'page' : undefined}
                 className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-3 text-start text-xs font-bold transition-colors ${
                   activeSection === section.key
@@ -547,20 +424,97 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
           </nav>
         </aside>
 
-        <section className="min-w-0">
-          <Select
-            aria-label="اختر قسم الإدارة"
-            label="قسم لوحة الإدارة"
-            selectedKeys={[activeSection]}
-            onChange={(event) => setActiveSection(event.target.value)}
-            className="mb-4 lg:hidden"
-          >
-            {adminSections.map((section) => (
-              <SelectItem key={section.key} value={section.key}>
-                {section.label}{typeof section.count === 'number' ? ` (${section.count})` : ''}
-              </SelectItem>
-            ))}
-          </Select>
+        <section id="admin-section-content" className="min-w-0 scroll-mt-36">
+          <div className="sticky top-16 z-40 -mx-3 mb-4 border-b border-zinc-200/80 bg-zinc-50/95 px-3 py-2 backdrop-blur-xl lg:hidden">
+            <Drawer state={adminNavigationState}>
+              <Drawer.Trigger className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-4 font-black text-zinc-950 shadow-sm outline-none transition-colors hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-zinc-950">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Menu className="size-5 shrink-0" aria-hidden="true" />
+                  <span>أقسام لوحة التحكم</span>
+                </span>
+                <span className="max-w-32 truncate text-xs font-bold text-zinc-500">{activeSectionLabel}</span>
+              </Drawer.Trigger>
+              <Drawer.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+                <Drawer.Content placement="left" className="h-dvh w-full p-0 [direction:ltr]">
+                  <Drawer.Dialog
+                    aria-label="أقسام لوحة التحكم"
+                    dir="rtl"
+                    className="flex h-full w-full max-w-[22rem] flex-col rounded-none rounded-e-[28px] border-e border-zinc-200 bg-white shadow-2xl outline-none"
+                  >
+                    <Drawer.Header className="flex items-center justify-between border-b border-zinc-100 px-4 py-4">
+                      <div>
+                        <Drawer.Heading className="text-base font-black text-zinc-950">
+                          لوحة التحكم
+                        </Drawer.Heading>
+                        <p className="mt-1 text-xs font-semibold text-zinc-500">
+                          كل أقسام المنصة في قائمة واحدة
+                        </p>
+                      </div>
+                      <Button
+                        isIconOnly
+                        variant="light"
+                        onPress={adminNavigationState.close}
+                        aria-label="إغلاق قائمة لوحة التحكم"
+                        className="size-11 min-w-11"
+                      >
+                        <X className="size-5" aria-hidden="true" />
+                      </Button>
+                    </Drawer.Header>
+                    <Drawer.Body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                      <nav className="space-y-1" aria-label="أقسام لوحة الإدارة للموبايل">
+                        {adminSections.map((section) => (
+                          <button
+                            key={section.key}
+                            type="button"
+                            onClick={() => chooseAdminSection(section.key)}
+                            aria-current={activeSection === section.key ? 'page' : undefined}
+                            className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl px-3 text-start text-sm font-bold transition-colors ${
+                              activeSection === section.key
+                                ? 'bg-zinc-950 text-white shadow-sm'
+                                : 'text-zinc-700 hover:bg-zinc-100'
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-3">
+                              {section.icon}
+                              <span className="truncate">{section.label}</span>
+                            </span>
+                            {typeof section.count === 'number' && (
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] ${
+                                activeSection === section.key
+                                  ? 'bg-white/15 text-white'
+                                  : 'bg-zinc-100 text-zinc-600'
+                              }`}>
+                                {section.count}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </nav>
+                    </Drawer.Body>
+                  </Drawer.Dialog>
+                </Drawer.Content>
+              </Drawer.Backdrop>
+            </Drawer>
+          </div>
+
+          <header className="mb-5">
+            <h1 className="flex items-center gap-2 text-2xl font-black sm:text-3xl">
+              <ShieldCheck className="size-6 text-zinc-900 sm:size-7" />
+              لوحة الإدارة
+            </h1>
+            <p className="mt-1 text-sm leading-6 text-zinc-500">
+              إدارة الموقع والحسابات والإيرادات والنشاط والنشر من مساحة واحدة.
+            </p>
+          </header>
+
+          {message && (
+            <p
+              role="status"
+              className="mb-5 rounded-xl border border-zinc-200 bg-zinc-100 p-3 text-sm font-semibold"
+            >
+              {message}
+            </p>
+          )}
 
           <Tabs
             aria-label="إدارة المنصة"
@@ -572,6 +526,68 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
               panel: 'px-0 pt-0',
             }}
           >
+        <Tab id="overview" key="overview" title="نظرة عامة">
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
+              <Metric
+                label="طلبات الحسابات"
+                value={pendingAccounts.length}
+                icon={<UserCog className="size-5" />}
+              />
+              <Metric
+                label="الحسابات النشطة"
+                value={props.profiles.filter((profile) => profile.is_active).length}
+                icon={<Users className="size-5" />}
+              />
+              <Metric
+                label="الأماكن العامة"
+                value={props.places.length}
+                icon={<Building2 className="size-5" />}
+              />
+              <Metric
+                label="طلبات الإضافة"
+                value={pendingAdditions.length}
+                icon={<ClipboardCheck className="size-5" />}
+              />
+              <Metric
+                label="تعديلات المحلات"
+                value={merchantChanges.length}
+                icon={<MessageSquareText className="size-5" />}
+              />
+              <Metric
+                label="الاقتراحات"
+                value={suggestions.length}
+                icon={<Lightbulb className="size-5" />}
+              />
+            </div>
+            <AdminQuickActions
+              sections={adminSections.slice(1, 9)}
+              onSelect={chooseAdminSection}
+            />
+          </div>
+        </Tab>
+
+        <Tab id="revenue" key="revenue" title="الإيرادات والتحصيل">
+          <RevenueOverview orders={props.orders} />
+        </Tab>
+
+        <Tab id="activity" key="activity" title="النشاط والأداء">
+          <BehaviorAnalyticsOverview
+            analytics={props.behaviorAnalytics}
+            places={props.places}
+            drivers={props.marketingDrivers}
+          />
+        </Tab>
+
+        <Tab id="health" key="health" title="سلامة النظام">
+          <SystemHealthCard
+            currentClientErrors={currentClientErrors}
+            historicalClientErrors={historicalClientErrors}
+            currentErrorCount={currentErrorCount}
+            currentRelease={props.currentRelease}
+          />
+        </Tab>
+
         <Tab
           id="marketing"
           key="marketing"
@@ -1182,6 +1198,221 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
   );
 }
 
+function AdminQuickActions({
+  sections,
+  onSelect,
+}: {
+  sections: Array<{
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    count?: number;
+  }>;
+  onSelect: (section: string) => void;
+}) {
+  return (
+    <Card className="border border-zinc-200">
+      <CardHeader className="font-black">وصول سريع</CardHeader>
+      <CardBody className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        {sections.map((section) => (
+          <button
+            key={section.key}
+            type="button"
+            onClick={() => onSelect(section.key)}
+            className="flex min-h-20 min-w-0 flex-col items-start justify-between gap-2 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 text-start transition-colors hover:border-zinc-300 hover:bg-white"
+          >
+            <span className="flex size-9 items-center justify-center rounded-xl bg-white text-zinc-900 shadow-sm">
+              {section.icon}
+            </span>
+            <span className="flex w-full items-end justify-between gap-2">
+              <span className="min-w-0 text-xs font-black leading-5 text-zinc-800">
+                {section.label}
+              </span>
+              {typeof section.count === 'number' && (
+                <bdi dir="ltr" className="shrink-0 text-xs font-black text-zinc-500">
+                  {section.count}
+                </bdi>
+              )}
+            </span>
+          </button>
+        ))}
+      </CardBody>
+    </Card>
+  );
+}
+
+function RevenueOverview({ orders }: { orders: Order[] }) {
+  const deliveredOrders = orders.filter((order) => order.status === 'delivered');
+  const deliveryFees = deliveredOrders.reduce(
+    (total, order) => total + Number(order.delivery_fee ?? 0),
+    0,
+  );
+  const collectionAmounts = orders.reduce(
+    (total, order) => total + Number(order.collection_amount ?? 0),
+    0,
+  );
+  const ordersWithFees = orders.filter((order) => Number(order.delivery_fee ?? 0) > 0);
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-3xl border border-zinc-200 bg-zinc-950 p-5 text-white sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-bold text-zinc-400">رسوم التوصيل للطلبات المكتملة</p>
+            <p className="mt-2 text-3xl font-black tabular-nums sm:text-4xl">
+              {formatCurrency(deliveryFees)}
+            </p>
+          </div>
+          <Chip className="w-fit bg-white/10 text-white">
+            {deliveredOrders.length.toLocaleString('ar-EG')} طلب مكتمل
+          </Chip>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <FinancialMetric label="إجمالي رسوم التوصيل" value={deliveryFees} />
+        <FinancialMetric label="مبالغ التحصيل المسجلة" value={collectionAmounts} />
+        <FinancialMetric label="طلبات برسوم محددة" value={ordersWithFees.length} isCurrency={false} />
+        <FinancialMetric label="إجمالي الطلبات المحملة" value={orders.length} isCurrency={false} />
+      </div>
+
+      <Card className="border border-zinc-200">
+        <CardHeader className="flex flex-col items-start gap-1">
+          <span className="font-black">آخر الرسوم المسجلة</span>
+          <span className="text-xs font-semibold text-zinc-500">
+            الأرقام مبنية على آخر {orders.length.toLocaleString('ar-EG')} طلب محمّل في لوحة الإدارة.
+          </span>
+        </CardHeader>
+        <CardBody className="gap-2">
+          {ordersWithFees.length ? ordersWithFees.slice(0, 12).map((order) => (
+            <article
+              key={order.id}
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-zinc-200 p-3"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black">#{order.public_code} — {order.recipient_name}</p>
+                <p className="mt-1 truncate text-xs text-zinc-500">{order.delivery_area} · {order.status}</p>
+              </div>
+              <p className="text-sm font-black tabular-nums text-emerald-700">
+                {formatCurrency(Number(order.delivery_fee ?? 0))}
+              </p>
+            </article>
+          )) : (
+            <EmptyState text="لا توجد رسوم توصيل مسجلة في الطلبات الحالية." />
+          )}
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+
+function FinancialMetric({
+  label,
+  value,
+  isCurrency = true,
+}: {
+  label: string;
+  value: number;
+  isCurrency?: boolean;
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-3 sm:p-4">
+      <p className="text-xs font-bold leading-5 text-zinc-500">{label}</p>
+      <p className="mt-2 truncate text-lg font-black tabular-nums text-zinc-950 sm:text-2xl">
+        {isCurrency ? formatCurrency(value) : value.toLocaleString('ar-EG')}
+      </p>
+    </div>
+  );
+}
+
+function SystemHealthCard({
+  currentClientErrors,
+  historicalClientErrors,
+  currentErrorCount,
+  currentRelease,
+}: {
+  currentClientErrors: ClientErrorSummary[];
+  historicalClientErrors: ClientErrorSummary[];
+  currentErrorCount: number;
+  currentRelease: string;
+}) {
+  return (
+    <Card
+      className={
+        currentClientErrors.length > 0
+          ? 'border border-amber-200 bg-amber-50/50'
+          : 'border border-emerald-200 bg-emerald-50/50'
+      }
+    >
+      <CardHeader className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="font-black">سلامة الإصدار الحالي</span>
+          <p className="mt-1 truncate text-xs text-zinc-500" dir="ltr">
+            {currentRelease.slice(0, 12)}
+          </p>
+        </div>
+        <Chip className={currentClientErrors.length > 0 ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-900'}>
+          {currentErrorCount > 0 ? `${currentErrorCount} حدث` : 'سليم'}
+        </Chip>
+      </CardHeader>
+      <CardBody className="gap-2">
+        {currentClientErrors.length === 0 && (
+          <p className="rounded-xl border border-emerald-200 bg-white p-3 text-sm font-bold text-emerald-900">
+            لا توجد أخطاء مسجلة على الإصدار الحالي.
+          </p>
+        )}
+        {currentClientErrors.slice(0, 10).map((item) => (
+          <article key={item.id} className="grid gap-2 rounded-xl border border-amber-200 bg-white p-3 text-xs sm:grid-cols-[1fr_auto]">
+            <div className="min-w-0">
+              <p className="truncate font-black">{item.event_type} · {item.route}</p>
+              <p className="mt-1 text-zinc-500">
+                {item.error_kind} · {item.browser_family} / {item.os_family} · بصمة {item.fingerprint.slice(0, 10)}
+              </p>
+            </div>
+            <div className="text-start font-bold tabular-nums sm:text-end">
+              <p>{item.occurrences} مرة</p>
+              <time dateTime={item.last_seen_at}>{formatCairoDateTime(item.last_seen_at)}</time>
+            </div>
+          </article>
+        ))}
+        {historicalClientErrors.length > 0 && (
+          <details className="group rounded-xl border border-zinc-200 bg-white">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-bold">
+              <span>أخطاء إصدارات سابقة — للرجوع فقط</span>
+              <Chip size="sm" variant="flat">
+                {historicalClientErrors.reduce((total, item) => total + item.occurrences, 0)} حدث
+              </Chip>
+            </summary>
+            <div className="space-y-2 border-t border-zinc-100 p-3">
+              {historicalClientErrors.slice(0, 10).map((item) => (
+                <article key={item.id} className="grid gap-2 rounded-xl bg-zinc-50 p-3 text-xs sm:grid-cols-[1fr_auto]">
+                  <div className="min-w-0">
+                    <p className="truncate font-black">{item.event_type} · {item.route}</p>
+                    <p className="mt-1 text-zinc-500">{item.error_kind} · {item.browser_family} / {item.os_family}</p>
+                    <p className="mt-1 text-zinc-400" dir="ltr">{item.release.slice(0, 12)} · {item.fingerprint.slice(0, 10)}</p>
+                  </div>
+                  <div className="text-start font-bold tabular-nums sm:text-end">
+                    <p>{item.occurrences} مرة</p>
+                    <time dateTime={item.last_seen_at}>{formatCairoDateTime(item.last_seen_at)}</time>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </details>
+        )}
+      </CardBody>
+    </Card>
+  );
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('ar-EG', {
+    style: 'currency',
+    currency: 'EGP',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 const analyticsActionLabels: Record<string, string> = {
   place_open: 'فتح تفاصيل مكان',
   driver_open: 'فتح تفاصيل كابتن',
@@ -1430,12 +1661,12 @@ function Metric({
 }) {
   return (
     <Card className="border border-zinc-200">
-      <CardBody className="flex flex-row items-center justify-between">
-        <div>
-          <p className="text-sm text-zinc-500">{label}</p>
-          <p className="text-2xl font-black">{value}</p>
+      <CardBody className="flex min-w-0 flex-row items-center justify-between gap-2 p-3 sm:p-4">
+        <div className="min-w-0">
+          <p className="text-xs font-bold leading-5 text-zinc-500 sm:text-sm">{label}</p>
+          <p className="text-2xl font-black tabular-nums">{value}</p>
         </div>
-        <div className="rounded-xl bg-zinc-100 p-3 text-zinc-800">{icon}</div>
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-800 sm:size-11">{icon}</div>
       </CardBody>
     </Card>
   );
@@ -1450,13 +1681,21 @@ function OrdersTab({ orders }: { orders: Order[] }) {
           orders.map((order) => (
             <div
               key={order.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200 p-3 text-sm"
+              className="grid gap-2 rounded-xl border border-zinc-200 p-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
             >
-              <span className="font-bold">
-                #{order.public_code} — {order.recipient_name}
-              </span>
-              <span>{order.delivery_area}</span>
-              <Chip className="bg-zinc-100 text-zinc-700">{order.status}</Chip>
+              <div className="min-w-0">
+                <p className="truncate font-bold">#{order.public_code} — {order.recipient_name}</p>
+                <p className="mt-1 truncate text-xs text-zinc-500">{order.delivery_area}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs font-bold text-zinc-600">
+                {order.delivery_fee != null && (
+                  <span>التوصيل: {formatCurrency(Number(order.delivery_fee))}</span>
+                )}
+                {order.collection_amount != null && (
+                  <span>التحصيل: {formatCurrency(Number(order.collection_amount))}</span>
+                )}
+              </div>
+              <Chip className="w-fit bg-zinc-100 text-zinc-700">{order.status}</Chip>
             </div>
           ))
         ) : (
