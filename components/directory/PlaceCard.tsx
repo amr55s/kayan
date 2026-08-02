@@ -86,8 +86,8 @@ export function PlaceCard({
               {getCategoryLabel(place.category)}
             </Chip>
             {place.is_featured && (
-              <Chip className="h-6 border border-zinc-300 bg-white text-[10px] font-semibold text-zinc-700">
-                <Star className="me-1 size-3 text-zinc-600" aria-hidden="true" />
+              <Chip className="h-6 border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] text-[10px] font-black text-[var(--dairtak-orange-deep)]">
+                <Star className="me-1 size-3 fill-current" aria-hidden="true" />
                 مميز
               </Chip>
             )}
@@ -263,7 +263,7 @@ export function PlaceCard({
             targetType: 'place',
             targetKey: place.id,
           })}
-          startContent={<MessageCircle className="size-4" aria-hidden="true" />}
+          startContent={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
           className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-zinc-100 px-2 text-xs font-bold text-zinc-900 hover:bg-zinc-200 sm:text-sm"
         >
           واتساب

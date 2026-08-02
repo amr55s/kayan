@@ -72,7 +72,7 @@ export default function Error({
             variant="bordered"
             startContent={<Home className="w-4 h-4" />}
           >
-            العودة إلى كيان سيتي سبوت
+            العودة إلى ديرتك
           </Button>
         </div>
       </div>

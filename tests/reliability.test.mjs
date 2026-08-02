@@ -41,7 +41,7 @@ test('the public hero is actionable and remains anchored to directory search', (
   const couponOffer = read('components/directory/CouponOffer.tsx');
   const deliveryBar = read('components/delivery/DeliveryBar.tsx');
   const driverCard = read('components/delivery/DriverCard.tsx');
-  assert.match(directory, /كل اللي تحتاجه في كيان، في مكان واحد\./);
+  assert.match(directory, /كل اللي تحتاجه في ديرتك، في مكان واحد\./);
   assert.match(directory, /bg-zinc-950/);
   assert.doesNotMatch(directory, /FECF34/i);
   assert.match(directory, /id="directory-search"/);
@@ -50,12 +50,15 @@ test('the public hero is actionable and remains anchored to directory search', (
   assert.match(directory, /placeholder:!text-zinc-500/);
   assert.match(directory, /hero_whatsapp_group/);
   assert.doesNotMatch(directory, /(?:amber|yellow|orange|emerald)-/);
-  assert.doesNotMatch(placeCard, /(?:amber|yellow|orange)-/);
-  assert.doesNotMatch(couponOffer, /(?:amber|yellow|orange|emerald)-/);
+  assert.doesNotMatch(placeCard, /\b(?:bg|text|border)-(?:amber|yellow|orange)-/);
+  assert.match(placeCard, /dairtak-orange-soft/);
+  assert.match(placeCard, /MessageCircle className="[^"]*dairtak-orange/);
+  assert.doesNotMatch(couponOffer, /\b(?:bg|text|border)-(?:amber|yellow|orange|emerald)-/);
+  assert.match(couponOffer, /MessageCircle className="[^"]*dairtak-orange/);
   assert.match(categoryBar, /CATEGORIES\.filter\(\(cat\) => cat\.id !== 'all'\)/);
   assert.match(categoryBar, /h-16/);
   assert.match(categoryBar, /bg-zinc-950 text-white/);
-  assert.match(deliveryBar, /bg-zinc-950/);
+  assert.match(deliveryBar, /bg-zinc-100\/90/);
   assert.match(deliveryBar, /sortedDrivers\.map/);
   assert.match(deliveryBar, /Number\(isConnected\(second\)\) - Number\(isConnected\(first\)\)/);
   assert.match(driverCard, /isAvailable &&/);
@@ -114,7 +117,7 @@ test('store category follows restaurants and supports product-focused listings',
 
 test('native place sharing includes the direct URL only once', () => {
   const share = read('lib/share.ts');
-  assert.match(share, /const text = `\$\{title\}\\n\$\{phone\}\\nعبر كيان سيتي سبوت`/);
+  assert.match(share, /const text = `\$\{title\}\\n\$\{phone\}\\nعبر ديرتك`/);
   assert.match(share, /navigator\.share\(\{ title: .* text, url \}\)/);
   assert.match(share, /fallbackWhatsApp\(`\$\{text\}\\n\$\{url\}`\)/);
 });
@@ -232,7 +235,7 @@ test('PWA caches only public shell data and provides an iOS-safe install path', 
   assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\)/);
   assert.match(serviceWorker, /isNextDataRequest/);
   assert.match(serviceWorker, /offline\.html/);
-  assert.match(serviceWorker, /kayan-v7-modal-portal-stores/);
+  assert.match(serviceWorker, /dairtak-v1-brand/);
   assert.match(serviceWorker, /event\.waitUntil\(self\.skipWaiting\(\)\)/);
   assert.match(installer, /إضافة إلى الشاشة الرئيسية/);
   assert.match(installer, /updateViaCache: 'none'/);

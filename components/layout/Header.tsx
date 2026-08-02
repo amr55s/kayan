@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Image from 'next/image';
 import {
   Button,
   Modal,
@@ -17,6 +16,7 @@ import { createClient } from '@/lib/supabase/client';
 import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
 import { SITE_NAME, SITE_NAME_AR } from '@/lib/brand';
 import { trackSiteEvent } from '@/lib/analytics/client';
+import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   isJoinOpen: boolean;
@@ -78,21 +78,13 @@ export const Header: React.FC<HeaderProps> = ({
           aria-label="التنقل الرئيسي"
           className="mx-auto flex h-16 w-full max-w-[90rem] items-center justify-between gap-1 overflow-hidden px-2 sm:px-5"
         >
-        <div className="flex w-11 min-w-11 shrink-0 items-center sm:w-auto">
-          <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label={`${SITE_NAME} - الصفحة الرئيسية`}>
-            <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200 shadow-sm">
-              <Image
-                src="/kayan-services-logo.png"
-                alt={`شعار ${SITE_NAME}`}
-                width={44}
-                height={44}
-                className="size-11 object-contain"
-                priority
-              />
-            </span>
-            <span className="hidden truncate text-[17px] font-black tracking-tight text-zinc-950 sm:block sm:text-lg">
-              {SITE_NAME}
-            </span>
+        <div className="flex min-w-[8.75rem] shrink-0 items-center sm:min-w-[10rem]">
+          <Link href="/" className="flex min-w-0 items-center" aria-label={`${SITE_NAME} - الصفحة الرئيسية`}>
+            <BrandLogo
+              variant="full"
+              className="h-10 w-auto max-w-[8.75rem] sm:h-11 sm:max-w-[10rem]"
+              priority
+            />
           </Link>
         </div>
 
@@ -102,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({
               href="/guide"
               className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-100"
             >
-              <BookOpen className="size-4" aria-hidden="true" />
+              <BookOpen className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />
               طريقة الاستخدام
             </Link>
           </div>
@@ -111,8 +103,8 @@ export const Header: React.FC<HeaderProps> = ({
               href="/share"
               className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-100"
             >
-              <Share2 className="size-4" aria-hidden="true" />
-              شارك كيان
+              <Share2 className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />
+              شارك ديرتك
             </Link>
           </div>
           {onOpenFeedbackModal && (
@@ -170,13 +162,10 @@ export const Header: React.FC<HeaderProps> = ({
                   className="flex h-full w-full max-w-[22rem] flex-col rounded-none rounded-r-[28px] border-r border-zinc-200 bg-white shadow-2xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-300 sm:max-w-[24rem]"
                 >
           <Drawer.Header className="flex items-center justify-between border-b border-zinc-100 px-4 py-4">
-            <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center overflow-hidden rounded-xl border border-zinc-200 bg-white">
-                <Image src="/kayan-services-logo.png" alt="" width={40} height={40} />
-              </span>
+            <div className="flex min-w-0 items-center gap-3">
+              <BrandLogo variant="full" className="h-11 w-auto max-w-[9.5rem] shrink-0" />
               <div>
-                <h2 className="text-sm font-black text-zinc-950">{SITE_NAME}</h2>
-                <p className="mt-0.5 text-[11px] font-semibold text-zinc-500">كل خدمات كيان في مكان واحد</p>
+                <p className="text-[11px] font-semibold text-zinc-500">كل خدمات ديرتك في مكان واحد</p>
               </div>
             </div>
             <Button
@@ -198,7 +187,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <BookOpen className="size-5" aria-hidden="true" /> طريقة الاستخدام
               </Link>
               <Link href="/share" onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100">
-                <Share2 className="size-5" aria-hidden="true" /> شارك كيان
+                <Share2 className="size-5 text-[var(--dairtak-orange)]" aria-hidden="true" /> شارك ديرتك
               </Link>
               {onOpenFeedbackModal && (
                 <button type="button" onClick={() => chooseMenu(onOpenFeedbackModal)} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100">
@@ -270,7 +259,7 @@ export const Header: React.FC<HeaderProps> = ({
                     startContent={<Share2 className="size-4" aria-hidden="true" />}
                     className="border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900"
                   >
-                    شارك كيان
+                    شارك ديرتك
                   </Button>
                 </div>
                 <Button

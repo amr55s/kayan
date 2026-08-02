@@ -168,7 +168,7 @@ export function MerchantOrderWorkspace({
       <section>
         <h1 className="text-2xl font-black">مساحة المحل</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          إدارة بيانات كيان سيتي سبوت وتشغيل طلبات التوصيل من مكان واحد.
+          إدارة بيانات ديرتك وتشغيل طلبات التوصيل من مكان واحد.
         </p>
       </section>
       {message && (
@@ -409,7 +409,7 @@ function MerchantDirectoryManager({
           <Store className="size-8 text-zinc-400" />
           <p className="font-bold">لا يوجد مكان عام مرتبط بحسابك بعد.</p>
           <p className="text-sm text-zinc-500">
-            اطلب من الإدارة ربط فرع المحل ببطاقة المكان في كيان سيتي سبوت.
+            اطلب من الإدارة ربط فرع المحل ببطاقة المكان في ديرتك.
           </p>
         </CardBody>
       </Card>
@@ -492,7 +492,7 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
           result.success
             ? uploadResult.failedFiles.length
               ? `تم حفظ التعديلات، لكن تعذر إرفاق ${uploadResult.failedFiles.length} من الصور. يمكنك إعادة محاولة الصور الفاشلة.`
-              : 'تم حفظ التعديلات وظهرت في كيان سيتي سبوت.'
+              : 'تم حفظ التعديلات وظهرت في ديرتك.'
             : result.message,
         );
         if (result.success) setFiles([]);

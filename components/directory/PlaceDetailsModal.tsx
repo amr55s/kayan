@@ -74,7 +74,7 @@ function DetailLink({
   const tones = {
     light: 'border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100',
     dark: 'border-zinc-900 bg-zinc-950 text-white hover:bg-zinc-800',
-    green: 'border-zinc-900 bg-zinc-950 text-white hover:bg-zinc-800',
+    green: 'border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100',
     blue: 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100',
   };
   return (
@@ -405,8 +405,8 @@ export function PlaceDetailsModal({
                           {getCategoryLabel(place.category)}
                         </Chip>
                         {place.is_featured && (
-                          <Chip className="border border-zinc-300 bg-white text-xs font-bold text-zinc-700">
-                            <Star className="me-1 size-3.5" aria-hidden="true" />
+                          <Chip className="border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] text-xs font-black text-[var(--dairtak-orange-deep)]">
+                            <Star className="me-1 size-3.5 fill-current" aria-hidden="true" />
                             مكان مميز
                           </Chip>
                         )}
@@ -440,7 +440,7 @@ export function PlaceDetailsModal({
                           {place.whatsapp_group_url && (
                             <DetailLink
                               href={place.whatsapp_group_url}
-                              icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                              icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                               label="انضم عبر WhatsApp"
                               tone="green"
                               analyticsEvent="group_click"
@@ -517,7 +517,7 @@ export function PlaceDetailsModal({
                       />
                       <DetailLink
                         href={whatsappUrl}
-                        icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                        icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                         label="WhatsApp"
                         tone="green"
                         analyticsEvent="whatsapp_click"
@@ -558,7 +558,7 @@ export function PlaceDetailsModal({
               <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2 rounded-b-[1.5rem] border-t border-zinc-200 bg-white/95 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:hidden">
                 <DetailLink
                   href={whatsappUrl}
-                  icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                  icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                   label="WhatsApp"
                   tone="green"
                   analyticsEvent="whatsapp_click"
@@ -577,7 +577,7 @@ export function PlaceDetailsModal({
                     {place.whatsapp_group_url && (
                       <DetailLink
                         href={place.whatsapp_group_url}
-                        icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                        icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                         label="الجروب"
                         tone="green"
                         analyticsEvent="group_click"

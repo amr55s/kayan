@@ -74,6 +74,9 @@
     --kayan-surface: #fafafa;
     --kayan-muted: #71717a;
     --kayan-border: #e4e4e7;
+    --dairtak-orange: #ff7a1a;
+    --dairtak-orange-soft: #fff1e7;
+    --dairtak-orange-deep: #d95500;
   }
   * {
     box-sizing: border-box;
@@ -101,9 +104,14 @@
     -webkit-tap-highlight-color: transparent;
   }
   :focus-visible {
-    outline: 2px solid #18181b;
+    outline: 2px solid var(--dairtak-orange);
     outline-offset: 2px;
   }
+}
+
+::selection {
+  background: var(--dairtak-orange);
+  color: #09090b;
 }
 
 @media (max-width: 767px) {

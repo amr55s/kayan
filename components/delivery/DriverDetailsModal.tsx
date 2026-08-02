@@ -61,7 +61,7 @@ export function DriverDetailsModal({
               </div>
               <div className="flex gap-1">
                 <Button isIconOnly variant="light" aria-label="مشاركة الكابتن" onPress={share}>
-                  <Share2 className="size-5" aria-hidden="true" />
+                  <Share2 className="size-5 text-[var(--dairtak-orange)]" aria-hidden="true" />
                 </Button>
                 <Button
                   isIconOnly
@@ -103,11 +103,11 @@ export function DriverDetailsModal({
                 as="a"
                 href={formatWhatsAppUrl(
                   driver.whatsapp || driver.phone,
-                  'السلام عليكم، محتاج توصيل طلب دليفري عبر كيان سيتي سبوت',
+                  'السلام عليكم، محتاج توصيل طلب دليفري عبر ديرتك',
                 )}
                 target="_blank"
                 rel="noopener noreferrer"
-                startContent={<MessageCircle className="size-5" aria-hidden="true" />}
+                startContent={<MessageCircle className="size-5 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                 onPress={() => trackSiteEvent('whatsapp_click', {
                   targetType: 'driver',
                   targetKey: driver.id,

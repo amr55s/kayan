@@ -570,7 +570,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   startContent={<Trash2 className="w-4 h-4" />}
                   isLoading={isSubmitting}
                   onClick={async () => {
-                    if (confirm(`هل أنت متأكد من حذف مكان "${title || place.title}" نهائياً من كيان سيتي سبوت؟`)) {
+                    if (confirm(`هل أنت متأكد من حذف مكان "${title || place.title}" نهائياً من ديرتك؟`)) {
                       setIsSubmitting(true);
                       const res = await serverDeleteActivePlace(place.id);
                       setIsSubmitting(false);
@@ -599,7 +599,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   startContent={!isSubmitting && <Check className="w-4 h-4" />}
                   className="font-bold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 px-6 h-11 shadow-sm rounded-xl"
                 >
-                  {mode === 'create' ? 'إضافة المكان ونشره في كيان سيتي سبوت' : 'حفظ التعديلات الحالية'}
+                  {mode === 'create' ? 'إضافة المكان ونشره في ديرتك' : 'حفظ التعديلات الحالية'}
                 </Button>
               </div>
             </ModalFooter>

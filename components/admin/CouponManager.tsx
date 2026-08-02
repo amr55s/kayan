@@ -321,7 +321,7 @@ export function CouponManager({
                   <Input
                     isRequired
                     label="اسم العرض"
-                    placeholder="مثال: خصم كيان 10%"
+                    placeholder="مثال: خصم ديرتك 10%"
                     maxLength={80}
                     value={draft.title}
                     onValueChange={(value) => setField('title', value)}
@@ -329,7 +329,7 @@ export function CouponManager({
                   <Input
                     isRequired
                     label="كود الكوبون"
-                    placeholder="KAYAN10"
+                    placeholder="DAIRTAK10"
                     maxLength={32}
                     value={draft.code}
                     onValueChange={(value) => setField('code', value.toUpperCase())}

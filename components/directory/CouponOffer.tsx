@@ -56,7 +56,7 @@ function CouponDetails({ coupon }: { coupon: StoreCoupon }) {
       <div className="rounded-2xl bg-zinc-950 p-4 text-white">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-bold text-zinc-300">عرض متاح عبر كيان</p>
+            <p className="text-xs font-bold text-zinc-300">عرض متاح عبر ديرتك</p>
             <h3 className="mt-1 text-xl font-black">{couponDiscount(coupon)}</h3>
             <p className="mt-1 text-xs font-semibold text-zinc-300">{minimumOrder(coupon)}</p>
           </div>
@@ -214,9 +214,9 @@ export function CouponOffer({ place }: { place: Place }) {
                     targetType: 'place',
                     targetKey: place.id,
                   })}
-                  startContent={<MessageCircle className="size-5" aria-hidden="true" />}
+                  startContent={<MessageCircle className="size-5 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                   endContent={<Tag className="size-4" aria-hidden="true" />}
-                  className="min-h-12 min-w-0 bg-zinc-950 px-3 text-sm font-black text-white hover:bg-zinc-800 sm:px-4 sm:text-base"
+                  className="min-h-12 min-w-0 border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] px-3 text-sm font-black text-zinc-950 hover:bg-[#ffe7d7] sm:px-4 sm:text-base"
                 >
                   استخدم الكوبون على واتساب
                 </Button>

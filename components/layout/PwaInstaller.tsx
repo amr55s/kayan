@@ -54,7 +54,7 @@ export function PwaInstaller() {
       if ('caches' in window) {
         void window.caches.keys().then((keys) =>
           Promise.all(keys
-            .filter((key) => key.startsWith('kayan-'))
+            .filter((key) => key.startsWith('kayan-') || key.startsWith('dairtak-'))
             .map((key) => window.caches.delete(key))),
         ).catch(() => undefined);
       }
@@ -226,7 +226,7 @@ export function PwaInstaller() {
             </span>
             <div className="min-w-0">
               <p className="truncate text-sm font-black">
-                {updateReady ? 'تحديث جديد جاهز' : 'ثبّت KAYAN CITY SPOT'}
+                {updateReady ? 'تحديث جديد جاهز' : 'ثبّت DAIRTAK'}
               </p>
               <p className="truncate text-[11px] text-zinc-400">
                 {updateReady ? 'حدّث عندما تكون جاهزًا' : 'وصول أسرع وتجربة ملء الشاشة'}
@@ -290,7 +290,7 @@ export function PwaInstaller() {
               <p className="text-sm font-semibold leading-6">اختر «إضافة إلى الشاشة الرئيسية» ثم «إضافة».</p>
             </div>
             <p className="text-xs leading-6 text-zinc-500">
-              افتح KAYAN CITY SPOT بعد ذلك من الأيقونة ليعمل بواجهة مستقلة وملء الشاشة.
+              افتح DAIRTAK بعد ذلك من الأيقونة ليعمل بواجهة مستقلة وملء الشاشة.
             </p>
             <Button
               onPress={() => setShowIosGuide(false)}

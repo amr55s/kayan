@@ -322,7 +322,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
     startTransition(async () => {
       try {
         const result = await linkBranchToPlace(branchId, placeId || null);
-        if (result.success) complete('تم تحديث ارتباط الفرع بكيان سيتي سبوت.');
+        if (result.success) complete('تم تحديث ارتباط الفرع بديرتك.');
         else setMessage(result.message);
       } catch (error) {
         recoverFromActionError(error);
@@ -680,7 +680,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
           title={`بلاغات التعديل (${directoryReports.length})`}
         >
           <Card className="border border-zinc-200">
-            <CardHeader className="font-black">تعديلات وبلاغات زوار كيان سيتي سبوت</CardHeader>
+            <CardHeader className="font-black">تعديلات وبلاغات زوار ديرتك</CardHeader>
             <CardBody className="gap-3">
               {directoryReports.length ? (
                 directoryReports.map((request) => (
@@ -858,7 +858,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
               </Card>
 
               <Card className="border border-zinc-200 lg:col-span-2">
-                <CardHeader className="font-black">إنشاء فرع وربطه بكيان سيتي سبوت</CardHeader>
+                <CardHeader className="font-black">إنشاء فرع وربطه بديرتك</CardHeader>
                 <CardBody>
                   <form
                     className="grid gap-3 sm:grid-cols-2"
@@ -1728,7 +1728,7 @@ function DirectoryTab({
   return (
     <>
       <Tabs
-        aria-label="إدارة كيان سيتي سبوت"
+        aria-label="إدارة ديرتك"
         className="kayan-admin-tabs min-w-0"
         classNames={{
           tabList: 'max-w-full overflow-x-auto rounded-2xl bg-zinc-100 p-1 no-scrollbar',

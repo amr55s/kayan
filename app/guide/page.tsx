@@ -17,8 +17,8 @@ import { PublicPageHeader } from '@/components/layout/PublicPageHeader';
 import { GuideAnalytics } from '@/components/marketing/GuideAnalytics';
 
 export const metadata: Metadata = {
-  title: 'طريقة استخدام كيان سيتي سبوت',
-  description: 'شرح استخدام دليل كيان للسكان والمحلات وكباتن التوصيل.',
+  title: 'طريقة استخدام ديرتك',
+  description: 'شرح استخدام دليل ديرتك للسكان والمحلات وكباتن التوصيل.',
 };
 
 const residentSteps = [
@@ -60,7 +60,7 @@ export default function GuidePage() {
             سهل، محلي، وبدون عمولات
           </span>
           <h1 className="mx-auto mt-5 max-w-3xl text-3xl font-black leading-tight sm:text-5xl">
-            كل حاجة في كيان سيتي سبوت واضحة من أول ضغطة
+            كل حاجة في ديرتك واضحة من أول ضغطة
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-zinc-600 sm:text-base">
             اختر القسم المناسب لك واعرف إزاي تبحث، تضيف نشاطك، أو تبدأ ككابتن توصيل.
@@ -135,7 +135,7 @@ export default function GuidePage() {
               </div>
               <Link href="/share" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-emerald-800">
                 <Share2 className="size-4" />
-                شارك كيان
+                شارك ديرتك
               </Link>
             </div>
           </section>

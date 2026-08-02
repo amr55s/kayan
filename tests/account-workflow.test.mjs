@@ -103,8 +103,11 @@ test('selected category text keeps high contrast', () => {
   assert.doesNotMatch(categoryBar, /transition-all/);
 });
 
-test('public branding uses KAYAN CITY SPOT consistently', () => {
+test('public branding uses DAIRTAK consistently', () => {
   const brand = read('lib/brand.ts');
+  const brandLogo = read('components/layout/BrandLogo.tsx');
+  const header = read('components/layout/Header.tsx');
+  const directory = read('components/directory/DirectoryView.tsx');
   const manifest = read('public/manifest.json');
   const serviceWorker = read('public/sw.js');
   const publicFiles = [
@@ -116,12 +119,15 @@ test('public branding uses KAYAN CITY SPOT consistently', () => {
     'lib/share.ts',
   ];
 
-  assert.match(brand, /export const SITE_NAME = 'KAYAN CITY SPOT';/);
-  assert.match(manifest, /"name": "KAYAN CITY SPOT",/);
-  assert.match(serviceWorker, /KAYAN CITY SPOT/);
+  assert.match(brand, /export const SITE_NAME = 'DAIRTAK';/);
+  assert.match(manifest, /"name": "DAIRTAK",/);
+  assert.match(serviceWorker, /DAIRTAK/);
+  assert.match(brandLogo, /src: '\/brand\/dairtak-logo\.svg'/);
+  assert.match(header, /<BrandLogo[\s\S]{0,100}variant="full"/);
+  assert.doesNotMatch(directory, /<BrandLogo/);
   assert.match(
-    read('components/directory/DirectoryView.tsx'),
-    /انضم لجروب KAYAN CITY SPOT على واتساب/,
+    directory,
+    /انضم لجروب DAIRTAK على واتساب/,
   );
 
   for (const file of publicFiles) {
@@ -146,7 +152,7 @@ test('WhatsApp support link stays visible across the whole site', () => {
   assert.match(groupButton, /size-12/);
   assert.match(groupButton, /sm:size-auto/);
   assert.match(groupButton, /fixed bottom-/);
-  assert.match(groupButton, /جروب KAYAN CITY SPOT/);
+  assert.match(groupButton, /جروب DAIRTAK/);
   assert.match(groupButton, /انضم عبر واتساب/);
   assert.doesNotMatch(groupButton, /01094552421/);
   assert.match(read('lib/community.ts'), /chat\.whatsapp\.com/);
@@ -192,7 +198,8 @@ test('drivers can manage a safe public avatar from their dashboard', () => {
   assert.match(workspace, /accept="image\/jpeg,image\/png,image\/webp"/);
   assert.match(workspace, /تغيير صورة الكابتن|إضافة صورة الكابتن/);
   assert.match(card, /src=\{driver\.avatar_url \|\| undefined\}/);
-  assert.match(card, /bg-gradient-to-br from-white via-zinc-50 to-zinc-200\/90/);
+  assert.match(card, /rounded-\[24px\] border border-zinc-200 bg-white/);
+  assert.match(card, /rounded-\[18px\] bg-zinc-50/);
   assert.match(migration, /add column if not exists avatar_url text/);
   assert.match(migration, /'driver-avatars'/);
   assert.match(migration, /file_size_limit/);

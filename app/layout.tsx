@@ -41,7 +41,10 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: '#09090b',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+  ],
 };
 
 export default function RootLayout({
@@ -53,7 +56,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" className="light" suppressHydrationWarning>
       <body
-        className="min-h-screen bg-zinc-50 font-sans text-zinc-950 antialiased selection:bg-zinc-900 selection:text-white"
+        className="min-h-screen bg-zinc-50 font-sans text-zinc-950 antialiased"
         suppressHydrationWarning
       >
         <a

@@ -35,8 +35,8 @@ const FEEDBACK_TYPES: { id: FeedbackType; label: string; description: string }[]
   { id: 'phone_change', label: 'تغيير رقم الهاتف أو الواتساب', description: 'تحديث أرقام التواصل' },
   { id: 'details_update', label: 'إضافة جروب أو عنوان أو خريطة', description: 'اقتراح روابط التواصل والموقع' },
   { id: 'report_issue', label: 'الإبلاغ عن بيانات غير صحيحة أو مكان مغلق', description: 'التنبيه لمشكلة بالبيانات' },
-  { id: 'general_suggestion', label: 'اقتراح أو ملاحظة عامة', description: 'ملاحظات لتطوير كيان سيتي سبوت' },
-  { id: 'rating', label: 'تقييم تجربتك مع كيان سيتي سبوت', description: 'شاركنا تقييمك من نجمة إلى خمس نجوم' },
+  { id: 'general_suggestion', label: 'اقتراح أو ملاحظة عامة', description: 'ملاحظات لتطوير ديرتك' },
+  { id: 'rating', label: 'تقييم تجربتك مع ديرتك', description: 'شاركنا تقييمك من نجمة إلى خمس نجوم' },
 ];
 
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({
@@ -184,7 +184,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       if (selectedFiles.length) setProcessingMsg('جاري إرسال الطلب...');
       const selectedPlace = fetchedPlaces.find((p) => p.id === targetPlaceId);
       const placeDisplayName = isOpinion
-        ? 'رأي عام في كيان سيتي سبوت'
+        ? 'رأي عام في ديرتك'
         : selectedPlace
           ? selectedPlace.title
           : placeNameOrPhone.trim() || 'مكان غير مدرج';
@@ -250,7 +250,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               </div>
               <div className="flex flex-col">
                 <span>التعديلات والاقتراحات والتقييم</span>
-                <span className="text-xs text-zinc-500 font-normal">رأيك يصل مباشرة إلى إدارة كيان سيتي سبوت</span>
+                <span className="text-xs text-zinc-500 font-normal">رأيك يصل مباشرة إلى إدارة ديرتك</span>
               </div>
             </ModalHeader>
 
@@ -265,8 +265,8 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   </h4>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-xs leading-relaxed font-semibold">
                     {feedbackType === 'rating' || feedbackType === 'general_suggestion'
-                      ? 'شكرًا لمشاركتنا رأيك. وصل مباشرة إلى الإدارة وسيتم مراجعته ضمن تطوير كيان سيتي سبوت.'
-                      : 'شكرًا لتواصلك مع كيان سيتي سبوت. سيتم مراجعة طلبك وتحديث البيانات قريبًا إن شاء الله.'}
+                      ? 'شكرًا لمشاركتنا رأيك. وصل مباشرة إلى الإدارة وسيتم مراجعته ضمن تطوير ديرتك.'
+                      : 'شكرًا لتواصلك مع ديرتك. سيتم مراجعة طلبك وتحديث البيانات قريبًا إن شاء الله.'}
                   </p>
                   {successWarning && (
                     <p className="max-w-xs rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-800">
@@ -346,7 +346,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   <div className="space-y-3">
                     <Select
                       labelPlacement="outside"
-                      label="اختر المكان المراد تعديله (من كيان سيتي سبوت)"
+                      label="اختر المكان المراد تعديله (من ديرتك)"
                       selectedKeys={[targetPlaceId]}
                       onChange={(e) => setTargetPlaceId(e.target.value)}
                       variant="bordered"

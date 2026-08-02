@@ -89,22 +89,22 @@ export function DeliveryBar({
   };
 
   return (
-    <section className="overflow-hidden rounded-[22px] border border-zinc-900 bg-zinc-950 py-2.5 text-white shadow-[0_12px_36px_-28px_rgba(0,0,0,.9)] sm:rounded-[26px] sm:py-3.5">
-      <div className="space-y-2.5">
+    <section className="overflow-hidden rounded-[26px] border border-zinc-200 bg-zinc-100/90 py-3 text-zinc-950 shadow-[0_18px_45px_-36px_rgba(0,0,0,.45)] sm:rounded-[30px] sm:py-4">
+      <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 px-3 sm:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="relative flex size-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white">
+            <div className="relative flex size-10 shrink-0 items-center justify-center rounded-[14px] border border-zinc-200 bg-white text-zinc-950 shadow-sm">
               <Bike className="size-4" aria-hidden="true" />
-              <span className="absolute -bottom-0.5 -end-0.5 size-2 rounded-full border-2 border-zinc-950 bg-sky-300" aria-hidden="true" />
+              <span className="absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-zinc-100 bg-[var(--dairtak-orange)]" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-sm font-black text-white">توصيل سريع</h2>
-                <Chip className="h-6 border border-white/15 bg-white/10 text-[10px] font-black text-white">
+                <h2 className="text-sm font-black text-zinc-950">توصيل سريع</h2>
+                <Chip className="h-6 border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] text-[10px] font-black text-[var(--dairtak-orange-deep)]">
                   {availableCount} متصل
                 </Chip>
               </div>
-              <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-400">المتصلون أولًا، وكل الكباتن ظاهرون.</p>
+              <p className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">المتصلون أولًا، وكل الكباتن ظاهرون.</p>
             </div>
           </div>
 
@@ -114,13 +114,13 @@ export function DeliveryBar({
                 onPress={renewPresence}
                 isLoading={pending}
                 startContent={!pending && <RefreshCw className="size-4" />}
-                className="min-h-10 border border-white/15 bg-white px-3 text-xs font-bold text-zinc-950 hover:bg-zinc-100"
+                className="min-h-10 border border-[#f47c22] bg-[var(--dairtak-orange)] px-3 text-xs font-black text-zinc-950 shadow-[0_8px_18px_-12px_rgba(244,124,34,.75)] hover:bg-[#ef721a]"
               >
                 جدّد تواجدي
               </Button>
             )}
             {renewalMessage && (
-              <span role="status" className="text-[10px] font-semibold text-zinc-300">
+              <span role="status" className="text-[10px] font-semibold text-zinc-600">
                 {renewalMessage}
               </span>
             )}
@@ -129,8 +129,8 @@ export function DeliveryBar({
 
         {sortedDrivers.length > 0 ? (
           <div
-            className="no-scrollbar grid w-full auto-cols-[min(80vw,292px)] grid-flow-col snap-x snap-mandatory gap-2 overflow-x-auto px-3 pb-0.5 scroll-px-3 scroll-smooth overscroll-x-contain sm:auto-cols-[292px] sm:px-4 sm:scroll-px-4"
-            aria-label="كل كباتن التوصيل في كيان سيتي سبوت"
+            className="no-scrollbar grid w-full auto-cols-[min(82vw,304px)] grid-flow-col snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-0.5 scroll-px-3 scroll-smooth overscroll-x-contain sm:auto-cols-[304px] sm:px-4 sm:scroll-px-4"
+            aria-label="كل كباتن التوصيل في ديرتك"
             tabIndex={0}
             onScroll={updateActiveDriver}
           >
@@ -145,13 +145,13 @@ export function DeliveryBar({
             ))}
           </div>
         ) : (
-          <div className="mx-3 rounded-xl border border-dashed border-white/20 bg-white/5 px-3 py-2.5 text-xs font-semibold text-zinc-300 sm:mx-4">
+          <div className="mx-3 rounded-2xl border border-dashed border-zinc-300 bg-white px-3 py-3 text-xs font-semibold text-zinc-600 sm:mx-4">
             لا توجد بطاقات كباتن منشورة حاليًا.
           </div>
         )}
 
         {sortedDrivers.length > 1 && (
-          <div className="flex items-center justify-center gap-2 px-3 text-[10px] font-semibold text-zinc-400 sm:hidden">
+          <div className="flex items-center justify-center gap-2 px-3 text-[10px] font-semibold text-zinc-500 sm:hidden">
             <ChevronLeft className="size-3.5" aria-hidden="true" />
             <span>اسحب لباقي الكباتن</span>
             <div className="flex items-center gap-1" aria-label={`${activeDriver + 1} من ${sortedDrivers.length}`}>
@@ -159,7 +159,7 @@ export function DeliveryBar({
                 <span
                   key={`${driver.source}:${driver.id}:dot`}
                   className={`h-1.5 rounded-full transition-[width,background-color] ${
-                    index === activeDriver ? 'w-4 bg-white' : 'w-1.5 bg-zinc-700'
+                    index === activeDriver ? 'w-4 bg-zinc-950' : 'w-1.5 bg-zinc-300'
                   }`}
                 />
               ))}

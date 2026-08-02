@@ -227,14 +227,11 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
 
       {/* Main Directory Body */}
       <main id="main-content" className="flex-1 pb-12">
-        <section className="border-b border-zinc-800 bg-zinc-950 px-3 py-2.5 text-white sm:px-4 sm:py-8">
+        <section className="relative overflow-hidden border-b border-zinc-800 bg-zinc-950 px-3 py-2.5 text-white sm:px-4 sm:py-8">
           <div className="mx-auto grid max-w-7xl items-center gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(420px,600px)] lg:gap-14">
             <div className="min-w-0 max-w-2xl">
-              <span className="inline-flex min-h-7 items-center gap-2 rounded-full border border-white/15 bg-white/[0.07] px-3 text-[10px] font-black tracking-wide text-white sm:min-h-8 sm:text-xs">
-                KAYAN CITY SPOT
-              </span>
-              <h1 className="mt-2 text-balance text-[1.35rem] font-black leading-[1.35] tracking-tight text-white min-[360px]:text-[1.5rem] sm:mt-3 sm:text-4xl sm:leading-[1.2]">
-                كل اللي تحتاجه في كيان، في مكان واحد.
+              <h1 className="text-balance text-[1.35rem] font-black leading-[1.35] tracking-tight text-white min-[360px]:text-[1.5rem] sm:text-4xl sm:leading-[1.2]">
+                كل اللي تحتاجه في ديرتك، في مكان واحد.
               </h1>
               <p className="mt-1.5 text-xs font-medium leading-5 text-zinc-300 sm:mt-3 sm:max-w-xl sm:text-base sm:leading-8">
                 مطاعم ومحلات وصيدليات وخدمات وكباتن توصيل.
@@ -263,7 +260,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 value={searchQuery}
                 onValueChange={setSearchQuery}
                 startContent={(
-                  <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white">
+                  <span className="relative flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--dairtak-orange)] text-white">
                     <Search className="size-4.5" aria-hidden="true" />
                   </span>
                 )}
@@ -283,10 +280,10 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                     targetType: 'feature',
                     targetKey: 'hero_whatsapp_group',
                   })}
-                  startContent={<MessageCircle className="size-4" aria-hidden="true" />}
-                  className="shrink-0 border border-white/15 bg-white px-4 text-xs font-black text-zinc-950 hover:bg-zinc-100"
+                  startContent={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
+                  className="shrink-0 border border-zinc-200 bg-white px-4 text-xs font-black text-zinc-950 hover:bg-zinc-100"
                 >
-                  اسأل جروب كيان
+                  اسأل جروب ديرتك
                 </Button>
               </div>
             </div>
@@ -370,7 +367,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               role="status"
               className="flex items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 text-sm text-zinc-700"
             >
-              <span>البطاقة المطلوبة غير موجودة أو تم حذفها، وتم إبقاؤك في دليل كيان.</span>
+              <span>البطاقة المطلوبة غير موجودة أو تم حذفها، وتم إبقاؤك في دليل ديرتك.</span>
               <Button
                 isIconOnly
                 variant="light"
@@ -419,7 +416,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               <p className="max-w-xs text-xs text-zinc-500">
                 {showFavoritesOnly
                   ? 'استخدم زر المفضلة داخل أي مكان لحفظه هنا.'
-                  : 'تأكد من كتابة الكلمات بشكل صحيح أو تواصل مع إدارة كيان سيتي سبوت لإضافة نشاطك.'}
+                  : 'تأكد من كتابة الكلمات بشكل صحيح أو تواصل مع إدارة ديرتك لإضافة نشاطك.'}
               </p>
             </div>
           )}
@@ -460,7 +457,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               طريقة استخدام الموقع
             </a>
             <a href="/share" className="inline-flex min-h-11 items-center rounded-xl px-3 font-bold text-zinc-700 hover:bg-zinc-100">
-              ساعدنا في نشر كيان
+              ساعدنا في نشر ديرتك
             </a>
           </div>
           <a
@@ -472,12 +469,12 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               targetKey: 'support_whatsapp_group',
             })}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
-            aria-label="الانضمام إلى جروب KAYAN CITY SPOT عبر واتساب"
+            aria-label="الانضمام إلى جروب ديرتك عبر واتساب"
           >
-            <MessageCircle className="size-4" aria-hidden="true" />
-            <span>انضم لجروب KAYAN CITY SPOT على واتساب</span>
+            <MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />
+            <span>انضم لجروب DAIRTAK على واتساب</span>
           </a>
-          <div>© {new Date(renderedAt).getFullYear()} KAYAN CITY SPOT</div>
+          <div>© {new Date(renderedAt).getFullYear()} DAIRTAK — ديرتك</div>
         </div>
       </footer>
 

@@ -149,7 +149,7 @@ function CampaignPreview({
             </Button>
             <a
               href={imageUrl}
-              download={`kayan-${campaign.campaign_code}.png`}
+              download={`dairtak-${campaign.campaign_code}.png`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-zinc-100 px-4 text-sm font-bold text-zinc-900"

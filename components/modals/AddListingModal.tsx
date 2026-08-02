@@ -278,7 +278,7 @@ export function AddListingModal({
                   )}
                   <div className="flex flex-wrap justify-center gap-2">
                     <Button as="a" href="/share" variant="flat" className="font-bold">
-                      ساعدنا في نشر كيان
+                      ساعدنا في نشر ديرتك
                     </Button>
                     <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
                       تم
