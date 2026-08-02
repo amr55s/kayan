@@ -7,7 +7,7 @@ import { fetchHomePageData } from '@/lib/supabase/queries';
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'شارك كيان سيتي سبوت',
+  title: 'شارك ديرتك',
   description: 'بطاقات جاهزة لمشاركة الأماكن وكباتن التوصيل داخل المنطقة.',
 };
 

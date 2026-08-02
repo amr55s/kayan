@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { trackSiteEvent } from '@/lib/analytics/client';
 import { WHATSAPP_GROUP_URL } from '@/lib/community';
 
@@ -16,6 +17,11 @@ function WhatsAppIcon() {
 }
 
 export function WhatsAppGroupButton() {
+  const pathname = usePathname();
+  if (['/admin', '/merchant', '/driver', '/login'].some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )) return null;
+
   return (
     <a
       href={WHATSAPP_GROUP_URL}
@@ -25,15 +31,15 @@ export function WhatsAppGroupButton() {
         targetType: 'feature',
         targetKey: 'support_whatsapp',
       })}
-      aria-label="الانضمام إلى جروب KAYAN CITY SPOT عبر واتساب"
-      className="kayan-support-fab group fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] end-3 z-50 inline-flex size-12 touch-manipulation items-center justify-center rounded-full border border-white/30 bg-emerald-600 p-0 text-white shadow-lg transition-[transform,background-color,box-shadow] hover:-translate-y-1 hover:bg-emerald-700 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 motion-reduce:transform-none sm:end-5 sm:size-auto sm:min-h-14 sm:gap-2.5 sm:py-2 sm:pe-4 sm:ps-2.5"
+      aria-label="الانضمام إلى جروب DAIRTAK عبر واتساب"
+      className="kayan-support-fab group fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] end-3 z-50 inline-flex size-12 touch-manipulation items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-950 shadow-[0_14px_32px_-18px_rgba(0,0,0,.45)] transition-[transform,background-color,box-shadow] hover:-translate-y-1 hover:bg-zinc-50 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#f47c22]/25 motion-reduce:transform-none motion-reduce:transition-none sm:end-5 sm:size-auto sm:min-h-14 sm:gap-2.5 sm:py-2 sm:pe-4 sm:ps-2.5"
     >
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-full text-white sm:size-10 sm:bg-white sm:text-emerald-600 sm:shadow-sm">
+      <span className="relative flex size-12 shrink-0 items-center justify-center rounded-full text-[var(--dairtak-orange)] sm:size-10 sm:bg-[var(--dairtak-orange-soft)]">
         <WhatsAppIcon />
       </span>
       <span className="hidden flex-col text-right leading-tight sm:flex">
-        <strong className="text-sm font-black">جروب KAYAN CITY SPOT</strong>
-        <span className="mt-0.5 text-[11px] font-semibold text-white/90">
+        <strong className="text-sm font-black">جروب DAIRTAK</strong>
+        <span className="mt-0.5 text-[11px] font-semibold text-zinc-500">
           انضم عبر واتساب
         </span>
       </span>

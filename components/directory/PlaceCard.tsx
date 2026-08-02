@@ -21,6 +21,7 @@ import {
   Images,
   MessageCircle,
   Phone,
+  ShoppingBag,
   Star,
 } from 'lucide-react';
 import type { Place } from '@/types';
@@ -34,6 +35,7 @@ import { ShareButton } from './ShareButton';
 import { UpvoteButton } from './UpvoteButton';
 import { useFavorites } from '@/hooks/useFavorites';
 import { trackSiteEvent } from '@/lib/analytics/client';
+import { CouponOffer } from './CouponOffer';
 
 type PlaceCardProps = {
   detailsHref: string;
@@ -84,8 +86,8 @@ export function PlaceCard({
               {getCategoryLabel(place.category)}
             </Chip>
             {place.is_featured && (
-              <Chip className="h-6 border border-amber-300/30 bg-amber-500/10 text-[10px] font-semibold text-amber-700">
-                <Star className="me-1 size-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+              <Chip className="h-6 border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] text-[10px] font-black text-[var(--dairtak-orange-deep)]">
+                <Star className="me-1 size-3 fill-current" aria-hidden="true" />
                 مميز
               </Chip>
             )}
@@ -123,7 +125,7 @@ export function PlaceCard({
                   aria-hidden="true"
                   className={`size-4 transition-[color,fill,transform] ${
                     isFavorite(place.id)
-                      ? 'scale-110 fill-rose-800 text-rose-800'
+                      ? 'scale-110 fill-rose-500 text-rose-500 drop-shadow-[0_2px_5px_rgba(244,63,94,.28)]'
                       : 'text-zinc-400'
                   }`}
                 />
@@ -142,6 +144,13 @@ export function PlaceCard({
             {place.title}
           </Link>
         </h2>
+        <span
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500"
+          aria-label={`${place.view_count ?? 0} مشاهدة للمكان`}
+        >
+          <Eye className="size-3.5" aria-hidden="true" />
+          {(place.view_count ?? 0).toLocaleString('ar-EG')} مشاهدة
+        </span>
       </CardHeader>
 
       {images.length > 0 && (
@@ -180,10 +189,23 @@ export function PlaceCard({
       )}
 
       <CardBody className="space-y-2 p-3 pt-2 sm:px-3.5">
+        <CouponOffer place={place} />
+
         {place.description && (
-          <p className="line-clamp-2 break-words text-xs leading-relaxed text-zinc-600">
-            {place.description}
-          </p>
+          <div className={place.category === 'stores'
+            ? 'rounded-xl border border-zinc-200 bg-zinc-50 p-2.5'
+            : undefined}
+          >
+            {place.category === 'stores' && (
+              <span className="mb-1 flex items-center gap-1.5 text-[11px] font-black text-zinc-800">
+                <ShoppingBag className="size-3.5" aria-hidden="true" />
+                المنتجات وما يميز المتجر
+              </span>
+            )}
+            <p className="line-clamp-1 break-words text-xs leading-relaxed text-zinc-600 sm:line-clamp-2">
+              {place.description}
+            </p>
+          </div>
         )}
 
         {place.instapay_vfcash && (
@@ -241,7 +263,7 @@ export function PlaceCard({
             targetType: 'place',
             targetKey: place.id,
           })}
-          startContent={<MessageCircle className="size-4" aria-hidden="true" />}
+          startContent={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
           className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-zinc-100 px-2 text-xs font-bold text-zinc-900 hover:bg-zinc-200 sm:text-sm"
         >
           واتساب
@@ -255,7 +277,7 @@ export function PlaceCard({
             targetKey: place.id,
           })}
           startContent={<Phone className="size-4 fill-current" aria-hidden="true" />}
-          className="min-w-0 flex-1 rounded-xl bg-zinc-900 px-2 text-xs font-bold text-white hover:bg-zinc-800 sm:text-sm"
+          className="min-w-0 flex-1 rounded-xl bg-zinc-950 px-2 text-xs font-black text-white hover:bg-zinc-800 sm:text-sm"
         >
           اتصال
         </Button>

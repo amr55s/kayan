@@ -135,7 +135,7 @@ export function DriverModal({
                   </p>
                   <div className="flex flex-wrap justify-center gap-2">
                     <Button as="a" href="/share" variant="flat" className="font-bold">
-                      ساعدنا في نشر كيان
+                      ساعدنا في نشر ديرتك
                     </Button>
                     <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
                       تم
@@ -220,7 +220,7 @@ export function DriverModal({
                   form="driver-account-form"
                   isLoading={isSubmitting}
                   startContent={!isSubmitting && <Send className="size-4" />}
-                  className="bg-zinc-950 font-bold text-white"
+                  className="bg-zinc-950 font-black text-white hover:bg-zinc-800"
                 >
                   إرسال طلب الحساب
                 </Button>

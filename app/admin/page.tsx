@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadBehaviorAnalytics } from '@/lib/analytics/admin';
 import { fetchHomePageData } from '@/lib/supabase/queries';
+import type { Place, StoreCoupon } from '@/types';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -44,6 +45,24 @@ async function loadClientErrors() {
   }
 }
 
+async function loadAdminPlaces(admin: ReturnType<typeof createAdminClient>) {
+  const enriched: any = await (admin as any)
+    .from('places')
+    .select('*, store_coupons(*)')
+    .order('created_at', { ascending: false });
+  const result = enriched.error
+    ? await (admin as any)
+        .from('places')
+        .select('*')
+        .order('created_at', { ascending: false })
+    : enriched;
+  if (result.error) throw result.error;
+  return (result.data ?? []).map((row: Place & { store_coupons?: StoreCoupon[] }) => {
+    const { store_coupons: coupons, ...place } = row;
+    return { ...place, coupons: coupons ?? [] } as Place;
+  });
+}
+
 export default async function AdminDashboard() {
   const profile = await requireProfile(['admin']);
   const supabase = await createClient();
@@ -78,17 +97,14 @@ export default async function AdminDashboard() {
       .order('created_at', { ascending: false })),
     safeAdminQuery('delivery_orders', (supabase as any)
       .from('delivery_orders')
-      .select('id, public_code, status, recipient_name, delivery_area, created_at')
+      .select('id, public_code, status, recipient_name, delivery_area, collection_amount, delivery_fee, created_at')
       .order('created_at', { ascending: false })
       .limit(100)),
     safeAdminQuery('merchant_branches', (supabase as any)
       .from('merchant_branches')
       .select('id, merchant_id, place_id, name, phone, address, area, is_default, is_active')
       .order('created_at', { ascending: false })),
-    safeAdminQuery('places', (supabase as any)
-      .from('places')
-      .select('*')
-      .order('created_at', { ascending: false })),
+    safeAdminQuery('places', loadAdminPlaces(adminData).then((data) => ({ data }))),
     safeAdminQuery('pending_requests', (supabase as any)
       .from('pending_requests')
       .select('*')

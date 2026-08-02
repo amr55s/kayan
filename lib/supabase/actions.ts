@@ -4,7 +4,7 @@ import { createClient } from './server';
 import { createAdminClient } from './admin';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { headers } from 'next/headers';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { FeedbackType } from '@/types';
 import { processImageForStorage } from '@/lib/images/server';
 import { toPlainArrayBuffer } from '@/lib/images/buffer';
@@ -18,9 +18,22 @@ export type ListingUploadFolder = 'requests' | 'feedback' | 'merchant';
 export type ImageUploadResult =
   | { success: true; url: string | null }
   | { success: false; message: string };
+export type SignedImageUploadResult =
+  | {
+      success: true;
+      path: string;
+      token: string;
+      url: string;
+    }
+  | { success: false; message: string };
 const MAX_IMAGE_BYTES = 3_500_000;
 const STORAGE_UPLOAD_ATTEMPTS = 2;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const IMAGE_EXTENSIONS: Record<string, 'jpg' | 'png' | 'webp'> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
 
 /**
  * Helper to check if Supabase is running in demo/placeholder mode
@@ -36,6 +49,10 @@ function safeArabicMessage(error: unknown, fallback: string): string {
     return message.replace(/^.*?:\s*/, '');
   }
   return fallback;
+}
+
+function isListingUploadFolder(value: string): value is ListingUploadFolder {
+  return value === 'requests' || value === 'feedback' || value === 'merchant';
 }
 
 async function getAnonymousRequestKey(purpose: string): Promise<string> {
@@ -55,6 +72,16 @@ async function getAnonymousRequestKey(purpose: string): Promise<string> {
     .digest('hex');
 }
 
+async function consumeImageUploadAllowance() {
+  const supabase = createAdminClient();
+  const requestKey = await getAnonymousRequestKey('listing-upload');
+  const { data: allowed, error } = await (supabase as any).rpc(
+    'consume_listing_upload_rate_limit',
+    { p_request_key: requestKey, p_limit: 24 },
+  );
+  return { supabase, allowed: Boolean(allowed), error };
+}
+
 /**
  * Helper to trigger instant cache revalidation across public and admin pages with tag revalidation
  */
@@ -70,6 +97,96 @@ function triggerInstantRevalidation(tags?: ('places' | 'drivers')[]) {
     }
   } catch (e) {
     console.warn('Revalidation notice:', e);
+  }
+}
+
+/**
+ * Creates a short-lived Storage upload token without sending image bytes
+ * through the Next.js/Vercel function. This avoids Server Action and platform
+ * request-body limits while keeping bucket credentials on the server.
+ */
+export async function prepareImageUpload(
+  input: {
+    contentType: string;
+    folder: ListingUploadFolder;
+    size: number;
+  },
+): Promise<SignedImageUploadResult> {
+  try {
+    if (!input || !isListingUploadFolder(input.folder) || !Number.isSafeInteger(input.size)) {
+      return {
+        success: false,
+        message: 'تعذر تجهيز الصورة للرفع. حاول اختيارها مرة أخرى.',
+      };
+    }
+    if (input.size <= 0) {
+      return { success: false, message: 'الصورة المختارة فارغة.' };
+    }
+    if (input.size > MAX_IMAGE_BYTES) {
+      return {
+        success: false,
+        message: 'حجم الصورة بعد التجهيز ما زال كبيرًا. أعد المحاولة وسيتم ضغطها أكثر.',
+      };
+    }
+    const extension = IMAGE_EXTENSIONS[input.contentType];
+    if (!extension) {
+      return {
+        success: false,
+        message: 'صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WebP.',
+      };
+    }
+    if (isDemoMode()) {
+      return {
+        success: false,
+        message: 'رفع الصور غير متاح في وضع العرض التجريبي.',
+      };
+    }
+
+    const { supabase, allowed, error: limitError } =
+      await consumeImageUploadAllowance();
+    if (limitError || !allowed) {
+      return {
+        success: false,
+        message: limitError
+          ? 'تعذر التحقق من رفع الصورة حالياً.'
+          : 'تم رفع صور كثيرة من هذا الاتصال. حاول مرة أخرى بعد ساعة.',
+      };
+    }
+
+    const path = `${input.folder}/${Date.now()}_${randomUUID()}.${extension}`;
+    const { data, error } = await supabase.storage
+      .from('listing-images')
+      .createSignedUploadUrl(path);
+    if (error || !data?.token) {
+      console.error('Signed Storage upload preparation failed:', error);
+      return {
+        success: false,
+        message: 'تعذر بدء رفع الصورة حالياً. حاول مرة أخرى.',
+      };
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('listing-images')
+      .getPublicUrl(path);
+    if (!publicUrlData.publicUrl) {
+      return {
+        success: false,
+        message: 'تعذر إنشاء رابط الصورة.',
+      };
+    }
+
+    return {
+      success: true,
+      path,
+      token: data.token,
+      url: publicUrlData.publicUrl,
+    };
+  } catch (error) {
+    console.error('Signed Storage upload exception:', error);
+    return {
+      success: false,
+      message: 'تعذر الاتصال بخدمة الصور حالياً. حاول مرة أخرى.',
+    };
   }
 }
 
@@ -100,12 +217,8 @@ export async function uploadImageToStorage(
       return { success: true, url: null };
     }
 
-    const supabase = createAdminClient();
-    const requestKey = await getAnonymousRequestKey('listing-upload');
-    const { data: allowed, error: limitError } = await (supabase as any).rpc(
-      'consume_listing_upload_rate_limit',
-      { p_request_key: requestKey, p_limit: 24 },
-    );
+    const { supabase, allowed, error: limitError } =
+      await consumeImageUploadAllowance();
     if (limitError || !allowed) {
       return {
         success: false,

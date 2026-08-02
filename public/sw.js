@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'kayan-v3';
+const CACHE_VERSION = 'dairtak-v1-brand';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
@@ -7,7 +7,12 @@ const PRIVATE_PREFIXES = ['/admin', '/driver', '/merchant', '/login'];
 const SHELL_ASSETS = [
   '/offline.html',
   '/manifest.json',
-  '/kayan-services-logo.png',
+  '/brand/dairtak-mark.png',
+  '/brand/dairtak-wordmark.png',
+  '/brand/dairtak-logo-full.png',
+  '/brand/dairtak-mark.svg',
+  '/brand/dairtak-wordmark.svg',
+  '/brand/dairtak-logo.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
@@ -25,7 +30,9 @@ self.addEventListener('activate', (event) => {
       caches.keys().then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith('kayan-') && !key.startsWith(CACHE_VERSION))
+            .filter((key) => (
+              key.startsWith('kayan-') || key.startsWith('dairtak-')
+            ) && !key.startsWith(CACHE_VERSION))
             .map((key) => caches.delete(key)),
         ),
       ),
@@ -35,7 +42,9 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'SKIP_WAITING') {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 function isPrivatePath(pathname) {
@@ -122,7 +131,7 @@ self.addEventListener('push', (event) => {
   } catch {
     payload = { body: event.data?.text() || 'لديك تحديث جديد.' };
   }
-  event.waitUntil(self.registration.showNotification(payload.title || 'KAYAN CITY SPOT', {
+  event.waitUntil(self.registration.showNotification(payload.title || 'DAIRTAK', {
     body: payload.body || 'لديك تحديث جديد.',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',

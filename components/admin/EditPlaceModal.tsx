@@ -23,7 +23,11 @@ import {
   LISTING_IMAGE_ACCEPT,
   uploadOptimizedImages,
 } from '@/lib/images/client';
-import { CATEGORY_OPTIONS } from '@/lib/categories';
+import {
+  CATEGORY_OPTIONS,
+  getListingDescriptionLabel,
+  getListingImageLabel,
+} from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
 
 interface EditPlaceModalProps {
@@ -385,7 +389,10 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
 
                 <Textarea
                   labelPlacement="outside"
-                  label="الوصف أو مواعيد العمل"
+                  label={getListingDescriptionLabel(category)}
+                  placeholder={category === 'stores'
+                    ? 'أهم المنتجات والماركات، نطاق الأسعار، وخيارات الاستلام أو التوصيل…'
+                    : undefined}
                   value={description}
                   onValueChange={setDescription}
                   variant="bordered"
@@ -455,7 +462,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                 {/* Professional Image Manager */}
                 <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 space-y-3">
                   <div className="flex items-center justify-between text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                    <span>إدارة صور المنيو والمكان</span>
+                    <span>إدارة {getListingImageLabel(category)}</span>
                     <span className="text-zinc-400 font-normal">
                       إجمالي {existingImages.length + uploadedImageUrls.length + newImageFiles.length} صور
                     </span>
@@ -563,7 +570,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   startContent={<Trash2 className="w-4 h-4" />}
                   isLoading={isSubmitting}
                   onClick={async () => {
-                    if (confirm(`هل أنت متأكد من حذف مكان "${title || place.title}" نهائياً من كيان سيتي سبوت؟`)) {
+                    if (confirm(`هل أنت متأكد من حذف مكان "${title || place.title}" نهائياً من ديرتك؟`)) {
                       setIsSubmitting(true);
                       const res = await serverDeleteActivePlace(place.id);
                       setIsSubmitting(false);
@@ -592,7 +599,7 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   startContent={!isSubmitting && <Check className="w-4 h-4" />}
                   className="font-bold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 px-6 h-11 shadow-sm rounded-xl"
                 >
-                  {mode === 'create' ? 'إضافة المكان ونشره في كيان سيتي سبوت' : 'حفظ التعديلات الحالية'}
+                  {mode === 'create' ? 'إضافة المكان ونشره في ديرتك' : 'حفظ التعديلات الحالية'}
                 </Button>
               </div>
             </ModalFooter>

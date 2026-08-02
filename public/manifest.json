@@ -1,7 +1,7 @@
 {
-  "name": "KAYAN CITY SPOT",
-  "short_name": "KAYAN",
-  "description": "كيان سيتي سبوت: المحلات والمطاعم والصيدليات والخدمات في مكان واحد",
+  "name": "DAIRTAK",
+  "short_name": "DAIRTAK",
+  "description": "ديرتك: المحلات والمطاعم والصيدليات والخدمات في مكان واحد",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -42,7 +42,7 @@
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "مشاركة كيان",
+      "name": "مشاركة ديرتك",
       "short_name": "مشاركة",
       "url": "/share",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]

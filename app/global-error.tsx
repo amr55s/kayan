@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { reportClientError } from '@/lib/observability/client-errors';
+import * as Sentry from '@sentry/nextjs';
+import {
+  reportClientError,
+  scheduleRuntimeRecovery,
+} from '@/lib/observability/client-errors';
 
 export default function GlobalError({
   error,
@@ -11,7 +15,12 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    Sentry.captureException(error);
     void reportClientError(error, 'react_boundary');
+    const recoveryTimer = scheduleRuntimeRecovery(error);
+    return () => {
+      if (recoveryTimer !== null) window.clearTimeout(recoveryTimer);
+    };
   }, [error]);
 
   return (

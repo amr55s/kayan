@@ -12,29 +12,112 @@ test('driver availability hydrates from a server-provided timestamp', () => {
   assert.match(page, /renderedAt/);
 });
 
-test('place details are deep-linked without creating a fragile dynamic route', () => {
+test('mobile navigation uses the HeroUI v3 drawer from the physical left edge', () => {
+  const header = read('components/layout/Header.tsx');
+  assert.match(header, /from '@heroui\/react\/drawer'/);
+  assert.match(header, /<Drawer\.Content[\s\S]{0,180}placement="left"[\s\S]{0,180}\[direction:ltr\]/);
+  assert.match(header, /<Drawer\.Dialog[\s\S]{0,180}dir="rtl"/);
+  assert.match(header, /rounded-r-\[28px\]/);
+  assert.match(header, /bg-zinc-950 text-white/);
+  assert.match(header, /aria-label="إغلاق القائمة"/);
+});
+
+test('admin navigation covers overview, revenue, activity, publishing, and mobile drawer access', () => {
+  const workspace = read('components/operations/AdminWorkspace.tsx');
+  const page = read('app/admin/page.tsx');
+  assert.match(workspace, /key: 'overview', label: 'نظرة عامة'/);
+  assert.match(workspace, /key: 'revenue', label: 'الإيرادات والتحصيل'/);
+  assert.match(workspace, /key: 'activity', label: 'النشاط والأداء'/);
+  assert.match(workspace, /key: 'marketing', label: 'التسويق والنشر'/);
+  assert.match(workspace, /أقسام لوحة التحكم/);
+  assert.match(workspace, /<Drawer\.Content placement="left" className="[^"]*\[direction:ltr\]/);
+  assert.match(page, /collection_amount, delivery_fee/);
+});
+
+test('the public hero is actionable and remains anchored to directory search', () => {
+  const directory = read('components/directory/DirectoryView.tsx');
+  const categoryBar = read('components/directory/CategoryBar.tsx');
+  const placeCard = read('components/directory/PlaceCard.tsx');
+  const couponOffer = read('components/directory/CouponOffer.tsx');
+  const deliveryBar = read('components/delivery/DeliveryBar.tsx');
+  const driverCard = read('components/delivery/DriverCard.tsx');
+  assert.match(directory, /كل اللي تحتاجه في ديرتك، في مكان واحد\./);
+  assert.match(directory, /bg-zinc-950/);
+  assert.doesNotMatch(directory, /FECF34/i);
+  assert.match(directory, /id="directory-search"/);
+  assert.match(directory, /<Input[\s\S]{0,400}value=\{searchQuery\}/);
+  assert.match(directory, /inputWrapper: '[^']*!bg-white/);
+  assert.match(directory, /placeholder:!text-zinc-500/);
+  assert.match(directory, /hero_whatsapp_group/);
+  assert.doesNotMatch(directory, /(?:amber|yellow|orange|emerald)-/);
+  assert.doesNotMatch(placeCard, /\b(?:bg|text|border)-(?:amber|yellow|orange)-/);
+  assert.match(placeCard, /dairtak-orange-soft/);
+  assert.match(placeCard, /MessageCircle className="[^"]*dairtak-orange/);
+  assert.doesNotMatch(couponOffer, /\b(?:bg|text|border)-(?:amber|yellow|orange|emerald)-/);
+  assert.match(couponOffer, /MessageCircle className="[^"]*dairtak-orange/);
+  assert.match(categoryBar, /CATEGORIES\.filter\(\(cat\) => cat\.id !== 'all'\)/);
+  assert.match(categoryBar, /h-16/);
+  assert.match(categoryBar, /bg-zinc-950 text-white/);
+  assert.match(deliveryBar, /bg-zinc-100\/90/);
+  assert.match(deliveryBar, /sortedDrivers\.map/);
+  assert.match(deliveryBar, /Number\(isConnected\(second\)\) - Number\(isConnected\(first\)\)/);
+  assert.match(driverCard, /isAvailable &&/);
+  assert.match(driverCard, />\s*متصل\s*</);
+  assert.match(driverCard, /bg-zinc-950 text-xs font-black text-white/);
+  assert.doesNotMatch(driverCard, /خامل|غير متاح/);
+});
+
+test('place details are deep-linked through Next navigation without patching browser history', () => {
   const directory = read('components/directory/DirectoryView.tsx');
   assert.match(directory, /params\.set\('place', placeId\)/);
   assert.match(directory, /البطاقة المطلوبة غير موجودة/);
   assert.match(directory, /router\.replace\(removePlaceFromUrl\(\)/);
-  assert.match(directory, /DIRECT_DETAIL_STATE/);
-  assert.match(directory, /History\.prototype\.replaceState\.call/);
-  assert.match(directory, /History\.prototype\.pushState\.call/);
-  assert.match(directory, /currentState\[DIRECT_DETAIL_STATE\]/);
-  assert.match(
-    directory,
-    /function closeDetails[\s\S]*window\.history\.replaceState\(window\.history\.state, '', cleanUrl\)/,
-  );
-  assert.doesNotMatch(
-    directory,
-    /function closeDetails[\s\S]{0,500}router\.replace\(cleanUrl/,
-  );
-  assert.doesNotMatch(directory, /function closeDetails[\s\S]{0,500}router\.back\(\)/);
+  assert.match(directory, /function closeDetails[\s\S]{0,500}router\.replace\(cleanUrl/);
+  assert.doesNotMatch(directory, /router\.back\(\)|History\.prototype|window\.history\.(?:pushState|replaceState)/);
+});
+
+test('store coupons are public-read-only and open a prefilled WhatsApp order', () => {
+  const migration = read('supabase/migrations/20260801080152_add_store_coupons.sql');
+  const offer = read('components/directory/CouponOffer.tsx');
+  const manager = read('components/admin/CouponManager.tsx');
+  assert.match(migration, /alter table public\.store_coupons enable row level security/);
+  assert.match(migration, /grant select on public\.store_coupons to anon, authenticated/);
+  assert.match(migration, /grant select, insert, update, delete on public\.store_coupons to service_role/);
+  assert.match(migration, /'KAYAN10'/);
+  assert.match(migration, /where p\.title = 'أكل بيتي مميز'/);
+  assert.match(offer, /استخدم الكوبون على واتساب/);
+  assert.match(offer, /whatsAppMessage\(place, selected\)/);
+  assert.match(manager, /serverUpsertStoreCoupon/);
+});
+
+test('all modals render in a body portal and coupons stay viewport-bound', () => {
+  const compatibilityLayer = read('components/ui/heroui-compat.tsx');
+  const couponOffer = read('components/directory/CouponOffer.tsx');
+  const globalStyles = read('app/globals.css');
+
+  assert.match(compatibilityLayer, /createPortal\(/);
+  assert.match(compatibilityLayer, /document\.body/);
+  assert.match(compatibilityLayer, /data-kayan-portal="modal"/);
+  assert.match(couponOffer, /max-h-\[min\(88dvh,720px\)\]/);
+  assert.match(globalStyles, /\.kayan-modal-wrapper[\s\S]{0,180}position:\s*fixed\s*!important/);
+});
+
+test('store category follows restaurants and supports product-focused listings', () => {
+  const constants = read('lib/constants.ts');
+  const validation = read('lib/operations/validation.ts');
+  const migration = read('supabase/migrations/20260801110838_add_store_directory_category.sql');
+  const merchantModal = read('components/modals/AddListingModal.tsx');
+
+  assert.match(constants, /id: 'restaurants'[\s\S]{0,260}id: 'stores'/);
+  assert.match(constants, /label: 'متجر'/);
+  assert.match(validation, /'stores'/);
+  assert.match(migration, /place_category in \([\s\S]*'stores'/);
+  assert.match(merchantModal, /أشهر الماركات، نطاق الأسعار/);
 });
 
 test('native place sharing includes the direct URL only once', () => {
   const share = read('lib/share.ts');
-  assert.match(share, /const text = `\$\{title\}\\n\$\{phone\}\\nعبر كيان سيتي سبوت`/);
+  assert.match(share, /const text = `\$\{title\}\\n\$\{phone\}\\nعبر ديرتك`/);
   assert.match(share, /navigator\.share\(\{ title: .* text, url \}\)/);
   assert.match(share, /fallbackWhatsApp\(`\$\{text\}\\n\$\{url\}`\)/);
 });
@@ -152,6 +235,8 @@ test('PWA caches only public shell data and provides an iOS-safe install path', 
   assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\)/);
   assert.match(serviceWorker, /isNextDataRequest/);
   assert.match(serviceWorker, /offline\.html/);
+  assert.match(serviceWorker, /dairtak-v1-brand/);
+  assert.match(serviceWorker, /event\.waitUntil\(self\.skipWaiting\(\)\)/);
   assert.match(installer, /إضافة إلى الشاشة الرئيسية/);
   assert.match(installer, /updateViaCache: 'none'/);
   assert.match(installer, /SKIP_WAITING/);

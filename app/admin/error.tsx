@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Button } from '@heroui/react';
 import { AlertTriangle, RefreshCw, Home, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
+import * as Sentry from '@sentry/nextjs';
 import { reportClientError } from '@/lib/observability/client-errors';
 
 export default function Error({
@@ -15,6 +16,7 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error('Application error:', error);
+    Sentry.captureException(error);
     void reportClientError(error, 'react_boundary');
     const retryKey = `admin-error-retry:${error.digest || error.message}`;
     let lastRetry = 0;
@@ -70,7 +72,7 @@ export default function Error({
             variant="bordered"
             startContent={<Home className="w-4 h-4" />}
           >
-            العودة إلى كيان سيتي سبوت
+            العودة إلى ديرتك
           </Button>
         </div>
       </div>

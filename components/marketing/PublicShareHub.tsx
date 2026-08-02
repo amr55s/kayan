@@ -167,7 +167,7 @@ function PublicShareCard({
           </Button>
           <a
             href={cardUrl}
-            download={`kayan-${item.key}.png`}
+            download={`dairtak-${item.key}.png`}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => trackSiteEvent('card_download', target)}
@@ -251,7 +251,7 @@ export function PublicShareHub({
       )}
 
       <section aria-labelledby="help-grow">
-        <h2 id="help-grow" className="text-2xl font-black">ساعد كيان يكبر</h2>
+        <h2 id="help-grow" className="text-2xl font-black">ساعد ديرتك تكبر</h2>
         <p className="mt-2 text-sm text-zinc-600">رسائل جاهزة لتعريف أصحاب المحلات والكباتن والسكان بالموقع.</p>
         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {ideaItems.map((item) => <PublicShareCard key={item.key} item={item} />)}

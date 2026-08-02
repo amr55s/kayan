@@ -1,5 +1,5 @@
 /**
- * KAYAN CITY SPOT Utility Helpers
+ * DAIRTAK Utility Helpers
  */
 
 /**

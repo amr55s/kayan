@@ -74,7 +74,7 @@ function DetailLink({
   const tones = {
     light: 'border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100',
     dark: 'border-zinc-900 bg-zinc-950 text-white hover:bg-zinc-800',
-    green: 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
+    green: 'border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100',
     blue: 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100',
   };
   return (
@@ -405,7 +405,7 @@ export function PlaceDetailsModal({
                           {getCategoryLabel(place.category)}
                         </Chip>
                         {place.is_featured && (
-                          <Chip className="border border-amber-200 bg-amber-50 text-xs font-bold text-amber-800">
+                          <Chip className="border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] text-xs font-black text-[var(--dairtak-orange-deep)]">
                             <Star className="me-1 size-3.5 fill-current" aria-hidden="true" />
                             مكان مميز
                           </Chip>
@@ -414,6 +414,11 @@ export function PlaceDetailsModal({
                       <h1 className="mt-3 break-words text-balance text-2xl font-black leading-tight text-zinc-950 sm:text-3xl">
                         {place.title}
                       </h1>
+                      {place.category === 'stores' && (
+                        <h2 className="mt-5 text-base font-black text-zinc-900 sm:text-lg">
+                          المنتجات وما يميز المتجر
+                        </h2>
+                      )}
                       {place.description ? (
                         <p className="mt-4 whitespace-pre-wrap break-words text-pretty text-sm leading-8 text-zinc-600 sm:text-base">
                           {place.description}
@@ -435,7 +440,7 @@ export function PlaceDetailsModal({
                           {place.whatsapp_group_url && (
                             <DetailLink
                               href={place.whatsapp_group_url}
-                              icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                              icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                               label="انضم عبر WhatsApp"
                               tone="green"
                               analyticsEvent="group_click"
@@ -512,7 +517,7 @@ export function PlaceDetailsModal({
                       />
                       <DetailLink
                         href={whatsappUrl}
-                        icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                        icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                         label="WhatsApp"
                         tone="green"
                         analyticsEvent="whatsapp_click"
@@ -553,7 +558,7 @@ export function PlaceDetailsModal({
               <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2 rounded-b-[1.5rem] border-t border-zinc-200 bg-white/95 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:hidden">
                 <DetailLink
                   href={whatsappUrl}
-                  icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                  icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                   label="WhatsApp"
                   tone="green"
                   analyticsEvent="whatsapp_click"
@@ -572,7 +577,7 @@ export function PlaceDetailsModal({
                     {place.whatsapp_group_url && (
                       <DetailLink
                         href={place.whatsapp_group_url}
-                        icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                        icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                         label="الجروب"
                         tone="green"
                         analyticsEvent="group_click"

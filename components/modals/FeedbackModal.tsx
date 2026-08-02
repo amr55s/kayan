@@ -35,8 +35,8 @@ const FEEDBACK_TYPES: { id: FeedbackType; label: string; description: string }[]
   { id: 'phone_change', label: 'تغيير رقم الهاتف أو الواتساب', description: 'تحديث أرقام التواصل' },
   { id: 'details_update', label: 'إضافة جروب أو عنوان أو خريطة', description: 'اقتراح روابط التواصل والموقع' },
   { id: 'report_issue', label: 'الإبلاغ عن بيانات غير صحيحة أو مكان مغلق', description: 'التنبيه لمشكلة بالبيانات' },
-  { id: 'general_suggestion', label: 'اقتراح أو ملاحظة عامة', description: 'ملاحظات لتطوير كيان سيتي سبوت' },
-  { id: 'rating', label: 'تقييم تجربتك مع كيان سيتي سبوت', description: 'شاركنا تقييمك من نجمة إلى خمس نجوم' },
+  { id: 'general_suggestion', label: 'اقتراح أو ملاحظة عامة', description: 'ملاحظات لتطوير ديرتك' },
+  { id: 'rating', label: 'تقييم تجربتك مع ديرتك', description: 'شاركنا تقييمك من نجمة إلى خمس نجوم' },
 ];
 
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({
@@ -184,7 +184,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
       if (selectedFiles.length) setProcessingMsg('جاري إرسال الطلب...');
       const selectedPlace = fetchedPlaces.find((p) => p.id === targetPlaceId);
       const placeDisplayName = isOpinion
-        ? 'رأي عام في كيان سيتي سبوت'
+        ? 'رأي عام في ديرتك'
         : selectedPlace
           ? selectedPlace.title
           : placeNameOrPhone.trim() || 'مكان غير مدرج';
@@ -250,7 +250,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
               </div>
               <div className="flex flex-col">
                 <span>التعديلات والاقتراحات والتقييم</span>
-                <span className="text-xs text-zinc-500 font-normal">رأيك يصل مباشرة إلى إدارة كيان سيتي سبوت</span>
+                <span className="text-xs text-zinc-500 font-normal">رأيك يصل مباشرة إلى إدارة ديرتك</span>
               </div>
             </ModalHeader>
 
@@ -265,8 +265,8 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   </h4>
                   <p className="text-sm text-zinc-600 dark:text-zinc-400 max-w-xs leading-relaxed font-semibold">
                     {feedbackType === 'rating' || feedbackType === 'general_suggestion'
-                      ? 'شكرًا لمشاركتنا رأيك. وصل مباشرة إلى الإدارة وسيتم مراجعته ضمن تطوير كيان سيتي سبوت.'
-                      : 'شكرًا لتواصلك مع كيان سيتي سبوت. سيتم مراجعة طلبك وتحديث البيانات قريبًا إن شاء الله.'}
+                      ? 'شكرًا لمشاركتنا رأيك. وصل مباشرة إلى الإدارة وسيتم مراجعته ضمن تطوير ديرتك.'
+                      : 'شكرًا لتواصلك مع ديرتك. سيتم مراجعة طلبك وتحديث البيانات قريبًا إن شاء الله.'}
                   </p>
                   {successWarning && (
                     <p className="max-w-xs rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold leading-6 text-amber-800">
@@ -346,7 +346,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   <div className="space-y-3">
                     <Select
                       labelPlacement="outside"
-                      label="اختر المكان المراد تعديله (من كيان سيتي سبوت)"
+                      label="اختر المكان المراد تعديله (من ديرتك)"
                       selectedKeys={[targetPlaceId]}
                       onChange={(e) => setTargetPlaceId(e.target.value)}
                       variant="bordered"
@@ -485,12 +485,13 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   {!['general_suggestion', 'rating'].includes(feedbackType) && (
                   /* Optional File Upload */
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
+                    <label htmlFor="feedback-images" className="flex items-center justify-between text-xs font-bold text-zinc-700 dark:text-zinc-300">
                       <span>إرفاق صور جديدة للمنيو أو المكان (اختياري - حتى 3 صور)</span>
                       <span className="text-zinc-400 font-normal text-[11px]">{selectedFiles.length} / 3 صور</span>
                     </label>
 
                     <input
+                      id="feedback-images"
                       type="file"
                       ref={fileInputRef}
                       accept="image/*"
@@ -500,15 +501,16 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     />
 
                     {selectedFiles.length < 3 && (
-                      <div
+                      <button
+                        type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full border-2 border-dashed border-zinc-300 dark:border-zinc-700 hover:border-zinc-800 dark:hover:border-zinc-200 rounded-2xl p-4 text-center cursor-pointer bg-zinc-50/50 dark:bg-zinc-800/40 transition-colors flex flex-col items-center justify-center gap-1.5"
+                        className="flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50/50 p-4 text-center transition-colors hover:border-zinc-800 focus-visible:ring-2 focus-visible:ring-zinc-950 dark:border-zinc-700 dark:bg-zinc-800/40 dark:hover:border-zinc-200"
                       >
-                        <Upload className="w-5 h-5 text-zinc-800 dark:text-zinc-200" />
+                        <Upload className="size-5 text-zinc-800 dark:text-zinc-200" aria-hidden="true" />
                         <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
                           اضغط هنا لإرفاق صور منيو أو إثبات تعديل
                         </span>
-                      </div>
+                      </button>
                     )}
 
                     {filePreviews.length > 0 && (
@@ -552,7 +554,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                   form="feedback-form"
                   isLoading={isSubmitting}
                   startContent={!isSubmitting && <Send className="w-4 h-4" />}
-                  className="font-bold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 px-6 h-11 shadow-sm rounded-xl"
+                  className="h-11 rounded-xl bg-zinc-950 px-6 font-black text-white shadow-sm hover:bg-zinc-800"
                 >
                   إرسال الطلب للإدارة
                 </Button>

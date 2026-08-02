@@ -14,7 +14,7 @@ export default async function DriverPage() {
   const [{ data: driver }, { data: orders }] = await Promise.all([
     (admin as any)
       .from('driver_profiles')
-      .select('active_until, contact_phone, whatsapp, vehicle_type')
+      .select('active_until, contact_phone, whatsapp, vehicle_type, avatar_url')
       .eq('profile_id', profile.id)
       .single(),
     (supabase as any).from('delivery_orders').select('*').order('created_at', { ascending: false }).limit(50),
@@ -32,6 +32,7 @@ export default async function DriverPage() {
           contactPhone: driver?.contact_phone ?? profile.phone,
           whatsapp: driver?.whatsapp ?? '',
           vehicleType: driver?.vehicle_type ?? '',
+          avatarUrl: driver?.avatar_url ?? null,
         }}
       />
     </>

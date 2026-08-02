@@ -17,7 +17,7 @@ export const marketingTemplateLabels: Record<MarketingTemplateKey, string> = {
   driver_invite: 'انضم ككابتن',
   missing_service: 'خدمة مش موجودة؟',
   data_correction: 'ساعدنا نصحح البيانات',
-  local_ambassadors: 'كن سفير كيان',
+  local_ambassadors: 'كن سفير ديرتك',
   general_site: 'عرّف جيرانك بالموقع',
 };
 
@@ -65,7 +65,7 @@ export const marketingIdeas: Array<{
   },
   {
     key: 'local_ambassadors',
-    title: 'كن سفير كيان في عمارتك',
+    title: 'كن سفير ديرتك في عمارتك',
     description: 'شارك QR في المدخل أو مع جيرانك ومحلاتك المعتادة.',
     path: '/share',
   },
@@ -141,7 +141,7 @@ export function marketingText(input: {
       `ابعث اقتراحك من ${SITE_NAME_AR} علشان تفضل بيانات المنطقة دقيقة.`,
     ],
     local_ambassadors: [
-      '🤝 خليك سفير كيان في عمارتك',
+      '🤝 خليك سفير ديرتك في عمارتك',
       'شارك الرابط أو QR مع جيرانك ومحلاتك المفضلة وساعدنا نبني دليل المنطقة معًا.',
     ],
   };

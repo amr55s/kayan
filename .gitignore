@@ -14,3 +14,6 @@ supabase/.temp/
 .vscode/
 .agents/
 skills-lock.json
+
+# Sentry Config File
+.env.sentry-build-plugin

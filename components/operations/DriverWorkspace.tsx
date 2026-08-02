@@ -1,12 +1,14 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState, useTransition } from 'react';
-import { Button, Card, CardBody, CardHeader, Chip, Input } from '@heroui/react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { Avatar, Button, Card, CardBody, CardHeader, Chip, Input } from '@heroui/react';
 import {
+  AlertTriangle,
   BellRing,
   Bike,
   CheckCircle2,
   Clock3,
+  ImagePlus,
   MapPin,
   MessageCircle,
   PackageCheck,
@@ -21,10 +23,12 @@ import {
   claimDeliveryOrder,
   renewDriverAvailability,
   updateDriverPublicProfile,
+  updateDriverAvatar,
 } from '@/lib/operations/actions';
 import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
 import { formatPhoneForTel, formatWhatsAppUrl } from '@/lib/utils';
 import { PushSubscriptionButton } from './PushSubscriptionButton';
+import { driverAvatarTone } from '@/lib/driver-avatar';
 
 type Order = {
   id: string;
@@ -46,7 +50,10 @@ type PublicProfile = {
   contactPhone: string;
   whatsapp: string;
   vehicleType: string;
+  avatarUrl: string | null;
 };
+
+type EditablePublicProfile = Omit<PublicProfile, 'avatarUrl'>;
 
 const statusLabel: Record<string, string> = {
   open: 'مهمة متاحة',
@@ -62,9 +69,9 @@ const cairoTime = new Intl.DateTimeFormat('ar-EG', {
 });
 
 function availabilityCopy(activeUntil: string | null, now: number) {
-  if (!activeUntil) return { active: false, label: 'غير متاح حاليًا', remaining: 'فعّل التواجد لاستقبال المهام' };
+  if (!activeUntil) return { active: false, label: 'خامل (غير متاح حاليًا)', remaining: 'فعّل التواجد لاستقبال المهام' };
   const remainingMs = new Date(activeUntil).getTime() - now;
-  if (remainingMs <= 0) return { active: false, label: 'انتهى وقت التواجد', remaining: 'يمكنك تجديد التواجد الآن' };
+  if (remainingMs <= 0) return { active: false, label: 'انتهى وقت التواجد (خامل)', remaining: 'يمكنك تجديد التواجد الآن' };
   const remainingMinutes = Math.ceil(remainingMs / 60_000);
   const hours = Math.floor(remainingMinutes / 60);
   const minutes = remainingMinutes % 60;
@@ -92,12 +99,21 @@ export function DriverWorkspace({
   const router = useRouter();
   const [actionPending, startActionTransition] = useTransition();
   const [profilePending, startProfileTransition] = useTransition();
+  const [avatarPending, startAvatarTransition] = useTransition();
   const [actionMessage, setActionMessage] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
-  const [profileForm, setProfileForm] = useState(publicProfile);
+  const currentEditableProfile: EditablePublicProfile = {
+    displayName: publicProfile.displayName,
+    contactPhone: publicProfile.contactPhone,
+    whatsapp: publicProfile.whatsapp,
+    vehicleType: publicProfile.vehicleType,
+  };
+  const [profileForm, setProfileForm] = useState<EditablePublicProfile>(currentEditableProfile);
+  const [avatarUrl, setAvatarUrl] = useState(publicProfile.avatarUrl);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [now, setNow] = useState(serverNow);
   const availability = availabilityCopy(availableUntil, now);
-  const isProfileDirty = JSON.stringify(profileForm) !== JSON.stringify(publicProfile);
+  const isProfileDirty = JSON.stringify(profileForm) !== JSON.stringify(currentEditableProfile);
   const openOrders = orders.filter((order) => order.status === 'open').length;
   const activeOrders = orders.filter((order) =>
     ['assigned', 'picked_up', 'issue'].includes(order.status),
@@ -161,11 +177,50 @@ export function DriverWorkspace({
     });
   }
 
+  function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setProfileMessage('');
+    if (file.size > 3_500_000) {
+      setProfileMessage('حجم الصورة كبير. اختر صورة أقل من 3.5 ميجابايت.');
+      return;
+    }
+
+    startAvatarTransition(async () => {
+      try {
+        const data = new FormData();
+        data.set('avatar', file);
+        const result = await updateDriverAvatar(data);
+        if (!result.success || !result.data) {
+          setProfileMessage(result.success ? 'تعذر تحديث الصورة.' : result.message);
+          return;
+        }
+        setAvatarUrl(result.data.avatarUrl);
+        setProfileMessage('تم تحديث صورتك وتظهر الآن في بطاقة الكابتن.');
+        router.refresh();
+      } catch (error) {
+        console.error('Driver avatar transport failed:', error);
+        setProfileMessage('انقطع الاتصال أثناء رفع الصورة. حاول مرة أخرى.');
+      }
+    });
+  }
+
   return (
     <main
       id="main-content"
       className="dir-rtl mx-auto min-h-[calc(100dvh-4rem)] max-w-5xl space-y-5 overflow-x-clip px-3 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6"
     >
+      {!availability.active && (
+        <div role="alert" className="flex items-start gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-200 shadow-sm">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-400" aria-hidden="true" />
+          <div>
+            <p className="font-extrabold text-sm text-amber-100">إشعار: حسابك خامل حاليًا!</p>
+            <p className="mt-1 text-xs text-amber-200/90 leading-5">أنت لا تظهر للعملاء في قائمة الكباتن المتاحين ولن تتلقى الطلبات الجديدة. اضغط «تفعيل التواجد لساعتين» لتظهر متصلاً.</p>
+          </div>
+        </div>
+      )}
+
       <Card className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 text-white shadow-lg shadow-zinc-950/10">
         <CardBody className="gap-5 p-4 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -176,11 +231,11 @@ export function DriverWorkspace({
                   size="sm"
                   className={
                     availability.active
-                      ? 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
-                      : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
+                      ? 'border border-emerald-400/30 bg-emerald-400/10 font-bold text-emerald-200'
+                      : 'border border-amber-500/40 bg-amber-500/15 font-bold text-amber-300'
                   }
                 >
-                  {availability.active ? 'متاح' : 'غير متاح'}
+                  {availability.active ? 'متصل ومتاح' : 'خامل (غير متاح)'}
                 </Chip>
               </div>
               <p className="mt-1 text-sm font-semibold text-zinc-200">{availability.label}</p>
@@ -240,6 +295,36 @@ export function DriverWorkspace({
                 {profileMessage}
               </p>
             )}
+            <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-gradient-to-br from-white via-zinc-50 to-zinc-100 p-3 sm:col-span-2">
+              <Avatar
+                src={avatarUrl || undefined}
+                name={profileForm.displayName || 'كابتن'}
+                className={`size-16 shrink-0 border text-base font-black shadow-sm ${driverAvatarTone(profileForm.contactPhone)}`}
+                classNames={{ img: 'object-cover' }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-zinc-950">صورتك على بطاقة التوصيل</p>
+                <p className="mt-1 text-xs leading-5 text-zinc-500">JPG أو PNG أو WebP، بحد أقصى 3.5 ميجابايت.</p>
+              </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={uploadAvatar}
+                aria-label="اختيار صورة الكابتن"
+              />
+              <Button
+                type="button"
+                isIconOnly
+                isLoading={avatarPending}
+                onPress={() => avatarInputRef.current?.click()}
+                aria-label={avatarUrl ? 'تغيير صورة الكابتن' : 'إضافة صورة الكابتن'}
+                className="size-11 min-w-11 border border-zinc-800 bg-zinc-950 text-white"
+              >
+                {!avatarPending && <ImagePlus className="size-5" aria-hidden="true" />}
+              </Button>
+            </div>
             <Input
               isRequired
               name="displayName"

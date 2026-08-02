@@ -41,24 +41,18 @@ const payloadSchema = z.object({
   campaignKey: z.string().regex(/^[a-z0-9_-]{0,64}$/i).default(''),
 });
 
-const placeEvents = new Set([
-  'place_open',
+const sharedEntityEvents = new Set([
   'phone_click',
   'whatsapp_click',
+  'share_click',
+]);
+const placeOnlyEvents = new Set([
+  'place_open',
   'group_click',
   'telegram_click',
   'map_click',
-  'share_click',
   'favorite_click',
   'upvote_click',
-]);
-const driverEvents = new Set([
-  'driver_open',
-  'phone_click',
-  'whatsapp_click',
-  'share_click',
-  'marketing_share_click',
-  'card_download',
 ]);
 const featureEvents = new Set([
   'search_use',
@@ -76,14 +70,20 @@ function targetIsValid(payload: z.infer<typeof payloadSchema>): boolean {
   if (payload.eventName === 'page_view') {
     return payload.targetType === 'site' && payload.targetKey === '';
   }
-  if (placeEvents.has(payload.eventName)) {
+  if (sharedEntityEvents.has(payload.eventName)) {
+    return (
+      (payload.targetType === 'place' || payload.targetType === 'driver')
+      && UUID_PATTERN.test(payload.targetKey)
+    );
+  }
+  if (placeOnlyEvents.has(payload.eventName)) {
     return payload.targetType === 'place' && UUID_PATTERN.test(payload.targetKey);
   }
-  if (
-    driverEvents.has(payload.eventName)
-    && payload.targetType === 'driver'
-  ) {
-    return UUID_PATTERN.test(payload.targetKey);
+  if (payload.eventName === 'driver_open') {
+    return (
+      payload.targetType === 'driver'
+      && UUID_PATTERN.test(payload.targetKey)
+    );
   }
   if (payload.eventName === 'marketing_share_click' || payload.eventName === 'card_download') {
     if (payload.targetType === 'place' || payload.targetType === 'driver') {

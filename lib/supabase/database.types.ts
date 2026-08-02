@@ -452,6 +452,8 @@ export type Database = {
       driver_profiles: {
         Row: {
           active_until: string | null
+          avatar_path: string | null
+          avatar_url: string | null
           contact_phone: string | null
           created_at: string
           is_available: boolean
@@ -464,6 +466,8 @@ export type Database = {
         }
         Insert: {
           active_until?: string | null
+          avatar_path?: string | null
+          avatar_url?: string | null
           contact_phone?: string | null
           created_at?: string
           is_available?: boolean
@@ -476,6 +480,8 @@ export type Database = {
         }
         Update: {
           active_until?: string | null
+          avatar_path?: string | null
+          avatar_url?: string | null
           contact_phone?: string | null
           created_at?: string
           is_available?: boolean
@@ -1030,6 +1036,7 @@ export type Database = {
           phone: string
           telegram_url: string | null
           title: string
+          view_count: number
           whatsapp: string | null
           whatsapp_group_url: string | null
         }
@@ -1046,6 +1053,7 @@ export type Database = {
           phone: string
           telegram_url?: string | null
           title: string
+          view_count?: number
           whatsapp?: string | null
           whatsapp_group_url?: string | null
         }
@@ -1062,10 +1070,89 @@ export type Database = {
           phone?: string
           telegram_url?: string | null
           title?: string
+          view_count?: number
           whatsapp?: string | null
           whatsapp_group_url?: string | null
         }
         Relationships: []
+      }
+      store_coupons: {
+        Row: {
+          applies_to: string
+          code: string
+          created_at: string
+          created_by: string | null
+          description: string
+          discount_type: string
+          discount_value: number
+          display_order: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          is_featured: boolean
+          minimum_order_amount: number | null
+          place_id: string
+          starts_at: string | null
+          title: string
+          updated_at: string
+          usage_limit_text: string
+        }
+        Insert: {
+          applies_to?: string
+          code: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          discount_type?: string
+          discount_value: number
+          display_order?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          minimum_order_amount?: number | null
+          place_id: string
+          starts_at?: string | null
+          title: string
+          updated_at?: string
+          usage_limit_text?: string
+        }
+        Update: {
+          applies_to?: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          discount_type?: string
+          discount_value?: number
+          display_order?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          is_featured?: boolean
+          minimum_order_amount?: number | null
+          place_id?: string
+          starts_at?: string | null
+          title?: string
+          updated_at?: string
+          usage_limit_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_coupons_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_coupons_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

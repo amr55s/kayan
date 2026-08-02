@@ -4,11 +4,11 @@ export async function sharePlace(
   pageUrl?: string
 ): Promise<boolean> {
   const url = pageUrl || (typeof window !== 'undefined' ? window.location.href : '');
-  const text = `${title}\n${phone}\nعبر كيان سيتي سبوت`;
+  const text = `${title}\n${phone}\nعبر ديرتك`;
 
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
-      await navigator.share({ title: `${title} — كيان سيتي سبوت`, text, url });
+      await navigator.share({ title: `${title} — ديرتك`, text, url });
       return true;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return false;
@@ -24,13 +24,13 @@ export async function sharePlace(
 export async function shareDirectoryItem(
   title: string,
   pageUrl: string,
-  description = 'شاهد التفاصيل وتواصل مباشرة بدون وسيط أو عمولات عبر كيان سيتي سبوت',
+  description = 'شاهد التفاصيل وتواصل مباشرة بدون وسيط أو عمولات عبر ديرتك',
 ): Promise<boolean> {
   const text = `${title}\n${description}`;
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
       await navigator.share({
-        title: `${title} — كيان سيتي سبوت`,
+        title: `${title} — ديرتك`,
         text,
         url: pageUrl,
       });
