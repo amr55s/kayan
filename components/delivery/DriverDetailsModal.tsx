@@ -1,6 +1,6 @@
 'use client';
 
-import { Avatar, Button, Chip, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@heroui/react';
+import { Avatar, Button, Chip, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from '@/components/ui/heroui-compat';
 import { MessageCircle, Phone, Share2, X } from 'lucide-react';
 import type { Driver } from '@/types';
 import { formatPhoneForTel, formatWhatsAppUrl } from '@/lib/utils';

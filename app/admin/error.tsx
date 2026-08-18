@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { Button } from '@heroui/react';
+import { Button } from '@heroui/react/button';
 import { AlertTriangle, RefreshCw, Home, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import * as Sentry from '@sentry/nextjs';
@@ -37,45 +37,40 @@ export default function Error({
   }, [error, reset]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 dir-rtl">
-      <div className="text-center space-y-4 max-w-md">
+    <main id="main-content" className="min-h-screen flex items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 dir-rtl">
+      <div className="text-center space-y-4 max-w-md" role="alert">
         <div className="w-16 h-16 mx-auto rounded-full bg-rose-100 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center">
           <AlertTriangle className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-extrabold text-zinc-900 dark:text-white">
+        <h1 className="text-xl font-extrabold text-zinc-900 dark:text-white">
           حدث خطأ في لوحة الإدارة
-        </h2>
+        </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           حدث انقطاع مؤقت أثناء تحديث البيانات. سنحاول استعادة لوحة الإدارة تلقائياً.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Button
-            color="warning"
-            variant="solid"
+            variant="primary"
             onClick={reset}
-            startContent={<RefreshCw className="w-4 h-4" />}
             className="font-bold text-zinc-950 bg-amber-400 hover:bg-amber-500"
           >
+            <RefreshCw className="w-4 h-4" aria-hidden="true" />
             إعادة المحاولة
           </Button>
           <Button
-            variant="bordered"
+            variant="outline"
             onClick={() => window.location.reload()}
-            startContent={<RotateCcw className="w-4 h-4" />}
             className="font-bold"
           >
+            <RotateCcw className="w-4 h-4" aria-hidden="true" />
             تحميل أحدث نسخة
           </Button>
-          <Button
-            as={Link}
-            href="/"
-            variant="bordered"
-            startContent={<Home className="w-4 h-4" />}
-          >
+          <Link href="/" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-300 px-4 font-bold text-zinc-900 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+            <Home className="w-4 h-4" aria-hidden="true" />
             العودة إلى ديرتك
-          </Button>
+          </Link>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

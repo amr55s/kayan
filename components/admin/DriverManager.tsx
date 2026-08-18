@@ -1,21 +1,18 @@
 'use client';
 
 import { FormEvent, useMemo, useState } from 'react';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Input,
-  Tooltip,
-} from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Chip } from '@heroui/react/chip';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { TextField } from '@heroui/react/textfield';
+import { Tooltip } from '@heroui/react/tooltip';
 import {
   Bike,
   CheckCircle2,
   Clock3,
   PauseCircle,
-  MessageCircle,
   Pencil,
   Phone,
   Save,
@@ -68,7 +65,6 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
       [
         driver.name,
         driver.phone,
-        driver.whatsapp,
         driver.vehicle_type,
         driver.source === 'account' ? 'حساب' : 'بطاقة قديمة',
       ].some((value) => value?.toLocaleLowerCase('ar').includes(query)),
@@ -82,7 +78,6 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
     (driver) =>
       driver.profile_complete === false
       || !driver.phone
-      || !driver.whatsapp
       || !driver.vehicle_type,
   ).length;
 
@@ -173,31 +168,28 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
       </div>
 
       <Card className="rounded-3xl border border-zinc-200 shadow-sm">
-        <CardHeader className="flex flex-col items-stretch gap-3 border-b border-zinc-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <Card.Header className="flex flex-col items-stretch gap-3 border-b border-zinc-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2 font-black text-zinc-950">
               <Bike className="size-5" aria-hidden="true" />
               إدارة كباتن التوصيل
             </h3>
             <p className="mt-1 text-xs leading-6 text-zinc-500">
-              عدّل رقم الاتصال وواتساب والمركبة، وفعّل أو أوقف ظهور الحساب من مكان واحد.
+              عدّل بيانات التشغيل والمركبة، وفعّل أو أوقف الحساب من مكان واحد.
             </p>
           </div>
-          <Chip variant="flat" className="w-fit font-bold text-zinc-700">
+          <Chip variant="secondary" className="w-fit font-bold text-zinc-700">
             {activeDrivers} حساب نشط
           </Chip>
-        </CardHeader>
-        <CardBody className="gap-4 p-4 sm:p-5">
-          <Input
-            isClearable
-            name="driverSearch"
-            autoComplete="off"
-            label="بحث في الكباتن"
-            placeholder="الاسم أو الرقم أو المركبة…"
-            value={search}
-            onValueChange={setSearch}
-            startContent={<Search className="size-4 text-zinc-400" aria-hidden="true" />}
-          />
+        </Card.Header>
+        <Card.Content className="gap-4 p-4 sm:p-5">
+          <TextField fullWidth className="space-y-1.5">
+            <Label className="text-sm font-bold text-zinc-800">بحث في الكباتن</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+              <Input name="driverSearch" autoComplete="off" placeholder="الاسم أو الرقم أو المركبة…" value={search} onChange={(event) => setSearch(event.target.value)} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50 ps-10 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
+            </div>
+          </TextField>
 
           {errorMsg && (
             <p
@@ -224,62 +216,38 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
                     : 'بطاقة كابتن قديمة.'}
                 </p>
               </div>
-              <Input
-                isRequired
-                name="driverName"
-                autoComplete="name"
-                label="اسم الكابتن"
-                value={editForm.name}
-                onValueChange={(name) => setEditForm({ ...editForm, name })}
-              />
-              <Input
-                isRequired
-                name="driverContactPhone"
-                autoComplete="tel"
-                type="tel"
-                inputMode="tel"
-                label="رقم الاتصال العام"
-                value={editForm.phone}
-                onValueChange={(phone) => setEditForm({ ...editForm, phone })}
-              />
-              <Input
-                isRequired
-                name="driverWhatsapp"
-                autoComplete="tel"
-                type="tel"
-                inputMode="tel"
-                label="رقم واتساب"
-                value={editForm.whatsapp}
-                onValueChange={(whatsapp) => setEditForm({ ...editForm, whatsapp })}
-              />
+              <TextField fullWidth isRequired className="space-y-1.5">
+                <Label className="text-sm font-bold text-zinc-800">اسم الكابتن</Label>
+                <Input required name="driverName" autoComplete="name" value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
+              </TextField>
+              <TextField fullWidth isRequired className="space-y-1.5">
+                <Label className="text-sm font-bold text-zinc-800">رقم التشغيل الداخلي</Label>
+                <Input required name="driverContactPhone" autoComplete="tel" type="tel" inputMode="tel" value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
+              </TextField>
               <p className="-mt-2 text-xs leading-5 text-zinc-500 sm:col-span-2">
-                هذان الرقمان يشغّلان زري «اتصال» و«واتساب» في البطاقة العامة ولا يغيّران رقم تسجيل الدخول.
+                الرقم مخصص لفريق التشغيل ولا يظهر في الدليل العام ولا يغيّر رقم تسجيل الدخول.
               </p>
-              <Input
-                name="driverVehicle"
-                autoComplete="off"
-                label="نوع المركبة"
-                placeholder="موتوسيكل، دراجة، سيارة"
-                value={editForm.vehicleType}
-                onValueChange={(vehicleType) => setEditForm({ ...editForm, vehicleType })}
-              />
+              <TextField fullWidth className="space-y-1.5">
+                <Label className="text-sm font-bold text-zinc-800">نوع المركبة</Label>
+                <Input name="driverVehicle" autoComplete="off" placeholder="موتوسيكل، دراجة، سيارة" value={editForm.vehicleType} onChange={(event) => setEditForm({ ...editForm, vehicleType: event.target.value })} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
+              </TextField>
               <div className="grid grid-cols-2 gap-2 sm:col-span-2 sm:flex">
                 <Button
                   type="submit"
-                  isLoading={pendingId === editing.id}
-                  startContent={pendingId !== editing.id && <Save className="size-4" aria-hidden="true" />}
+                  isPending={pendingId === editing.id}
                   className="min-h-11 bg-zinc-950 font-bold text-white"
                 >
+                  {pendingId !== editing.id && <Save className="size-4" aria-hidden="true" />}
                   حفظ البيانات
                 </Button>
                 <Button
                   type="button"
-                  variant="flat"
+                  variant="secondary"
                   isDisabled={pendingId === editing.id}
                   onPress={() => setEditing(null)}
-                  startContent={<X className="size-4" aria-hidden="true" />}
                   className="min-h-11"
                 >
+                  <X className="size-4" aria-hidden="true" />
                   إلغاء
                 </Button>
               </div>
@@ -330,33 +298,24 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
                       </dt>
                       <dd><bdi dir="ltr" className="font-mono">{driver.phone || 'غير محدد'}</bdi></dd>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <dt className="flex items-center gap-1 text-zinc-500">
-                        <MessageCircle className="size-3.5" aria-hidden="true" />
-                        واتساب
-                      </dt>
-                      <dd><bdi dir="ltr" className="font-mono">{driver.whatsapp || 'غير محدد'}</bdi></dd>
-                    </div>
                   </dl>
 
                   <div className="mt-3 grid gap-2">
                     <Button
                       size="sm"
-                      isLoading={pendingId === driver.id}
+                      isPending={pendingId === driver.id}
                       isDisabled={Boolean(pendingId) && pendingId !== driver.id}
                       onPress={() => handleToggle(driver)}
-                      startContent={
-                        pendingId !== driver.id
-                        && (driver.is_active
-                          ? <PauseCircle className="size-4" aria-hidden="true" />
-                          : <UserRoundCheck className="size-4" aria-hidden="true" />)
-                      }
                       className={
                         driver.is_active
                           ? 'min-h-11 border border-zinc-200 bg-white font-bold text-zinc-800'
                           : 'min-h-11 bg-emerald-600 font-black text-white'
                       }
                     >
+                      {pendingId !== driver.id
+                        && (driver.is_active
+                          ? <PauseCircle className="size-4" aria-hidden="true" />
+                          : <UserRoundCheck className="size-4" aria-hidden="true" />)}
                       {driver.is_active
                         ? 'إيقاف الحساب'
                         : driver.profile_complete === false
@@ -379,24 +338,27 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
                             : 'موقوف'}
                       </Chip>
                       <div className="flex gap-1">
-                        <Tooltip content="تعديل البيانات">
+                        <Tooltip>
+                          <Tooltip.Trigger>
                           <Button
                             isIconOnly
                             size="sm"
-                            variant="flat"
+                            variant="secondary"
                             aria-label={`تعديل بيانات ${driver.name || 'الكابتن'}`}
                             onPress={() => beginEdit(driver)}
                           >
                             <Pencil className="size-4" aria-hidden="true" />
                           </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>تعديل البيانات</Tooltip.Content>
                         </Tooltip>
                         {driver.source === 'public' && (
-                          <Tooltip content="حذف البطاقة القديمة" color="danger">
+                          <Tooltip>
+                            <Tooltip.Trigger>
                             <Button
                               isIconOnly
                               size="sm"
-                              color="danger"
-                              variant="light"
+                              variant="danger-soft"
                               aria-label={`حذف ${driver.name || 'الكابتن'}`}
                               isDisabled={Boolean(pendingId)}
                               onPress={() => handleDelete(driver)}
@@ -404,6 +366,8 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
                             >
                               <Trash2 className="size-4" aria-hidden="true" />
                             </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Content>حذف البطاقة القديمة</Tooltip.Content>
                           </Tooltip>
                         )}
                       </div>
@@ -420,7 +384,7 @@ export function DriverManager({ drivers, onRefresh }: DriverManagerProps) {
               </p>
             </div>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
     </div>
   );
@@ -437,7 +401,7 @@ function AdminDriverMetric({
 }) {
   return (
     <Card className="rounded-2xl border border-zinc-200 shadow-none">
-      <CardBody className="flex-row items-center gap-2 p-3">
+      <Card.Content className="flex-row items-center gap-2 p-3">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-zinc-100">
           {icon}
         </span>
@@ -445,7 +409,7 @@ function AdminDriverMetric({
           <p className="truncate text-[10px] font-bold text-zinc-500 sm:text-xs">{label}</p>
           <p className="text-lg font-black tabular-nums">{value}</p>
         </div>
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }

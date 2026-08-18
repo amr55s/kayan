@@ -9,7 +9,7 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from '@heroui/react';
+} from '@/components/ui/heroui-compat';
 import { Bike, CheckCircle2, KeyRound, Send } from 'lucide-react';
 import { submitAccountRequest } from '@/lib/operations/actions';
 import { isValidEgyptianPhone } from '@/lib/utils';

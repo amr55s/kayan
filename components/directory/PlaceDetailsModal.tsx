@@ -13,7 +13,7 @@ import {
   ModalBody,
   ModalContent,
   ModalHeader,
-} from '@heroui/react';
+} from '@/components/ui/heroui-compat';
 import {
   ArrowUpLeft,
   ChevronLeft,

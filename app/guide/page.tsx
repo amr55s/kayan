@@ -7,9 +7,9 @@ import {
   Heart,
   Images,
   MapPin,
-  MessageCircle,
   Search,
   Share2,
+  ShoppingBag,
   Store,
   UserRound,
 } from 'lucide-react';
@@ -23,8 +23,8 @@ export const metadata: Metadata = {
 
 const residentSteps = [
   { icon: Search, title: 'ابحث أو اختر تصنيفًا', text: 'اكتب اسم المكان أو الخدمة أو تصفح المطاعم والمحلات والخدمات.' },
-  { icon: Images, title: 'افتح البطاقة', text: 'شاهد الصور كاملة والوصف والجروب والعنوان والخريطة عند توفرها.' },
-  { icon: MessageCircle, title: 'تواصل مباشرة', text: 'اتصل أو افتح WhatsApp من داخل البطاقة بدون وسيط أو عمولة.' },
+  { icon: Images, title: 'افتح البطاقة', text: 'شاهد الصور كاملة والوصف والعنوان والخريطة عند توفرها.' },
+  { icon: ShoppingBag, title: 'اطلب داخل الموقع', text: 'أضف المنتجات إلى السلة، راجع الإجمالي، ثم أكمل الطلب والدفع عند الاستلام.' },
   { icon: Heart, title: 'احفظ وساعد غيرك', text: 'أضف للمفضلة، رشّح المكان، أو شارك رابطه مع جيرانك.' },
 ];
 
@@ -57,7 +57,7 @@ export default function GuidePage() {
         <section className="border-b border-zinc-200 bg-white px-4 py-12 text-center sm:py-16">
           <span className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-4 py-2 text-xs font-black">
             <CheckCircle2 className="size-4 text-emerald-600" />
-            سهل، محلي، وبدون عمولات
+            سهل، محلي، وبخطوات واضحة
           </span>
           <h1 className="mx-auto mt-5 max-w-3xl text-3xl font-black leading-tight sm:text-5xl">
             كل حاجة في ديرتك واضحة من أول ضغطة
@@ -84,13 +84,13 @@ export default function GuidePage() {
               <h2 className="mt-5 text-2xl font-black">للمحلات والخدمات</h2>
               <ol className="mt-5 space-y-3 text-sm leading-7 text-zinc-300">
                 <li>1. اضغط «انضم» ثم «طلب حساب محل أو خدمة».</li>
-                <li>2. أضف الاسم والتصنيف ورقم التواصل وصورًا واضحة.</li>
+                <li>2. أضف بيانات النشاط والمنتجات والصور من لوحة التاجر.</li>
                 <li>3. الإدارة تراجع البيانات قبل ظهورها للعامة.</li>
                 <li>4. بعد تفعيل حساب المحل يمكنك تحديث البطاقة والصور مباشرة.</li>
-                <li>5. شارك رابط بطاقتك مع العملاء؛ الإضافة والتواصل بدون عمولات.</li>
+                <li>5. تابع الطلبات والمراجعات والاستحقاقات من داخل الموقع.</li>
               </ol>
-              <Link href="/?register=place" className="mt-6 inline-flex min-h-12 items-center rounded-2xl bg-white px-5 text-sm font-black text-zinc-950">
-                أضف محلك أو خدمتك
+              <Link href="/login" className="mt-6 inline-flex min-h-12 items-center rounded-2xl bg-white px-5 text-sm font-black text-zinc-950">
+                افتح لوحة التاجر
               </Link>
             </article>
 
@@ -99,13 +99,13 @@ export default function GuidePage() {
               <h2 className="mt-5 text-2xl font-black">لكباتن التوصيل</h2>
               <ol className="mt-5 space-y-3 text-sm leading-7 text-zinc-600">
                 <li>1. اضغط «انضم» ثم «طلب حساب كابتن توصيل».</li>
-                <li>2. اكتب اسمك ورقمك ونوع المركبة بدقة.</li>
+                <li>2. أكمل بياناتك التشغيلية ونوع المركبة بدقة.</li>
                 <li>3. بعد الموافقة افتح لوحة الكابتن وحدّث حالة تواجدك.</li>
-                <li>4. السكان يتصلون أو يرسلون WhatsApp مباشرة من بطاقتك.</li>
-                <li>5. شارك رابط بطاقتك وحدث بياناتك عند أي تغيير.</li>
+                <li>4. استقبل المهام وتحديثاتها داخل لوحة الكابتن.</li>
+                <li>5. حدّث حالة الطلب أو ارفع مشكلة للإدارة من نفس اللوحة.</li>
               </ol>
-              <Link href="/?register=driver" className="mt-6 inline-flex min-h-12 items-center rounded-2xl bg-zinc-950 px-5 text-sm font-black text-white">
-                اطلب حساب كابتن
+              <Link href="/login" className="mt-6 inline-flex min-h-12 items-center rounded-2xl bg-zinc-950 px-5 text-sm font-black text-white">
+                افتح لوحة الكابتن
               </Link>
             </article>
           </section>
@@ -118,7 +118,7 @@ export default function GuidePage() {
                   أضف المكان من الصفحة الرئيسية، أو افتح بطاقته واضغط اقتراح تعديل. أي تعديل من الجمهور يظل تحت المراجعة قبل النشر.
                 </p>
               </div>
-              <Link href="/" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-zinc-950 px-5 text-sm font-black text-white">
+              <Link href="/services" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-zinc-950 px-5 text-sm font-black text-white">
                 <MapPin className="size-4" />
                 افتح الدليل
               </Link>
@@ -130,7 +130,7 @@ export default function GuidePage() {
               <div>
                 <h2 className="text-2xl font-black">ساعدنا نوصل لكل جار</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-7 text-emerald-50">
-                  نزّل بطاقة جاهزة أو شارك أحدث الأماكن والكباتن في جروب عمارتك.
+                  نزّل بطاقة جاهزة أو شارك رابط أحدث الأماكن والكباتن بالطريقة التي تناسبك.
                 </p>
               </div>
               <Link href="/share" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-emerald-800">

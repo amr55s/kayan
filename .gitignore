@@ -10,6 +10,8 @@ node_modules/
 *.log
 tsconfig.tsbuildinfo
 supabase/.temp/
+.artifacts/
+output/
 
 .vscode/
 .agents/

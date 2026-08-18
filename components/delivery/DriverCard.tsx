@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Avatar, Button, Card, CardBody, Chip } from '@heroui/react';
+import { Avatar, Button, Card, CardBody, Chip } from '@/components/ui/heroui-compat';
 import { Bike, MessageCircle, Phone, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import type { Driver } from '@/types';

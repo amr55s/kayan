@@ -1,7 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button, Card, CardBody, CardHeader, Chip, Input } from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Chip } from '@heroui/react/chip';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { TextField } from '@heroui/react/textfield';
 import { Bike, Building2, Check, Link2, X } from 'lucide-react';
 import {
   approveAccountRequest,
@@ -72,7 +77,7 @@ export function AccountRequestManager({
 
   return (
     <Card className="border border-zinc-200">
-      <CardHeader className="flex items-center justify-between gap-3">
+      <Card.Header className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-black">طلبات حسابات الكباتن والأنشطة</h2>
           <p className="mt-1 text-xs font-normal text-zinc-500">
@@ -80,8 +85,8 @@ export function AccountRequestManager({
           </p>
         </div>
         <Chip className="bg-zinc-950 text-white">{pendingRequests.length} معلق</Chip>
-      </CardHeader>
-      <CardBody className="gap-3">
+      </Card.Header>
+      <Card.Content className="gap-3">
         {pendingRequests.length ? (
           pendingRequests.map((request) => {
             const place = request.existing_place_id
@@ -101,7 +106,7 @@ export function AccountRequestManager({
                         <Building2 className="size-5" />
                       )}
                       <h3 className="font-black">{request.display_name}</h3>
-                      <Chip size="sm" variant="flat">
+                      <Chip size="sm" variant="secondary">
                         {request.kind === 'driver' ? 'كابتن' : 'نشاط'}
                       </Chip>
                       {request.legacy_driver_id && (
@@ -133,14 +138,14 @@ export function AccountRequestManager({
                       </p>
                       <div className="flex gap-2">
                         <Button
-                          isLoading={pending}
+                          isPending={pending}
                           onPress={() => approve(request)}
                           className="bg-zinc-950 font-bold text-white"
                         >
                           نعم، تفعيل الحساب
                         </Button>
                         <Button
-                          variant="flat"
+                          variant="secondary"
                           onPress={() => setApprovingId(null)}
                         >
                           إلغاء
@@ -149,21 +154,20 @@ export function AccountRequestManager({
                     </div>
                   ) : rejectingId === request.id ? (
                     <div className="flex w-full flex-col gap-2 lg:max-w-md">
-                      <Input
-                        label="سبب الرفض (اختياري)"
-                        value={reason}
-                        onValueChange={setReason}
-                      />
+                      <TextField fullWidth className="space-y-1.5">
+                        <Label className="text-sm font-bold text-zinc-800">سبب الرفض (اختياري)</Label>
+                        <Input value={reason} onChange={(event) => setReason(event.target.value)} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
+                      </TextField>
                       <div className="flex gap-2">
                         <Button
-                          color="danger"
-                          isLoading={pending}
+                          variant="danger"
+                          isPending={pending}
                           onPress={() => reject(request)}
                         >
                           تأكيد الرفض
                         </Button>
                         <Button
-                          variant="flat"
+                          variant="secondary"
                           onPress={() => {
                             setRejectingId(null);
                             setReason('');
@@ -176,22 +180,21 @@ export function AccountRequestManager({
                   ) : (
                     <div className="flex gap-2">
                       <Button
-                        isLoading={pending}
+                        isPending={pending}
                         onPress={() => {
                           setRejectingId(null);
                           setApprovingId(request.id);
                         }}
-                        startContent={!pending && <Check className="size-4" />}
                         className="bg-zinc-950 font-bold text-white"
                       >
+                        {!pending && <Check className="size-4" aria-hidden="true" />}
                         موافقة وتفعيل
                       </Button>
                       <Button
-                        variant="flat"
-                        color="danger"
+                        variant="danger-soft"
                         onPress={() => setRejectingId(request.id)}
-                        startContent={<X className="size-4" />}
                       >
+                        <X className="size-4" aria-hidden="true" />
                         رفض
                       </Button>
                     </div>
@@ -205,7 +208,7 @@ export function AccountRequestManager({
             لا توجد طلبات حسابات معلقة.
           </p>
         )}
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }

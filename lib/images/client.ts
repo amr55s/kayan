@@ -4,7 +4,6 @@ import {
   prepareImageUpload,
   type ListingUploadFolder,
 } from '@/lib/supabase/actions';
-import { createClient as createBrowserSupabaseClient } from '@/lib/supabase/client';
 
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const TARGET_UPLOAD_BYTES = 1_050_000;
@@ -191,6 +190,19 @@ function canRetryUpload(message: string): boolean {
   return !/صيغة|فارغة|أكبر من|إعدادات|صور كثيرة|بعد ساعة/.test(message);
 }
 
+async function sha256Hex(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function readUploadResponse(response: Response): Promise<Record<string, unknown>> {
+  try {
+    return await response.json() as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Decodes once, reuses one canvas, and performs at most three encodes. This
  * keeps low-memory phones responsive while preserving readable menu text.
@@ -230,10 +242,9 @@ export async function optimizeImageForUpload(file: File): Promise<File> {
         );
         if (!best || blob.size < best.size) best = blob;
         if (blob.size <= TARGET_UPLOAD_BYTES) break;
-      } catch (error) {
+      } catch {
         // A full-size canvas can exceed iOS' transient memory budget. Continue
         // with a smaller canvas instead of failing the whole batch.
-        console.warn('Canvas encoding attempt failed; retrying smaller.', error);
       }
       await yieldToBrowser();
     }
@@ -247,8 +258,7 @@ export async function optimizeImageForUpload(file: File): Promise<File> {
       type: 'image/jpeg',
       lastModified: Date.now(),
     });
-  } catch (error) {
-    console.warn('Browser image optimization failed; using server fallback.', error);
+  } catch {
     if (file.size <= SERVER_FALLBACK_BYTES && SERVER_FALLBACK_TYPES.has(normalizedType)) {
       return file.type === normalizedType
         ? file
@@ -258,7 +268,7 @@ export async function optimizeImageForUpload(file: File): Promise<File> {
           });
     }
     throw new Error(
-      `تعذر قراءة الصورة "${file.name}" داخل المتصفح. حوّلها إلى JPG أو أرسلها من تطبيق الصور أو واتساب ثم حاول مرة أخرى.`,
+      `تعذر قراءة الصورة "${file.name}" داخل المتصفح. حوّلها إلى JPG أو أعد تصديرها من تطبيق الصور ثم حاول مرة أخرى.`,
     );
   } finally {
     image?.release();
@@ -311,9 +321,11 @@ export async function uploadOptimizedImages(
       });
       let uploadedUrl = '';
       let failureMessage = 'تعذر رفع الصورة حالياً.';
+      const checksumSha256 = await sha256Hex(optimizedFile);
       for (let attempt = 1; attempt <= CLIENT_UPLOAD_ATTEMPTS; attempt += 1) {
         try {
           const prepared = await prepareImageUpload({
+            checksumSha256,
             contentType: optimizedFile.type,
             folder,
             size: optimizedFile.size,
@@ -322,25 +334,31 @@ export async function uploadOptimizedImages(
             failureMessage = prepared.message;
             if (!canRetryUpload(failureMessage)) break;
           } else {
-            const { data, error } = await createBrowserSupabaseClient()
-              .storage
-              .from('listing-images')
-              .uploadToSignedUrl(
-                prepared.path,
-                prepared.token,
-                optimizedFile,
-                {
-                  cacheControl: '31536000',
-                  contentType: optimizedFile.type,
-                },
-              );
-            if (!error && data?.path === prepared.path) {
-              uploadedUrl = prepared.url;
+            const staged = await fetch(prepared.uploadUrl, {
+              method: 'PUT',
+              headers: prepared.requiredHeaders,
+              body: optimizedFile,
+            });
+            if (staged.ok) {
+              const finalized = await fetch(`/api/legacy-media/uploads/${prepared.sessionId}/finalize`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ checksumSha256 }),
+              });
+              const finalizedBody = await readUploadResponse(finalized);
+              if (finalized.ok && typeof finalizedBody.token === 'string') {
+                uploadedUrl = finalizedBody.token;
+                break;
+              }
+              failureMessage = typeof finalizedBody.error === 'string'
+                ? 'تعذر التحقق من الصورة بعد رفعها. حاول مرة أخرى.'
+                : failureMessage;
+            } else {
+              failureMessage = 'تعذر إرسال الصورة إلى خدمة التخزين. تحقق من الإنترنت ثم حاول مرة أخرى.';
+            }
+            if (uploadedUrl) {
               break;
             }
-            console.error('Direct signed image upload failed:', error);
-            failureMessage =
-              'تعذر إرسال الصورة إلى خدمة التخزين. تحقق من الإنترنت ثم حاول مرة أخرى.';
           }
         } catch (error) {
           failureMessage = safeUploadMessage(error);
@@ -359,7 +377,6 @@ export async function uploadOptimizedImages(
         });
       }
     } catch (error) {
-      console.error(`Image upload failed for "${originalFile.name}":`, error);
       failedFiles.push(originalFile.name);
       failures.push({
         fileKey: imageFileKey(originalFile),

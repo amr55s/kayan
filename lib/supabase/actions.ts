@@ -6,9 +6,11 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 import { headers } from 'next/headers';
 import { createHash, randomUUID } from 'node:crypto';
 import { FeedbackType } from '@/types';
-import { processImageForStorage } from '@/lib/images/server';
-import { toPlainArrayBuffer } from '@/lib/images/buffer';
 import { validateListingImageUrls } from '@/lib/images/urls';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
+import { getCurrentProfile } from '@/lib/auth/guards';
+import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
+import { createPrivateStageUpload } from '@/lib/media/spaces';
 import {
   validatePlaceDetails,
   type PlaceDetailsInput,
@@ -21,14 +23,12 @@ export type ImageUploadResult =
 export type SignedImageUploadResult =
   | {
       success: true;
-      path: string;
-      token: string;
-      url: string;
+      sessionId: string;
+      uploadUrl: string;
+      requiredHeaders: Record<string, string>;
     }
   | { success: false; message: string };
 const MAX_IMAGE_BYTES = 3_500_000;
-const STORAGE_UPLOAD_ATTEMPTS = 2;
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const IMAGE_EXTENSIONS: Record<string, 'jpg' | 'png' | 'webp'> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -72,9 +72,9 @@ async function getAnonymousRequestKey(purpose: string): Promise<string> {
     .digest('hex');
 }
 
-async function consumeImageUploadAllowance() {
+async function consumeImageUploadAllowance(ownerId: string) {
   const supabase = createAdminClient();
-  const requestKey = await getAnonymousRequestKey('listing-upload');
+  const requestKey = await getAnonymousRequestKey(`listing-upload:${ownerId}`);
   const { data: allowed, error } = await (supabase as any).rpc(
     'consume_listing_upload_rate_limit',
     { p_request_key: requestKey, p_limit: 24 },
@@ -95,25 +95,31 @@ function triggerInstantRevalidation(tags?: ('places' | 'drivers')[]) {
       revalidateTag('places', 'max');
       revalidateTag('drivers', 'max');
     }
-  } catch (e) {
-    console.warn('Revalidation notice:', e);
+  } catch (error) {
+    logSafeServerFailure('warn', 'public_revalidation_failed', { failure: error });
   }
 }
 
 /**
- * Creates a short-lived Storage upload token without sending image bytes
- * through the Next.js/Vercel function. This avoids Server Action and platform
- * request-body limits while keeping bucket credentials on the server.
+ * Creates a short-lived DigitalOcean Spaces upload URL without sending image
+ * bytes through the Next.js/Vercel function. The object remains private until
+ * the server validates and normalizes it.
  */
 export async function prepareImageUpload(
   input: {
+    checksumSha256: string;
     contentType: string;
     folder: ListingUploadFolder;
     size: number;
   },
 ): Promise<SignedImageUploadResult> {
   try {
-    if (!input || !isListingUploadFolder(input.folder) || !Number.isSafeInteger(input.size)) {
+    if (
+      !input
+      || !isListingUploadFolder(input.folder)
+      || !Number.isSafeInteger(input.size)
+      || !/^[a-f0-9]{64}$/iu.test(input.checksumSha256)
+    ) {
       return {
         success: false,
         message: 'تعذر تجهيز الصورة للرفع. حاول اختيارها مرة أخرى.',
@@ -135,15 +141,24 @@ export async function prepareImageUpload(
         message: 'صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WebP.',
       };
     }
-    if (isDemoMode()) {
-      return {
-        success: false,
-        message: 'رفع الصور غير متاح في وضع العرض التجريبي.',
-      };
+    const profile = await getCurrentProfile();
+    if (!profile || !profile.is_active || profile.must_change_password) {
+      return { success: false, message: 'سجّل الدخول مرة أخرى قبل رفع الصور.' };
+    }
+    if (
+      (input.folder === 'requests' && profile.role !== 'admin')
+      || (input.folder === 'merchant' && profile.role !== 'merchant')
+      || input.folder === 'feedback'
+    ) {
+      return { success: false, message: 'غير مصرح لك برفع الصور في هذا المسار.' };
+    }
+
+    if (profile.role === 'admin') {
+      await requireMarketplaceAdminRole(['super_admin', 'catalog_reviewer'], { failureMode: 'throw' });
     }
 
     const { supabase, allowed, error: limitError } =
-      await consumeImageUploadAllowance();
+      await consumeImageUploadAllowance(profile.id);
     if (limitError || !allowed) {
       return {
         success: false,
@@ -153,36 +168,44 @@ export async function prepareImageUpload(
       };
     }
 
-    const path = `${input.folder}/${Date.now()}_${randomUUID()}.${extension}`;
-    const { data, error } = await supabase.storage
-      .from('listing-images')
-      .createSignedUploadUrl(path);
-    if (error || !data?.token) {
-      console.error('Signed Storage upload preparation failed:', error);
-      return {
-        success: false,
-        message: 'تعذر بدء رفع الصورة حالياً. حاول مرة أخرى.',
-      };
-    }
+    const sessionId = randomUUID();
+    const path = `staging/legacy-place/${profile.id}/${sessionId}.${extension}`;
+    const { error } = await (supabase as any).from('legacy_media_uploads').insert({
+      id: sessionId,
+      owner_id: profile.id,
+      merchant_id: profile.role === 'merchant' ? profile.merchant_id : null,
+      folder: input.folder,
+      purpose: 'place',
+      staging_key: path,
+      expected_content_type: input.contentType,
+      expected_size_bytes: input.size,
+      expected_sha256: input.checksumSha256.toLowerCase(),
+    });
+    if (error) throw error;
 
-    const { data: publicUrlData } = supabase.storage
-      .from('listing-images')
-      .getPublicUrl(path);
-    if (!publicUrlData.publicUrl) {
+    try {
+      const signed = await createPrivateStageUpload({
+        checksumSha256: input.checksumSha256.toLowerCase(),
+        contentType: input.contentType,
+        objectKey: path,
+        sizeBytes: input.size,
+      });
       return {
-        success: false,
-        message: 'تعذر إنشاء رابط الصورة.',
+        success: true,
+        sessionId,
+        uploadUrl: signed.uploadUrl,
+        requiredHeaders: signed.requiredHeaders,
       };
+    } catch (error) {
+      await (supabase as any).from('legacy_media_uploads').update({
+        status: 'failed',
+        failure_code: 'spaces_presign_failed',
+        updated_at: new Date().toISOString(),
+      }).eq('id', sessionId);
+      throw error;
     }
-
-    return {
-      success: true,
-      path,
-      token: data.token,
-      url: publicUrlData.publicUrl,
-    };
   } catch (error) {
-    console.error('Signed Storage upload exception:', error);
+    logSafeServerFailure('error', 'spaces_upload_preparation_failed', { failure: error });
     return {
       success: false,
       message: 'تعذر الاتصال بخدمة الصور حالياً. حاول مرة أخرى.',
@@ -191,99 +214,19 @@ export async function prepareImageUpload(
 }
 
 /**
- * Uploads an image file to Supabase Storage ('listing-images' bucket)
- * Returns the public URL of the uploaded image or null on error.
+ * Retained only as a compatibility export for inactive legacy modals. Active
+ * screens use private, direct-to-Spaces staging through prepareImageUpload.
  */
 export async function uploadImageToStorage(
   file: File,
   folder: ListingUploadFolder = 'requests',
 ): Promise<ImageUploadResult> {
-  try {
-    if (!file.size || file.size > MAX_IMAGE_BYTES) {
-      return {
-        success: false,
-        message: 'تعذر إرسال الصورة للمعالجة. حاول اختيارها مرة أخرى.',
-      };
-    }
-    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-      return {
-        success: false,
-        message: 'صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WebP.',
-      };
-    }
-
-    if (isDemoMode()) {
-      console.warn('Supabase in demo mode: Skipping file storage upload.');
-      return { success: true, url: null };
-    }
-
-    const { supabase, allowed, error: limitError } =
-      await consumeImageUploadAllowance();
-    if (limitError || !allowed) {
-      return {
-        success: false,
-        message: limitError
-          ? 'تعذر التحقق من رفع الصورة حالياً.'
-          : 'تم رفع صور كثيرة من هذا الاتصال. حاول مرة أخرى بعد ساعة.',
-      };
-    }
-    const processed = await processImageForStorage(
-      Buffer.from(await file.arrayBuffer()),
-    );
-    const uploadBody = toPlainArrayBuffer(processed.buffer);
-    let storedPath: string | null = null;
-
-    for (let attempt = 1; attempt <= STORAGE_UPLOAD_ATTEMPTS; attempt += 1) {
-      const fileName = `${Date.now()}_${attempt}_${Math.random().toString(36).substring(2, 9)}.${processed.extension}`;
-      const filePath = `${folder}/${fileName}`;
-      const { data, error } = await supabase.storage
-        .from('listing-images')
-        .upload(filePath, uploadBody.slice(0), {
-          cacheControl: '31536000',
-          contentType: processed.contentType,
-          upsert: false,
-        });
-
-      if (!error && data?.path) {
-        const { data: storedInfo, error: infoError } = await supabase.storage
-          .from('listing-images')
-          .info(data.path);
-        if (!infoError && storedInfo?.size && storedInfo.size > 0) {
-          storedPath = data.path;
-          break;
-        }
-        console.error(`Storage verification attempt ${attempt} failed:`, infoError);
-      } else {
-        console.error(`Storage upload attempt ${attempt} failed:`, error);
-      }
-    }
-
-    if (!storedPath) {
-      return {
-        success: false,
-        message: 'تعذر رفع الصورة حالياً.',
-      };
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from('listing-images')
-      .getPublicUrl(storedPath);
-
-    if (!publicUrlData.publicUrl) {
-      return {
-        success: false,
-        message: 'تم رفع الصورة لكن تعذر إنشاء رابط العرض.',
-      };
-    }
-
-    return { success: true, url: publicUrlData.publicUrl };
-  } catch (err) {
-    console.error('Storage upload exception:', err);
-    return {
-      success: false,
-      message: 'تعذر معالجة الصورة أو رفعها. لم يتم حفظ المكان بدونها؛ حاول مرة أخرى.',
-    };
-  }
+  void file;
+  void folder;
+  return {
+    success: false,
+    message: 'مسار الرفع القديم متوقف. أعد فتح النموذج واستخدم مسار الصور الجديد.',
+  };
 }
 
 /**
@@ -368,7 +311,7 @@ export async function submitFeedbackSubmission(
     triggerInstantRevalidation();
     return { success: true, message: 'تم استلام طلبك بنجاح! سيتم المراجعة بواسطة الإدارة قريباً.' };
   } catch (err: any) {
-    console.error('Error submitting feedback:', err);
+    logSafeServerFailure('error', 'feedback_submission_failed', { failure: err });
     return {
       success: false,
       message: safeArabicMessage(
@@ -409,7 +352,7 @@ export async function upvotePlace(
       message: recorded ? 'شكراً لتوصيتك! 👍' : 'تم تسجيل توصيتك من قبل.',
     };
   } catch (err: any) {
-    console.error('Error upvoting place:', err);
+    logSafeServerFailure('error', 'place_upvote_failed', { failure: err });
     return {
       success: false,
       message: safeArabicMessage(err, 'حدث خطأ أثناء التصويت. حاول مرة أخرى.'),

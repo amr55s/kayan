@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button, Tooltip } from '@heroui/react';
+import { Button, Tooltip } from '@/components/ui/heroui-compat';
 import { Share2 } from 'lucide-react';
 import { sharePlace } from '@/lib/share';
 import { trackSiteEvent } from '@/lib/analytics/client';

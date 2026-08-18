@@ -1,19 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  Input,
-  Textarea,
-  Select,
-  SelectItem,
-  Switch,
-} from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { ListBox } from '@heroui/react/list-box';
+import { Modal } from '@heroui/react/modal';
+import { Select } from '@heroui/react/select';
+import { Switch } from '@heroui/react/switch';
+import { TextArea } from '@heroui/react/textarea';
+import { TextField } from '@heroui/react/textfield';
+import { useOverlayState } from '@heroui/react';
 import { Edit, Check } from 'lucide-react';
 import { PendingRequest } from '@/types';
 import { serverEditAndApproveRequest } from '@/lib/supabase/admin-actions';
@@ -41,6 +38,7 @@ export const EditRequestModal: React.FC<EditRequestModalProps> = ({
   const [isFeatured, setIsFeatured] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const modalState = useOverlayState({ isOpen, onOpenChange });
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -93,156 +91,78 @@ export const EditRequestModal: React.FC<EditRequestModalProps> = ({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onOpenChange={onOpenChange}
-      size="xl"
-      placement="center"
-      scrollBehavior="inside"
-      backdrop="blur"
-      classNames={{
-        base: "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 dir-rtl",
-      }}
-    >
-      <ModalContent>
-        {(onClose) => (
-          <>
-            <ModalHeader className="flex items-center gap-2 text-zinc-900 dark:text-white font-bold text-lg border-b border-zinc-100 dark:border-zinc-800 pb-3">
+    <Modal state={modalState}>
+      <Modal.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+        <Modal.Container placement="center" size="lg" scroll="inside" className="p-3">
+          <Modal.Dialog aria-label="تعديل بيانات الطلب ونشره" dir="rtl" className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <Modal.Header className="flex items-center gap-2 border-b border-zinc-100 pb-3 text-lg font-bold text-zinc-900 dark:border-zinc-800 dark:text-white">
               <Edit className="w-5 h-5 text-zinc-900 dark:text-white" />
-              <span>تعديل بيانات الطلب ونشره في ديرتك</span>
-            </ModalHeader>
+              <Modal.Heading>تعديل بيانات الطلب ونشره في ديرتك</Modal.Heading>
+            </Modal.Header>
 
-            <ModalBody className="py-4 space-y-4">
+            <Modal.Body className="space-y-4 py-4">
               {errorMsg && (
                 <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
                   {errorMsg}
                 </p>
               )}
               <form id="edit-request-form" onSubmit={handleSubmit} className="space-y-4">
-                <Input
-                  isRequired
-                  labelPlacement="outside"
-                  label="اسم المكان / الخدمة"
-                  value={title}
-                  onValueChange={setTitle}
-                  variant="bordered"
-                  size="md"
-                  classNames={{
-                    label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                    inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                  }}
-                />
+                <TextField fullWidth isRequired className="space-y-1.5">
+                  <Label className="text-xs font-bold text-zinc-700 dark:text-zinc-200">اسم المكان / الخدمة</Label>
+                  <Input required value={title} onChange={(event) => setTitle(event.target.value)} className="min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900" />
+                </TextField>
 
                 <Select
                   isRequired
-                  labelPlacement="outside"
-                  label="التصنيف"
-                  selectedKeys={[category]}
-                  onChange={(e) => setCategory(e.target.value)}
-                  variant="bordered"
-                  size="md"
-                  classNames={{
-                    label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                    trigger: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                  }}
+                  selectedKey={category}
+                  onSelectionChange={(key) => setCategory(String(key))}
                 >
-                  {CATEGORY_OPTIONS.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.label}
-                    </SelectItem>
-                  ))}
+                  <Label className="text-xs font-bold text-zinc-700 dark:text-zinc-200">التصنيف</Label>
+                  <Select.Trigger className="min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3.5 outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900"><Select.Value /><Select.Indicator /></Select.Trigger>
+                  <Select.Popover className="z-[110] rounded-xl border border-zinc-200 bg-white p-1 shadow-xl"><ListBox>{CATEGORY_OPTIONS.map((c) => <ListBox.Item key={c.id} id={c.id} textValue={c.label} className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100 data-[selected]:font-bold">{c.label}</ListBox.Item>)}</ListBox></Select.Popover>
                 </Select>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    isRequired
-                    labelPlacement="outside"
-                    label="رقم الهاتف"
-                    value={phone}
-                    onValueChange={setPhone}
-                    variant="bordered"
-                    type="tel"
-                    size="md"
-                    classNames={{
-                      label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                      inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                    }}
-                  />
-                  <Input
-                    labelPlacement="outside"
-                    label="رقم الواتساب"
-                    value={whatsapp}
-                    onValueChange={setWhatsapp}
-                    variant="bordered"
-                    type="tel"
-                    size="md"
-                    classNames={{
-                      label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                      inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                    }}
-                  />
+                  <TextField fullWidth isRequired className="space-y-1.5">
+                    <Label className="text-xs font-bold text-zinc-700 dark:text-zinc-200">رقم تشغيلي داخلي</Label>
+                    <Input required value={phone} onChange={(event) => setPhone(event.target.value)} type="tel" className="min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900" />
+                  </TextField>
                 </div>
 
-                <Input
-                  labelPlacement="outside"
-                  label="فودافون كاش / InstaPay"
-                  value={instapayVfcash}
-                  onValueChange={setInstapayVfcash}
-                  variant="bordered"
-                  type="tel"
-                  size="md"
-                  classNames={{
-                    label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                    inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                  }}
-                />
-
-                <Textarea
-                  labelPlacement="outside"
-                  label="الوصف"
-                  value={description}
-                  onValueChange={setDescription}
-                  variant="bordered"
-                  minRows={3}
-                  classNames={{
-                    label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                    inputWrapper: "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                  }}
-                />
+                <TextField fullWidth className="space-y-1.5">
+                  <Label className="text-xs font-bold text-zinc-700 dark:text-zinc-200">الوصف</Label>
+                  <TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="min-h-24 w-full rounded-xl border border-zinc-300 bg-white p-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900" />
+                </TextField>
 
                 <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700">
                   <span className="font-bold text-xs text-zinc-800 dark:text-zinc-200">
                     تمييز المكان في أعلى النتائج (Featured)
                   </span>
-                  <Switch
-                    size="sm"
-                    color="primary"
-                    isSelected={isFeatured}
-                    onValueChange={setIsFeatured}
-                  />
+                  <Switch size="sm" isSelected={isFeatured} onChange={setIsFeatured} aria-label="تمييز المكان">
+                    <Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content>
+                  </Switch>
                 </div>
               </form>
-            </ModalBody>
+            </Modal.Body>
 
-            <ModalFooter className="border-t border-zinc-100 dark:border-zinc-800 pt-3">
-              <Button variant="flat" color="default" onClick={onClose} disabled={isSubmitting} className="h-11 font-semibold">
+            <Modal.Footer className="border-t border-zinc-100 pt-3 dark:border-zinc-800">
+              <Button variant="secondary" onPress={modalState.close} isDisabled={isSubmitting} className="h-11 font-semibold">
                 إلغاء
               </Button>
               <Button
                 type="submit"
                 form="edit-request-form"
-                color="success"
-                variant="solid"
-                isLoading={isSubmitting}
-                startContent={!isSubmitting && <Check className="w-4 h-4" />}
+                variant="primary"
+                isPending={isSubmitting}
                 className="min-h-[44px] bg-zinc-900 px-6 text-xs font-bold text-white hover:bg-zinc-800"
               >
+                {!isSubmitting && <Check className="w-4 h-4" aria-hidden="true" />}
                 تعديل وتفعيل الآن
               </Button>
-            </ModalFooter>
-          </>
-        )}
-      </ModalContent>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 };

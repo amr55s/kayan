@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
 import { z } from 'zod';
-import { getCurrentProfile } from '@/lib/auth/guards';
+import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import { placeDetailsValidators } from '@/lib/place-details';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type {
@@ -51,10 +51,7 @@ const campaignSchema = z.object({
 });
 
 async function requireAdmin() {
-  const profile = await getCurrentProfile();
-  if (!profile || !profile.is_active || profile.role !== 'admin') {
-    throw new Error('admin_access_required');
-  }
+  const { profile } = await requireMarketplaceAdminRole(['super_admin'], { failureMode: 'throw' });
   return profile;
 }
 

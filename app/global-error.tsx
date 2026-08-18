@@ -26,8 +26,8 @@ export default function GlobalError({
   return (
     <html lang="ar" dir="rtl">
       <body style={{ margin: 0, background: '#fafafa', color: '#18181b', fontFamily: 'system-ui, sans-serif' }}>
-        <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 16 }}>
-          <section style={{ width: '100%', maxWidth: 420, border: '1px solid #e4e4e7', borderRadius: 24, background: '#fff', padding: 24, textAlign: 'center' }}>
+        <main id="main-content" style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 16 }}>
+          <section role="alert" style={{ width: '100%', maxWidth: 420, border: '1px solid #e4e4e7', borderRadius: 24, background: '#fff', padding: 24, textAlign: 'center' }}>
             <h1 style={{ margin: 0, fontSize: 24 }}>تعذر تشغيل الصفحة</h1>
             <p style={{ margin: '12px 0 20px', lineHeight: 1.8, color: '#52525b' }}>
               لم تُفقد بياناتك. جرّب تشغيل الصفحة مرة أخرى أو ارجع للرئيسية.

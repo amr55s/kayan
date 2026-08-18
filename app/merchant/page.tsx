@@ -23,13 +23,18 @@ export default async function MerchantPage() {
     placeIds.length
       ? (supabase as any)
           .from('places')
-          .select('*')
+          .select('id,title,category,description,images,is_featured,created_at,address,map_url,view_count,recommend_count')
           .in('id', placeIds)
       : Promise.resolve({ data: [] }),
-    (supabase as any).from('driver_profiles').select('profile_id, active_until, profiles!driver_profiles_profile_id_fkey(display_name, phone)').eq('is_available', true).gt('active_until', new Date().toISOString()),
-    (supabase as any).from('delivery_orders').select('*').eq('merchant_id', profile.merchant_id).order('created_at', { ascending: false }).limit(50),
+    (supabase as any).rpc('list_available_delivery_drivers'),
+    (supabase as any).rpc('list_merchant_delivery_orders', { p_limit: 50 }),
   ]);
-  const drivers = (driverRows ?? []).map((row: any) => ({ id: row.profile_id, name: row.profiles?.display_name ?? 'كابتن توصيل', phone: row.profiles?.phone ?? '', activeUntil: row.active_until }));
+  const drivers = (driverRows ?? []).map((row: any) => ({
+    id: row.id,
+    name: row.display_name ?? 'كابتن توصيل',
+    vehicleType: row.vehicle_type ?? null,
+    activeUntil: row.active_until,
+  }));
   return (
     <>
       <DashboardHeader displayName={profile.display_name} role="merchant" />

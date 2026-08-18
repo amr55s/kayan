@@ -2,20 +2,18 @@
 
 import { FormEvent, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Input,
-  Select,
-  SelectItem,
-  Tab,
-  Tabs,
-  Textarea,
-  useOverlayState,
-} from '@heroui/react';
+import Link from 'next/link';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Chip } from '@heroui/react/chip';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { ListBox } from '@heroui/react/list-box';
+import { Select } from '@heroui/react/select';
+import { Tabs } from '@heroui/react/tabs';
+import { TextArea } from '@heroui/react/textarea';
+import { TextField } from '@heroui/react/textfield';
+import { useOverlayState } from '@heroui/react';
 import { Drawer } from '@heroui/react/drawer';
 import {
   Activity,
@@ -71,6 +69,13 @@ import type { BehaviorAnalyticsSummary } from '@/lib/analytics/admin';
 import { MarketingCenter } from '@/components/admin/MarketingCenter';
 import { CouponManager } from '@/components/admin/CouponManager';
 import { formatCairoDateTime, formatUtcDayMonth } from '@/lib/format-date';
+
+const CardHeader = Card.Header;
+const CardBody = Card.Content;
+
+function Tab({ id, children }: { id: string; title?: React.ReactNode; children: React.ReactNode }) {
+  return <Tabs.Panel id={id}>{children}</Tabs.Panel>;
+}
 
 type Merchant = { id: string; display_name: string; is_active: boolean };
 type Profile = {
@@ -137,6 +142,21 @@ type ClientErrorSummary = {
   first_seen_at: string;
   last_seen_at: string;
 };
+
+type AdminSelectOption = { id: string; label: string; value?: string };
+
+function AdminInput({ label, value, onValueChange, className, isRequired, ...props }: Omit<React.ComponentProps<typeof Input>, 'value' | 'onChange' | 'className'> & { label: string; value: string; onValueChange: (value: string) => void; className?: string; isRequired?: boolean }) {
+  return <TextField fullWidth isRequired={isRequired} className={`space-y-1.5 ${className || ''}`}><Label className="text-sm font-bold text-zinc-800">{label}</Label><Input {...props} required={isRequired} value={value} onChange={(event) => onValueChange(event.target.value)} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" /></TextField>;
+}
+
+function AdminTextarea({ label, value, onValueChange, className, isRequired, ...props }: Omit<React.ComponentProps<typeof TextArea>, 'value' | 'onChange' | 'className'> & { label: string; value: string; onValueChange: (value: string) => void; className?: string; isRequired?: boolean }) {
+  return <TextField fullWidth isRequired={isRequired} className={`space-y-1.5 ${className || ''}`}><Label className="text-sm font-bold text-zinc-800">{label}</Label><TextArea {...props} required={isRequired} value={value} onChange={(event) => onValueChange(event.target.value)} className="min-h-24 w-full rounded-xl border border-zinc-200 bg-white p-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" /></TextField>;
+}
+
+function AdminSelect({ label, value, onValueChange, options, isRequired }: { label: string; value: string; onValueChange: (value: string) => void; options: AdminSelectOption[]; isRequired?: boolean }) {
+  const selectedId = options.find((option) => (option.value ?? option.id) === value)?.id ?? null;
+  return <Select isRequired={isRequired} selectedKey={selectedId} onSelectionChange={(key) => { const option = options.find((item) => item.id === String(key)); onValueChange(option?.value ?? option?.id ?? ''); }}><Label className="text-sm font-bold text-zinc-800">{label}</Label><Select.Trigger className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/10"><Select.Value /><Select.Indicator /></Select.Trigger><Select.Popover className="z-[110] rounded-xl border border-zinc-200 bg-white p-1 shadow-xl"><ListBox>{options.map((option) => <ListBox.Item key={option.id} id={option.id} textValue={option.label} className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100 data-[selected]:font-bold">{option.label}</ListBox.Item>)}</ListBox></Select.Popover></Select>;
+}
 
 type AdminWorkspaceProps = {
   merchants: Merchant[];
@@ -452,7 +472,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                       </div>
                       <Button
                         isIconOnly
-                        variant="light"
+                        variant="ghost"
                         onPress={adminNavigationState.close}
                         aria-label="إغلاق قائمة لوحة التحكم"
                         className="size-11 min-w-11"
@@ -497,14 +517,12 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
             </Drawer>
           </div>
 
-          <header className="mb-5">
-            <h1 className="flex items-center gap-2 text-2xl font-black sm:text-3xl">
-              <ShieldCheck className="size-6 text-zinc-900 sm:size-7" />
-              لوحة الإدارة
-            </h1>
-            <p className="mt-1 text-sm leading-6 text-zinc-500">
-              إدارة الموقع والحسابات والإيرادات والنشاط والنشر من مساحة واحدة.
-            </p>
+          <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-black sm:text-3xl"><ShieldCheck className="size-6 text-zinc-900 sm:size-7" />لوحة الإدارة</h1>
+              <p className="mt-1 text-sm leading-6 text-zinc-500">إدارة الموقع والحسابات والإيرادات والنشاط والنشر من مساحة واحدة.</p>
+            </div>
+            <Link href="/admin/marketplace/orders" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-950 bg-zinc-950 px-4 text-sm font-black text-white transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"><Store className="size-4" aria-hidden="true" />إدارة طلبات المتجر</Link>
           </header>
 
           {message && (
@@ -521,11 +539,8 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
             selectedKey={activeSection}
             onSelectionChange={(key) => setActiveSection(String(key))}
             className="kayan-admin-tabs min-w-0"
-            classNames={{
-              tabList: 'sr-only',
-              panel: 'px-0 pt-0',
-            }}
           >
+        <Tabs.ListContainer className="sr-only"><Tabs.List aria-label="إدارة المنصة">{adminSections.map((section) => <Tabs.Tab key={section.key} id={section.key}>{section.label}</Tabs.Tab>)}</Tabs.List></Tabs.ListContainer>
         <Tab id="overview" key="overview" title="نظرة عامة">
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-3 2xl:grid-cols-6">
@@ -741,20 +756,20 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                         <Button
                           isDisabled={pending}
                           onPress={() => setSelectedRequest(request)}
-                          startContent={<Pencil className="size-4" />}
                           className="border border-zinc-200 bg-white font-bold text-zinc-800"
                         >
+                          <Pencil className="size-4" aria-hidden="true" />
                           مراجعة وتعديل
                         </Button>
                         <Button
-                          isLoading={pending}
+                          isPending={pending}
                           onPress={() => rejectRequest(request.id)}
                           className="border border-rose-200 bg-rose-50 font-bold text-rose-700"
                         >
                           رفض
                         </Button>
                         <Button
-                          isLoading={pending}
+                          isPending={pending}
                           onPress={() => approveRequest(request.id)}
                           className="bg-zinc-900 font-bold text-white"
                         >
@@ -809,7 +824,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                         </p>
                       </div>
                       <Button
-                        isLoading={pending}
+                        isPending={pending}
                         onPress={() => resolveSuggestion(request.id)}
                         className="border border-zinc-200 bg-zinc-100 font-bold text-zinc-800"
                       >
@@ -840,7 +855,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                 <CardHeader className="font-black">إنشاء محل</CardHeader>
                 <CardBody>
                   <form className="grid gap-3" onSubmit={createMerchantSubmit}>
-                    <Input
+                    <AdminInput
                       isRequired
                       label="اسم المحل"
                       value={merchantName}
@@ -848,7 +863,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                     />
                     <Button
                       type="submit"
-                      isLoading={pending}
+                      isPending={pending}
                       className="bg-zinc-900 font-bold text-white"
                     >
                       إضافة المحل
@@ -864,62 +879,28 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                     className="grid gap-3 sm:grid-cols-2"
                     onSubmit={createBranchSubmit}
                   >
-                    <Select
-                      isRequired
-                      label="المحل"
-                      selectedKeys={branch.merchantId ? [branch.merchantId] : []}
-                      onSelectionChange={(keys) =>
-                        setBranch({
-                          ...branch,
-                          merchantId: String(Array.from(keys)[0] ?? ''),
-                        })
-                      }
-                    >
-                      {props.merchants.map((merchant) => (
-                        <SelectItem key={merchant.id} value={merchant.id}>
-                          {merchant.display_name}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                    <Select
-                      label="بطاقة المكان العامة"
-                      selectedKeys={branch.placeId ? [branch.placeId] : ['']}
-                      onSelectionChange={(keys) =>
-                        setBranch({
-                          ...branch,
-                          placeId: String(Array.from(keys)[0] ?? ''),
-                        })
-                      }
-                    >
-                      <SelectItem key="unlinked" value="">
-                        بدون ربط حالياً
-                      </SelectItem>
-                      {props.places.map((place) => (
-                        <SelectItem key={place.id} value={place.id}>
-                          {place.title}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                    <Input
+                    <AdminSelect isRequired label="المحل" value={branch.merchantId} onValueChange={(merchantId) => setBranch({ ...branch, merchantId })} options={props.merchants.map((merchant) => ({ id: merchant.id, label: merchant.display_name }))} />
+                    <AdminSelect label="بطاقة المكان العامة" value={branch.placeId} onValueChange={(placeId) => setBranch({ ...branch, placeId })} options={[{ id: 'unlinked', value: '', label: 'بدون ربط حالياً' }, ...props.places.map((place) => ({ id: place.id, label: place.title }))]} />
+                    <AdminInput
                       isRequired
                       label="اسم الفرع"
                       value={branch.name}
                       onValueChange={(name) => setBranch({ ...branch, name })}
                     />
-                    <Input
+                    <AdminInput
                       isRequired
                       type="tel"
                       label="هاتف الفرع"
                       value={branch.phone}
                       onValueChange={(phone) => setBranch({ ...branch, phone })}
                     />
-                    <Input
+                    <AdminInput
                       isRequired
                       label="المنطقة"
                       value={branch.area}
                       onValueChange={(area) => setBranch({ ...branch, area })}
                     />
-                    <Textarea
+                    <AdminTextarea
                       isRequired
                       label="العنوان"
                       value={branch.address}
@@ -927,7 +908,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                     />
                     <Button
                       type="submit"
-                      isLoading={pending}
+                      isPending={pending}
                       className="bg-zinc-900 font-bold text-white sm:col-span-2"
                     >
                       إنشاء وربط الفرع
@@ -955,25 +936,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                           ?.display_name || 'محل غير معروف'}
                       </p>
                     </div>
-                    <Select
-                      label="بطاقة الخدمة"
-                      selectedKeys={item.place_id ? [item.place_id] : ['']}
-                      onSelectionChange={(keys) =>
-                        updateBranchLink(
-                          item.id,
-                          String(Array.from(keys)[0] ?? ''),
-                        )
-                      }
-                    >
-                      <SelectItem key="none" value="">
-                        بدون ربط
-                      </SelectItem>
-                      {props.places.map((place) => (
-                        <SelectItem key={place.id} value={place.id}>
-                          {place.title}
-                        </SelectItem>
-                      ))}
-                    </Select>
+                    <AdminSelect label="بطاقة الخدمة" value={item.place_id || ''} onValueChange={(placeId) => updateBranchLink(item.id, placeId)} options={[{ id: 'none', value: '', label: 'بدون ربط' }, ...props.places.map((place) => ({ id: place.id, label: place.title }))]} />
                   </div>
                 ))}
               </CardBody>
@@ -988,7 +951,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                     onSubmit={createUserSubmit}
                     autoComplete="off"
                   >
-                    <Input
+                    <AdminInput
                       isRequired
                       label="الاسم"
                       name="new-user-display-name"
@@ -996,7 +959,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                       value={user.displayName}
                       onValueChange={(displayName) => setUser({ ...user, displayName })}
                     />
-                    <Input
+                    <AdminInput
                       isRequired
                       type="tel"
                       label="الهاتف"
@@ -1005,7 +968,7 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                       value={user.phone}
                       onValueChange={(phone) => setUser({ ...user, phone })}
                     />
-                    <Input
+                    <AdminInput
                       isRequired
                       type="password"
                       label="كلمة المرور المؤقتة"
@@ -1014,48 +977,13 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                       value={user.password}
                       onValueChange={(password) => setUser({ ...user, password })}
                     />
-                    <Select
-                      label="الدور"
-                      selectedKeys={[user.role]}
-                      onSelectionChange={(keys) =>
-                        setUser({
-                          ...user,
-                          role: String(Array.from(keys)[0]) as Profile['role'],
-                        })
-                      }
-                    >
-                      <SelectItem key="driver" value="driver">
-                        كابتن
-                      </SelectItem>
-                      <SelectItem key="merchant" value="merchant">
-                        محل
-                      </SelectItem>
-                      <SelectItem key="admin" value="admin">
-                        أدمن
-                      </SelectItem>
-                    </Select>
+                    <AdminSelect label="الدور" value={user.role} onValueChange={(role) => setUser({ ...user, role: role as Profile['role'] })} options={[{ id: 'driver', label: 'كابتن' }, { id: 'merchant', label: 'محل' }, { id: 'admin', label: 'أدمن' }]} />
                     {user.role === 'merchant' && (
-                      <Select
-                        isRequired
-                        label="المحل"
-                        selectedKeys={user.merchantId ? [user.merchantId] : []}
-                        onSelectionChange={(keys) =>
-                          setUser({
-                            ...user,
-                            merchantId: String(Array.from(keys)[0] ?? ''),
-                          })
-                        }
-                      >
-                        {props.merchants.map((merchant) => (
-                          <SelectItem key={merchant.id} value={merchant.id}>
-                            {merchant.display_name}
-                          </SelectItem>
-                        ))}
-                      </Select>
+                      <AdminSelect isRequired label="المحل" value={user.merchantId} onValueChange={(merchantId) => setUser({ ...user, merchantId })} options={props.merchants.map((merchant) => ({ id: merchant.id, label: merchant.display_name }))} />
                     )}
                     <Button
                       type="submit"
-                      isLoading={pending}
+                      isPending={pending}
                       className="bg-zinc-900 font-bold text-white"
                     >
                       إنشاء الحساب
@@ -1085,8 +1013,8 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                       </div>
                       <div className="flex gap-2">
                         <Button
-                          variant="flat"
-                          isLoading={pending}
+                          variant="secondary"
+                          isPending={pending}
                           onPress={() => toggleProfile(profile)}
                           className={
                             profile.is_active
@@ -1098,9 +1026,9 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
                         </Button>
                         <Button
                           onPress={() => setSelectedProfile(profile)}
-                          startContent={<UserCog className="size-4" />}
                           className="bg-zinc-900 font-bold text-white"
                         >
+                          <UserCog className="size-4" aria-hidden="true" />
                           إدارة
                         </Button>
                       </div>
@@ -1379,7 +1307,7 @@ function SystemHealthCard({
           <details className="group rounded-xl border border-zinc-200 bg-white">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-bold">
               <span>أخطاء إصدارات سابقة — للرجوع فقط</span>
-              <Chip size="sm" variant="flat">
+              <Chip size="sm" variant="secondary">
                 {historicalClientErrors.reduce((total, item) => total + item.occurrences, 0)} حدث
               </Chip>
             </summary>
@@ -1420,8 +1348,8 @@ const analyticsActionLabels: Record<string, string> = {
   marketing_share_click: 'مشاركة مادة تسويقية',
   card_download: 'تنزيل بطاقة نشر',
   phone_click: 'ضغط اتصال',
-  whatsapp_click: 'ضغط WhatsApp',
-  group_click: 'فتح جروب WhatsApp',
+  whatsapp_click: 'تواصل خارجي قديم',
+  group_click: 'فتح رابط خارجي قديم',
   telegram_click: 'فتح Telegram',
   map_click: 'فتح الخريطة',
   share_click: 'مشاركة مكان',
@@ -1730,14 +1658,10 @@ function DirectoryTab({
       <Tabs
         aria-label="إدارة ديرتك"
         className="kayan-admin-tabs min-w-0"
-        classNames={{
-          tabList: 'max-w-full overflow-x-auto rounded-2xl bg-zinc-100 p-1 no-scrollbar',
-          tab: 'min-h-11 shrink-0 px-4 font-bold',
-          cursor: 'bg-zinc-950',
-          panel: 'px-0 pt-4',
-        }}
+        defaultSelectedKey="places"
       >
-        <Tab key="places" title={`الأماكن والخدمات (${places.length})`}>
+        <Tabs.ListContainer className="max-w-full overflow-x-auto rounded-xl bg-zinc-100 p-1"><Tabs.List aria-label="إدارة الدليل"><Tabs.Tab id="places">الأماكن والخدمات ({places.length})</Tabs.Tab><Tabs.Tab id="drivers">الكباتن ({drivers.length})</Tabs.Tab></Tabs.List></Tabs.ListContainer>
+        <Tab id="places" key="places" title={`الأماكن والخدمات (${places.length})`}>
           <Card className="border border-zinc-200">
             <CardHeader className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 font-black">
@@ -1746,15 +1670,14 @@ function DirectoryTab({
               </div>
               <Button
                 onPress={() => setPlaceModal({ mode: 'create', place: null })}
-                startContent={<Plus className="size-4" />}
                 className="bg-zinc-900 font-bold text-white"
               >
+                <Plus className="size-4" aria-hidden="true" />
                 إضافة مكان مباشرة
               </Button>
             </CardHeader>
             <CardBody className="gap-3">
-              <Input
-                isClearable
+              <AdminInput
                 label="بحث بالاسم أو الهاتف"
                 value={placeSearch}
                 onValueChange={setPlaceSearch}
@@ -1773,7 +1696,7 @@ function DirectoryTab({
                       <Button
                         isIconOnly
                         aria-label={`تعديل ${place.title}`}
-                        variant="flat"
+                        variant="secondary"
                         onPress={() => setPlaceModal({ mode: 'edit', place })}
                       >
                         <Pencil className="size-4" />
@@ -1786,7 +1709,7 @@ function DirectoryTab({
             </CardBody>
           </Card>
         </Tab>
-        <Tab key="drivers" title={`الكباتن (${drivers.length})`}>
+        <Tab id="drivers" key="drivers" title={`الكباتن (${drivers.length})`}>
           <DriverManager drivers={drivers} onRefresh={onRefresh} />
         </Tab>
       </Tabs>

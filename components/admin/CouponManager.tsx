@@ -1,23 +1,18 @@
 'use client';
 
 import { FormEvent, useMemo, useState, useTransition } from 'react';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Switch,
-  Textarea,
-} from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Chip } from '@heroui/react/chip';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { ListBox } from '@heroui/react/list-box';
+import { Modal } from '@heroui/react/modal';
+import { Select } from '@heroui/react/select';
+import { Switch } from '@heroui/react/switch';
+import { TextArea } from '@heroui/react/textarea';
+import { TextField } from '@heroui/react/textfield';
+import { useOverlayState } from '@heroui/react';
 import {
   BadgePercent,
   CalendarClock,
@@ -76,6 +71,20 @@ function createDraft(placeId: string, coupon?: StoreCoupon): CouponDraft {
   };
 }
 
+type CouponOption = { id: string; label: string };
+
+function CouponInput({ label, value, onValueChange, icon, isRequired, ...props }: Omit<React.ComponentProps<typeof Input>, 'value' | 'onChange'> & { label: string; value: string; onValueChange: (value: string) => void; icon?: React.ReactNode; isRequired?: boolean }) {
+  return <TextField fullWidth isRequired={isRequired} className="space-y-1.5"><Label className="text-sm font-bold text-zinc-800">{label}</Label><div className="relative">{icon ? <span className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-zinc-400">{icon}</span> : null}<Input {...props} required={isRequired} value={value} onChange={(event) => onValueChange(event.target.value)} className={`min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10 ${icon ? 'ps-10' : ''}`} /></div></TextField>;
+}
+
+function CouponTextarea({ label, value, onValueChange, isRequired, ...props }: Omit<React.ComponentProps<typeof TextArea>, 'value' | 'onChange'> & { label: string; value: string; onValueChange: (value: string) => void; isRequired?: boolean }) {
+  return <TextField fullWidth isRequired={isRequired} className="space-y-1.5"><Label className="text-sm font-bold text-zinc-800">{label}</Label><TextArea {...props} required={isRequired} value={value} onChange={(event) => onValueChange(event.target.value)} className="min-h-24 w-full rounded-xl border border-zinc-200 bg-white p-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" /></TextField>;
+}
+
+function CouponSelect({ label, value, onValueChange, options, isRequired }: { label: string; value: string; onValueChange: (value: string) => void; options: CouponOption[]; isRequired?: boolean }) {
+  return <Select isRequired={isRequired} selectedKey={value || null} onSelectionChange={(key) => onValueChange(String(key ?? ''))}><Label className="text-sm font-bold text-zinc-800">{label}</Label><Select.Trigger className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/10"><Select.Value /><Select.Indicator /></Select.Trigger><Select.Popover className="z-[110] rounded-xl border border-zinc-200 bg-white p-1 shadow-xl"><ListBox>{options.map((option) => <ListBox.Item key={option.id} id={option.id} textValue={option.label} className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100 data-[selected]:font-bold">{option.label}</ListBox.Item>)}</ListBox></Select.Popover></Select>;
+}
+
 function discountLabel(coupon: StoreCoupon) {
   const value = Number(coupon.discount_value).toLocaleString('ar-EG', {
     maximumFractionDigits: 2,
@@ -110,6 +119,12 @@ export function CouponManager({
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState<CouponDraft | null>(null);
   const [formError, setFormError] = useState('');
+  const modalState = useOverlayState({
+    isOpen: Boolean(draft),
+    onOpenChange: (open) => {
+      if (!open && !pending) setDraft(null);
+    },
+  });
   const coupons = useMemo(
     () => places.flatMap((place) =>
       (place.coupons ?? []).map((coupon) => ({ coupon, place })),
@@ -183,7 +198,7 @@ export function CouponManager({
   return (
     <>
       <Card className="border border-zinc-200 shadow-none">
-        <CardHeader className="flex flex-col items-stretch gap-4 border-b border-zinc-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <Card.Header className="flex flex-col items-stretch gap-4 border-b border-zinc-100 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="flex items-center gap-2 font-black text-zinc-950">
               <BadgePercent className="size-5" aria-hidden="true" />
@@ -195,19 +210,14 @@ export function CouponManager({
           </div>
           <Button
             onPress={openCreate}
-            startContent={<Plus className="size-4" aria-hidden="true" />}
             className="bg-zinc-950 font-bold text-white"
           >
+            <Plus className="size-4" aria-hidden="true" />
             كوبون جديد
           </Button>
-        </CardHeader>
-        <CardBody className="gap-4 p-4">
-          <Input
-            isClearable
-            label="ابحث باسم المتجر أو العرض أو الكود"
-            value={search}
-            onValueChange={setSearch}
-          />
+        </Card.Header>
+        <Card.Content className="gap-4 p-4">
+          <CouponInput label="ابحث باسم المتجر أو العرض أو الكود" value={search} onValueChange={setSearch} />
           <div className="grid gap-3 lg:grid-cols-2">
             {filtered.map(({ coupon, place }) => {
               const state = couponState(coupon);
@@ -254,9 +264,9 @@ export function CouponManager({
                         setFormError('');
                         setDraft(createDraft(place.id, coupon));
                       }}
-                      startContent={<Pencil className="size-4" aria-hidden="true" />}
                       className="flex-1 border border-zinc-200 bg-zinc-50 font-bold text-zinc-800"
                     >
+                      <Pencil className="size-4" aria-hidden="true" />
                       تعديل
                     </Button>
                     <Button
@@ -278,47 +288,33 @@ export function CouponManager({
               {coupons.length ? 'لا توجد كوبونات مطابقة للبحث.' : 'لا توجد كوبونات بعد. أنشئ أول عرض لأي متجر.'}
             </div>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
 
-      <Modal
-        isOpen={Boolean(draft)}
-        onOpenChange={(open) => {
-          if (!open && !pending) setDraft(null);
-        }}
-        scrollBehavior="inside"
-        classNames={{ base: 'max-w-3xl border border-zinc-200 bg-white' }}
-      >
-        <ModalContent>
-          {(onClose) => draft && (
+      <Modal state={modalState}>
+        <Modal.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+          <Modal.Container placement="center" size="lg" scroll="inside" className="p-3">
+            <Modal.Dialog aria-label={draft?.id ? 'تعديل الكوبون' : 'إنشاء كوبون جديد'} dir="rtl" className="max-w-3xl border border-zinc-200 bg-white">
+          {draft ? (
             <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
-              <ModalHeader className="border-b border-zinc-100">
-                <h2 className="flex items-center gap-2 text-lg font-black">
+              <Modal.Header className="border-b border-zinc-100">
+                <Modal.Heading className="flex items-center gap-2 text-lg font-black">
                   <Tag className="size-5" aria-hidden="true" />
                   {draft.id ? 'تعديل الكوبون' : 'إنشاء كوبون جديد'}
-                </h2>
+                </Modal.Heading>
                 <p className="mt-1 text-xs font-semibold text-zinc-500">
-                  اكتب الشروط بوضوح؛ العميل سيشاهدها قبل فتح WhatsApp.
+                  اكتب الشروط بوضوح؛ العميل سيشاهدها قبل تطبيق الكود داخل السلة.
                 </p>
-              </ModalHeader>
-              <ModalBody className="space-y-4 py-4">
+              </Modal.Header>
+              <Modal.Body className="space-y-4 py-4">
                 {formError && (
                   <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-bold text-rose-800">
                     {formError}
                   </p>
                 )}
-                <Select
-                  isRequired
-                  label="المتجر"
-                  selectedKeys={[draft.place_id]}
-                  onChange={(event) => setField('place_id', event.target.value)}
-                >
-                  {places.map((place) => (
-                    <SelectItem key={place.id} value={place.id}>{place.title}</SelectItem>
-                  ))}
-                </Select>
+                <CouponSelect isRequired label="المتجر" value={draft.place_id} onValueChange={(value) => setField('place_id', value)} options={places.map((place) => ({ id: place.id, label: place.title }))} />
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Input
+                  <CouponInput
                     isRequired
                     label="اسم العرض"
                     placeholder="مثال: خصم ديرتك 10%"
@@ -326,35 +322,28 @@ export function CouponManager({
                     value={draft.title}
                     onValueChange={(value) => setField('title', value)}
                   />
-                  <Input
+                  <CouponInput
                     isRequired
                     label="كود الكوبون"
                     placeholder="DAIRTAK10"
                     maxLength={32}
                     value={draft.code}
                     onValueChange={(value) => setField('code', value.toUpperCase())}
-                    startContent={<Tag className="size-4 text-zinc-400" aria-hidden="true" />}
+                    icon={<Tag className="size-4 text-zinc-400" aria-hidden="true" />}
                   />
                 </div>
-                <Textarea
+                <CouponTextarea
                   isRequired
                   label="وصف العرض"
                   placeholder="اشرح للعميل الخصم ومتى يستفيد منه."
-                  minRows={2}
+                  rows={2}
                   maxLength={280}
                   value={draft.description}
                   onValueChange={(value) => setField('description', value)}
                 />
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <Select
-                    label="نوع الخصم"
-                    selectedKeys={[draft.discount_type]}
-                    onChange={(event) => setField('discount_type', event.target.value as CouponDiscountType)}
-                  >
-                    <SelectItem key="percentage" value="percentage">نسبة مئوية</SelectItem>
-                    <SelectItem key="fixed" value="fixed">قيمة ثابتة</SelectItem>
-                  </Select>
-                  <Input
+                  <CouponSelect label="نوع الخصم" value={draft.discount_type} onValueChange={(value) => setField('discount_type', value as CouponDiscountType)} options={[{ id: 'percentage', label: 'نسبة مئوية' }, { id: 'fixed', label: 'قيمة ثابتة' }]} />
+                  <CouponInput
                     isRequired
                     type="number"
                     min="0.01"
@@ -364,7 +353,7 @@ export function CouponManager({
                     value={draft.discount_value}
                     onValueChange={(value) => setField('discount_value', value)}
                   />
-                  <Input
+                  <CouponInput
                     type="number"
                     min="0"
                     step="0.01"
@@ -375,7 +364,7 @@ export function CouponManager({
                   />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Input
+                  <CouponInput
                     isRequired
                     label="الخصم على إيه؟"
                     placeholder="كل المنتجات أو منتجات محددة"
@@ -383,7 +372,7 @@ export function CouponManager({
                     value={draft.applies_to}
                     onValueChange={(value) => setField('applies_to', value)}
                   />
-                  <Input
+                  <CouponInput
                     isRequired
                     label="الحد أو شروط الاستخدام"
                     placeholder="مثال: الحد الأدنى 450 جنيه"
@@ -393,21 +382,21 @@ export function CouponManager({
                   />
                 </div>
                 <div className="grid gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-2">
-                  <Input
+                  <CouponInput
                     type="datetime-local"
                     label="يبدأ في (اختياري)"
                     value={draft.starts_at ?? ''}
                     onValueChange={(value) => setField('starts_at', value)}
-                    startContent={<CalendarClock className="size-4 text-zinc-400" aria-hidden="true" />}
+                    icon={<CalendarClock className="size-4 text-zinc-400" aria-hidden="true" />}
                   />
-                  <Input
+                  <CouponInput
                     type="datetime-local"
                     label="ينتهي في (اختياري)"
                     value={draft.expires_at ?? ''}
                     onValueChange={(value) => setField('expires_at', value)}
-                    startContent={<CalendarClock className="size-4 text-zinc-400" aria-hidden="true" />}
+                    icon={<CalendarClock className="size-4 text-zinc-400" aria-hidden="true" />}
                   />
-                  <Input
+                  <CouponInput
                     type="number"
                     min="0"
                     max="1000"
@@ -417,33 +406,29 @@ export function CouponManager({
                   />
                   <div className="flex flex-wrap items-center gap-5 pt-2 text-sm font-bold">
                     <label className="flex items-center gap-2">
-                      <Switch
-                        isSelected={draft.is_active}
-                        onValueChange={(value) => setField('is_active', value)}
-                      />
+                      <Switch isSelected={draft.is_active} onChange={(value) => setField('is_active', value)} aria-label="الكوبون منشور"><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
                       منشور
                     </label>
                     <label className="flex items-center gap-2">
-                      <Switch
-                        isSelected={draft.is_featured}
-                        onValueChange={(value) => setField('is_featured', value)}
-                      />
+                      <Switch isSelected={draft.is_featured} onChange={(value) => setField('is_featured', value)} aria-label="الكوبون مميز"><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
                       مميز
                     </label>
                   </div>
                 </div>
-              </ModalBody>
-              <ModalFooter className="gap-2 border-t border-zinc-100">
-                <Button type="button" variant="flat" onPress={onClose} isDisabled={pending}>
+              </Modal.Body>
+              <Modal.Footer className="gap-2 border-t border-zinc-100">
+                <Button type="button" variant="secondary" onPress={modalState.close} isDisabled={pending}>
                   إلغاء
                 </Button>
-                <Button type="submit" isLoading={pending} className="bg-zinc-950 font-bold text-white">
+                <Button type="submit" isPending={pending} className="bg-zinc-950 font-bold text-white">
                   {draft.id ? 'حفظ التعديلات' : 'إنشاء ونشر الكوبون'}
                 </Button>
-              </ModalFooter>
+              </Modal.Footer>
             </form>
-          )}
-        </ModalContent>
+          ) : null}
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
     </>
   );

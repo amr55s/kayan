@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
-import { Button, Chip } from '@heroui/react';
+import { Button, Chip } from '@/components/ui/heroui-compat';
 import { Bike, ChevronLeft, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Driver } from '@/types';

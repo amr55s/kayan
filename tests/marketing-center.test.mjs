@@ -16,9 +16,12 @@ test('marketing groups and campaign data stay server-only', () => {
   assert.match(migration, /select public\.record_site_analytics_v2/);
 });
 
-test('admin marketing actions verify the admin session and validate WhatsApp groups', () => {
+test('legacy marketing channel actions remain admin-only and validated', () => {
   const actions = read('lib/marketing/admin-actions.ts');
-  assert.match(actions, /profile\.role !== 'admin'/);
+  assert.match(
+    actions,
+    /requireMarketplaceAdminRole\(\['super_admin'\], \{ failureMode: 'throw' \}\)/,
+  );
   assert.match(actions, /placeDetailsValidators\.whatsappGroup/);
   assert.match(actions, /\.from\('marketing_channels'\)/);
   assert.match(actions, /\.from\('marketing_campaigns'\)/);
@@ -30,7 +33,7 @@ test('marketing cards resolve real entities and encode a direct QR link', () => 
   assert.match(route, /QRCode\.toBuffer\(targetUrl/);
   assert.match(route, /\.from\('places'\)/);
   assert.match(route, /fetchPublicDrivers\(\)/);
-  assert.match(route, /تواصل مباشر • بدون عمولات/);
+  assert.match(route, /طلب ومتابعة من داخل الموقع/);
   assert.doesNotMatch(route, /driver\.phone|place\.phone/);
   assert.match(route, /cache-control/);
   assert.match(route, /Too many card requests/);
@@ -58,25 +61,45 @@ test('public guide and share kit cover residents, merchants, and drivers', () =>
   assert.match(guide, /للسكان والمستخدمين/);
   assert.match(guide, /للمحلات والخدمات/);
   assert.match(guide, /لكباتن التوصيل/);
-  assert.match(guide, /بدون عمولات/);
+  assert.match(guide, /أكمل الطلب والدفع عند الاستلام/);
   assert.match(share, /PublicShareHub/);
   assert.match(hub, /marketing_share_click/);
   assert.match(hub, /card_download/);
   assert.match(hub, /loading="eager"/);
   assert.match(hub, /IntersectionObserver/);
   assert.match(hub, /content-visibility:auto/);
+  assert.match(hub, /حدّد النص التالي وانسخه من داخل الموقع/);
+  assert.doesNotMatch(hub, /wa\.me|api\.whatsapp\.com|chat\.whatsapp\.com|place\.phone|driver\.phone/i);
   assert.match(share, /sharePlaces/);
   assert.match(share, /shareDrivers/);
 });
 
-test('official community group link is updated in app and marketing data', () => {
-  const community = read('lib/community.ts');
-  const migration = read(
-    'supabase/migrations/20260729112345_update_official_whatsapp_group_link.sql',
-  );
-  assert.match(community, /\?mode=gi_t/);
-  assert.match(migration, /where slug = 'kayan-main'/);
-  assert.match(migration, /\?mode=gi_t/);
+test('public marketing cards cannot bypass directory RLS or select private place columns', () => {
+  const card = read('app/api/marketing-card/route.ts');
+  assert.match(card, /createPublicClient\(\)/u);
+  assert.match(card, /\.select\('id,title,images'\)/u);
+  assert.doesNotMatch(card, /createAdminClient|\.select\(['"]\*['"]\)/u);
+});
+
+test('active marketing surfaces do not wire legacy community contact links', () => {
+  const activeSurfaces = [
+    'app/layout.tsx',
+    'app/guide/page.tsx',
+    'app/share/page.tsx',
+    'components/marketing/PublicShareHub.tsx',
+    'components/admin/MarketingCenter.tsx',
+  ];
+
+  for (const file of activeSurfaces) {
+    assert.doesNotMatch(
+      read(file),
+      /@\/lib\/community|WHATSAPP_GROUP_URL|whatsapp_url|wa\.me|api\.whatsapp\.com|chat\.whatsapp\.com/i,
+      `${file} must keep contact and publishing inside the application`,
+    );
+  }
+  const center = read('components/admin/MarketingCenter.tsx');
+  assert.doesNotMatch(center, /saveMarketingChannel|setMarketingChannelActive/);
+  assert.match(center, /مسار المحتوى/);
 });
 
 test('campaign attribution is anonymous and survives safe in-app navigation', () => {

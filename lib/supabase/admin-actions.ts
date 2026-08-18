@@ -1,17 +1,20 @@
 'use server';
 
+import { z } from 'zod';
 import { createAdminClient } from './admin';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { PendingRequest, Place, Driver, FeedbackRequest, StoreCoupon } from '@/types';
-import { getCurrentProfile } from '@/lib/auth/guards';
+import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import { validatePlaceDetails } from '@/lib/place-details';
 import { validateListingImageUrls } from '@/lib/images/urls';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
+import {
+  claimLegacyPlaceUploads,
+  splitLegacyPlaceImageReferences,
+} from '@/lib/media/legacy';
 
 async function requireAdminSession() {
-  const profile = await getCurrentProfile();
-  if (!profile || !profile.is_active || profile.role !== 'admin') {
-    throw new Error('admin_access_required');
-  }
+  const { profile } = await requireMarketplaceAdminRole(['super_admin'], { failureMode: 'throw' });
   return profile;
 }
 
@@ -58,8 +61,8 @@ function triggerInstantRevalidation(tags?: ('places' | 'drivers')[]) {
       revalidateTag('places', 'max');
       revalidateTag('drivers', 'max');
     }
-  } catch (e) {
-    console.warn('Revalidation notice:', e);
+  } catch (error) {
+    logSafeServerFailure('warn', 'admin_revalidation_failed', { failure: error });
   }
 }
 
@@ -103,7 +106,7 @@ export async function serverFetchAdminMetrics(): Promise<{
       pendingFeedbacks: feedbackCount?.count || 0,
     };
   } catch (err) {
-    console.error('serverFetchAdminMetrics exception:', err);
+    logSafeServerFailure('error', 'admin_metrics_fetch_failed', { failure: err });
     return { totalPlaces: 8, activeDrivers: 5, pendingAdditions: 0, pendingFeedbacks: 0 };
   }
 }
@@ -135,7 +138,7 @@ export async function serverFetchAdminData(): Promise<{
       feedbackRequests: (feedbackRes?.data as FeedbackRequest[]) || [],
     };
   } catch (err) {
-    console.error('serverFetchAdminData exception:', err);
+    logSafeServerFailure('error', 'admin_data_fetch_failed', { failure: err });
     return { pendingRequests: [], places: [], drivers: [], feedbackRequests: [] };
   }
 }
@@ -190,7 +193,7 @@ export async function serverApprovePendingRequest(
     triggerInstantRevalidation();
     return { success: true };
   } catch (error) {
-    console.error('serverApprovePendingRequest error:', error);
+    logSafeServerFailure('error', 'pending_request_approval_failed', { failure: error });
     return { success: false, message: 'تعذر اعتماد الطلب حالياً. لم يتم فقد الطلب، حاول مرة أخرى.' };
   }
 }
@@ -254,7 +257,7 @@ export async function serverEditAndApproveRequest(
     triggerInstantRevalidation();
     return { success: true };
   } catch (error) {
-    console.error('serverEditAndApproveRequest error:', error);
+    logSafeServerFailure('error', 'pending_request_edit_approval_failed', { failure: error });
     return { success: false, message: 'تعذر حفظ واعتماد الطلب حالياً. لم يتم فقد الطلب.' };
   }
 }
@@ -279,7 +282,7 @@ export async function serverRejectPendingRequest(
     triggerInstantRevalidation();
     return { success: true };
   } catch (error) {
-    console.error('serverRejectPendingRequest error:', error);
+    logSafeServerFailure('error', 'pending_request_rejection_failed', { failure: error });
     return { success: false, message: 'تعذر رفض الطلب حالياً. لم يتم حذف الطلب.' };
   }
 }
@@ -308,12 +311,15 @@ export async function serverInsertPlaceDirectly(
       address: placeData.address,
       mapUrl: placeData.map_url,
     });
-    const uploadedImages = validateListingImageUrls(placeData.images ?? [], 6);
-    if (!uploadedImages.length) {
+    const pendingImages = splitLegacyPlaceImageReferences(placeData.images ?? [], 6);
+    if (pendingImages.urls.length) {
+      throw new Error('روابط الصور الجديدة غير صالحة. أعد رفع الصور من النموذج.');
+    }
+    if (!pendingImages.uploadIds.length) {
       throw new Error('أضف صورة واحدة على الأقل للمكان أو المنيو قبل النشر.');
     }
     const supabase = createAdminClient();
-    const { error } = await (supabase as any).from('places').insert([
+    const { data: inserted, error } = await (supabase as any).from('places').insert([
       {
         title: placeData.title.trim(),
         category: placeData.category,
@@ -325,17 +331,24 @@ export async function serverInsertPlaceDirectly(
         telegram_url: details.telegramUrl,
         address: details.address,
         map_url: details.mapUrl,
-        images: uploadedImages,
+        images: [],
         is_featured: placeData.is_featured || false,
       },
-    ]);
+    ]).select('id').single();
 
     if (error) throw error;
+    try {
+      const claimed = await claimLegacyPlaceUploads(pendingImages.uploadIds, inserted.id, []);
+      if (!claimed.length) throw new Error('place_media_claim_failed');
+    } catch (error) {
+      await (supabase as any).from('places').delete().eq('id', inserted.id);
+      throw error;
+    }
 
     triggerInstantRevalidation();
     return { success: true, message: 'تمت إضافة المكان بنجاح ونشره في ديرتك!' };
   } catch (err: any) {
-    console.error('serverInsertPlaceDirectly error:', err);
+    logSafeServerFailure('error', 'admin_place_insert_failed', { failure: err });
     return {
       success: false,
       message: safeAdminMessage(err, 'حدث خطأ أثناء إضافة المكان. حاول مرة أخرى.'),
@@ -356,6 +369,20 @@ export async function serverUpdateActivePlace(
       mapUrl: updatedData.map_url,
     });
     const supabase = createAdminClient();
+    const id = z.uuid().parse(placeId);
+    const references = splitLegacyPlaceImageReferences(updatedData.images ?? [], 15);
+    const { data: current, error: currentError } = await (supabase as any)
+      .from('places')
+      .select('id, images')
+      .eq('id', id)
+      .single();
+    if (currentError || !current) throw currentError ?? new Error('place_not_found');
+    const currentImages = new Set<string>(current.images ?? []);
+    if (references.urls.some((url) => !currentImages.has(url))) {
+      throw new Error('قائمة الصور الحالية غير صالحة.');
+    }
+    const claimed = await claimLegacyPlaceUploads(references.uploadIds, id, references.urls);
+    const finalImages = Array.from(new Set([...references.urls, ...claimed]));
     const { error } = await (supabase as any)
       .from('places')
       .update({
@@ -369,16 +396,16 @@ export async function serverUpdateActivePlace(
         telegram_url: details.telegramUrl,
         address: details.address,
         map_url: details.mapUrl,
-        images: updatedData.images,
+        images: finalImages,
         is_featured: updatedData.is_featured,
       })
-      .eq('id', placeId);
+      .eq('id', id);
 
     if (error) throw error;
     triggerInstantRevalidation();
     return { success: true };
   } catch (err: any) {
-    console.error('serverUpdateActivePlace error:', err);
+    logSafeServerFailure('error', 'admin_place_update_failed', { failure: err });
     return {
       success: false,
       message: safeAdminMessage(err, 'حدث خطأ أثناء تحديث المكان. حاول مرة أخرى.'),
@@ -397,7 +424,7 @@ export async function serverDeleteActivePlace(
     triggerInstantRevalidation();
     return { success: true };
   } catch (err: any) {
-    console.error('serverDeleteActivePlace error:', err);
+    logSafeServerFailure('error', 'admin_place_delete_failed', { failure: err });
     return {
       success: false,
       message: safeAdminMessage(err, 'حدث خطأ أثناء حذف المكان. حاول مرة أخرى.'),
@@ -526,7 +553,7 @@ export async function serverUpsertStoreCoupon(
       message: input.id ? 'تم تحديث الكوبون.' : 'تم إنشاء الكوبون ونشره على بطاقة المتجر.',
     };
   } catch (error) {
-    console.error('serverUpsertStoreCoupon error:', error);
+    logSafeServerFailure('error', 'store_coupon_upsert_failed', { failure: error });
     return {
       success: false,
       message: safeAdminMessage(error, 'تعذر حفظ الكوبون. راجع البيانات وحاول مرة أخرى.'),
@@ -556,7 +583,7 @@ export async function serverDeleteStoreCoupon(
     triggerInstantRevalidation(['places']);
     return { success: true, message: 'تم حذف الكوبون.' };
   } catch (error) {
-    console.error('serverDeleteStoreCoupon error:', error);
+    logSafeServerFailure('error', 'store_coupon_delete_failed', { failure: error });
     return {
       success: false,
       message: safeAdminMessage(error, 'تعذر حذف الكوبون حالياً.'),
@@ -598,7 +625,7 @@ export async function serverToggleDriverStatus(
     triggerInstantRevalidation();
     return { success: true };
   } catch (error) {
-    console.error('serverToggleDriverStatus error:', error);
+    logSafeServerFailure('error', 'driver_status_toggle_failed', { failure: error });
     return { success: false, message: 'تعذر تغيير حالة الكابتن حالياً.' };
   }
 }
@@ -627,7 +654,7 @@ export async function serverExtendDriverTime(
     triggerInstantRevalidation();
     return { success: true };
   } catch (error) {
-    console.error('serverExtendDriverTime error:', error);
+    logSafeServerFailure('error', 'driver_time_extension_failed', { failure: error });
     return { success: false, message: 'تعذر تمديد وقت الكابتن حالياً.' };
   }
 }
@@ -648,7 +675,7 @@ export async function serverDeleteDriver(
     triggerInstantRevalidation();
     return { success: true };
   } catch (error) {
-    console.error('serverDeleteDriver error:', error);
+    logSafeServerFailure('error', 'driver_delete_failed', { failure: error });
     return { success: false, message: 'تعذر حذف الكابتن حالياً.' };
   }
 }

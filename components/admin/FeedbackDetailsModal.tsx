@@ -1,16 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  Chip,
-  Image as HeroImage,
-} from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Chip } from '@heroui/react/chip';
+import { Modal } from '@heroui/react/modal';
+import { useOverlayState } from '@heroui/react';
 import { MessageSquare, CheckCircle, Phone, ArrowRight, Download, ExternalLink, RefreshCw } from 'lucide-react';
 import { FeedbackImageMode, FeedbackRequest, Place } from '@/types';
 import {
@@ -39,6 +33,7 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
   const [imageMode, setImageMode] = useState<FeedbackImageMode>(
     feedback.feedback_type === 'merchant_update' ? 'replace' : 'append',
   );
+  const modalState = useOverlayState({ isOpen, onOpenChange });
 
   const imagesToPreview = feedback.proposed_images?.length
     ? feedback.proposed_images
@@ -96,23 +91,11 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onOpenChange={onOpenChange}
-      size="2xl"
-      placement="center"
-      scrollBehavior="inside"
-      backdrop="blur"
-      classNames={{
-        base: "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 dir-rtl font-sans",
-        header: "border-b border-zinc-100 dark:border-zinc-800 pb-3",
-        footer: "border-t border-zinc-100 dark:border-zinc-800 pt-3",
-      }}
-    >
-      <ModalContent>
-        {(onClose) => (
-          <>
-            <ModalHeader className="flex items-center justify-between text-zinc-900 dark:text-white font-bold text-lg">
+    <Modal state={modalState}>
+      <Modal.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+        <Modal.Container placement="center" size="lg" scroll="inside" className="p-3">
+          <Modal.Dialog aria-label="تفاصيل طلب التعديل" dir="rtl" className="border border-zinc-200 bg-white font-sans dark:border-zinc-800 dark:bg-zinc-900">
+            <Modal.Header className="flex items-center justify-between border-b border-zinc-100 pb-3 text-lg font-bold text-zinc-900 dark:border-zinc-800 dark:text-white">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-sm">
                   <MessageSquare className="w-5 h-5" />
@@ -130,15 +113,15 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
               </div>
               <Chip
                 size="sm"
-                variant="flat"
+                variant="secondary"
                 color={feedback.status === 'resolved' ? 'success' : 'warning'}
                 className="font-bold text-xs"
               >
                 {feedback.status === 'resolved' ? 'تمت المعالجة' : 'قيد الانتظار'}
               </Chip>
-            </ModalHeader>
+            </Modal.Header>
 
-            <ModalBody className="py-4 space-y-4">
+            <Modal.Body className="space-y-4 py-4">
               {actionError && (
                 <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
                   {actionError}
@@ -153,9 +136,9 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5 font-bold text-zinc-600 dark:text-zinc-400">
                     <span>هاتف مقدم الطلب:</span>
-                    <a href={`tel:${feedback.contact_phone}`} className="font-mono text-emerald-600 dark:text-emerald-400 underline dir-ltr">
+                    <bdi dir="ltr" className="font-mono text-zinc-700 dark:text-zinc-300">
                       {feedback.contact_phone}
-                    </a>
+                    </bdi>
                   </div>
                 </div>
 
@@ -194,20 +177,8 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
                           <p className="font-mono">
                             {feedback.proposed_phone || targetPlace?.phone}
                           </p>
-                          <p className="font-normal">
-                            واتساب: {feedback.proposed_whatsapp || 'سيتم حذفه'}
-                          </p>
-                          <p className="font-normal">
-                            الدفع: {feedback.proposed_instapay_vfcash || 'سيتم حذفه'}
-                          </p>
                           <p className="whitespace-pre-wrap font-normal">
                             {feedback.proposed_description || 'بدون وصف'}
-                          </p>
-                          <p className="break-all font-normal">
-                            جروب WhatsApp: {feedback.proposed_whatsapp_group_url || 'بدون'}
-                          </p>
-                          <p className="break-all font-normal">
-                            Telegram: {feedback.proposed_telegram_url || 'بدون'}
                           </p>
                           <p className="whitespace-pre-wrap font-normal">
                             العنوان: {feedback.proposed_address || 'بدون'}
@@ -218,12 +189,6 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
                         </div>
                       ) : feedback.feedback_type === 'details_update' ? (
                         <div className="space-y-1.5">
-                          {feedback.proposed_whatsapp_group_url && (
-                            <p className="break-all">WhatsApp: {feedback.proposed_whatsapp_group_url}</p>
-                          )}
-                          {feedback.proposed_telegram_url && (
-                            <p className="break-all">Telegram: {feedback.proposed_telegram_url}</p>
-                          )}
                           {feedback.proposed_address && (
                             <p className="whitespace-pre-wrap">العنوان: {feedback.proposed_address}</p>
                           )}
@@ -254,15 +219,9 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {imagesToPreview.map((imgUrl, idx) => (
                       <div key={idx} className="relative group rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 h-32">
-                        <HeroImage
-                          src={imgUrl}
-                          alt={`صورة ${idx + 1}`}
-                          classNames={{
-                            wrapper: "w-full h-full",
-                            img: "w-full h-full object-cover",
-                          }}
-                          radius="none"
-                        />
+                        {/* User-supplied URLs are validated server-side and may not match Next Image hosts. */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={imgUrl} alt={`صورة ${idx + 1}`} className="h-full w-full object-cover" />
                         <div className="absolute inset-0 bg-zinc-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10">
                           <a
                             href={imgUrl}
@@ -289,14 +248,14 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
                     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
                       <span className="text-xs font-bold text-zinc-700">طريقة تطبيق الصور:</span>
                       <Button
-                        variant="flat"
+                        variant="secondary"
                         onPress={() => setImageMode('append')}
                         className={imageMode === 'append' ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900 border border-zinc-200'}
                       >
                         إضافة إلى الصور الحالية
                       </Button>
                       <Button
-                        variant="flat"
+                        variant="secondary"
                         onPress={() => setImageMode('replace')}
                         className={imageMode === 'replace' ? 'bg-zinc-900 text-white' : 'bg-white text-zinc-900 border border-zinc-200'}
                       >
@@ -306,13 +265,12 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
                   )}
                 </div>
               )}
-            </ModalBody>
+            </Modal.Body>
 
-            <ModalFooter className="flex flex-col sm:flex-row gap-2">
+            <Modal.Footer className="flex flex-col gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800 sm:flex-row">
               <Button
-                variant="flat"
-                color="default"
-                onClick={onClose}
+                variant="secondary"
+                onPress={modalState.close}
                 className="font-semibold h-11"
               >
                 إغلاق
@@ -321,34 +279,32 @@ export const FeedbackDetailsModal: React.FC<FeedbackDetailsModalProps> = ({
               {feedback.status !== 'resolved' && (
                 <>
                   <Button
-                    variant="flat"
-                    color="warning"
+                    variant="secondary"
                     onClick={handleResolveOnly}
-                    isLoading={isResolving}
-                    startContent={!isResolving && <CheckCircle className="w-4 h-4" />}
+                    isPending={isResolving}
                     className="min-h-[44px] border border-zinc-200 bg-zinc-100 text-xs font-bold text-zinc-800"
                   >
+                    {!isResolving && <CheckCircle className="w-4 h-4" aria-hidden="true" />}
                     تم المعالجة بدون تعديل
                   </Button>
 
                   {canApply && (
                     <Button
-                      color="success"
-                      variant="solid"
+                      variant="primary"
                       onClick={handleApply}
-                      isLoading={isApplying}
-                      startContent={!isApplying && <RefreshCw className="w-4 h-4" />}
+                      isPending={isApplying}
                       className="min-h-[44px] bg-zinc-900 px-6 text-xs font-bold text-white shadow-md hover:bg-zinc-800"
                     >
+                      {!isApplying && <RefreshCw className="w-4 h-4" aria-hidden="true" />}
                       تأكيد وتطبيق التعديل فوراً
                     </Button>
                   )}
                 </>
               )}
-            </ModalFooter>
-          </>
-        )}
-      </ModalContent>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 };

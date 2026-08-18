@@ -1,7 +1,10 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { Button, Card, CardBody, CardHeader, Input } from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
 import { ArrowRight, KeyRound, Phone, ShieldCheck, UserPlus } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { completeInitialPassword, loginWithPhone } from '@/lib/auth/actions';
@@ -52,13 +55,9 @@ export function LoginForm() {
   }
 
   return (
-    <main className="dir-rtl relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-gradient-to-br from-white via-zinc-50 to-zinc-200/70 px-4 py-10 text-zinc-900">
-      {/* Decorative ambient light gradients */}
-      <div className="pointer-events-none absolute -right-32 -top-32 size-96 rounded-full bg-orange-200/35 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 -left-32 size-96 rounded-full bg-zinc-300/35 blur-3xl" />
-
-      <Card className="relative z-10 w-full max-w-md rounded-[32px] border border-zinc-200/80 bg-white/90 p-2 text-zinc-900 shadow-2xl shadow-zinc-200/60 backdrop-blur-xl sm:p-4">
-        <CardHeader className="flex flex-col items-center gap-3 pb-2 text-center pt-6 sm:pt-8">
+    <main id="main-content" className="dir-rtl flex min-h-screen w-full items-center justify-center bg-zinc-100 px-4 py-10 text-zinc-900">
+      <Card className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-2 text-zinc-900 shadow-lg sm:p-4">
+        <Card.Header className="flex flex-col items-center gap-3 pb-2 pt-6 text-center sm:pt-8">
           <div className="flex h-24 w-full max-w-[19rem] items-center justify-center overflow-hidden rounded-2xl bg-white px-4 shadow-md ring-1 ring-zinc-200/80">
             <BrandLogo variant="full" className="h-auto w-full" priority />
           </div>
@@ -76,8 +75,8 @@ export function LoginForm() {
                 : 'بوابة الكباتن وأصحاب المحلات والإدارة'}
             </p>
           </div>
-        </CardHeader>
-        <CardBody className="px-4 py-6 sm:px-6">
+        </Card.Header>
+        <Card.Content className="px-4 py-6 sm:px-6">
           <form className="space-y-4" onSubmit={submit}>
             {error && (
               <p
@@ -88,60 +87,35 @@ export function LoginForm() {
               </p>
             )}
             {!changePassword && (
-              <Input
-                isRequired
-                name="phone"
-                autoComplete="tel"
-                type="tel"
-                inputMode="tel"
-                label="رقم الهاتف"
-                placeholder="01012345678"
-                value={phone}
-                onValueChange={setPhone}
-                startContent={<Phone className="size-4 text-zinc-400" aria-hidden="true" />}
-                classNames={{
-                  label: 'text-xs font-bold text-zinc-700',
-                  inputWrapper:
-                    'bg-zinc-50 border-zinc-200 focus-within:!border-zinc-500 focus-within:!bg-white rounded-2xl shadow-xs transition-colors',
-                }}
-              />
+              <div className="space-y-1.5">
+                <Label htmlFor="login-phone" className="text-xs font-bold text-zinc-700">رقم الهاتف</Label>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                  <Input id="login-phone" required name="phone" autoComplete="tel" type="tel" inputMode="tel" placeholder="01012345678" value={phone} onChange={(event) => setPhone(event.target.value)} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 ps-10 text-base outline-none focus:border-zinc-500 focus:bg-white focus:ring-2 focus:ring-zinc-950/10" />
+                </div>
+              </div>
             )}
-            <Input
-              isRequired
-              name={changePassword ? 'new-password' : 'password'}
-              autoComplete={changePassword ? 'new-password' : 'current-password'}
-              type="password"
-              label={changePassword ? 'كلمة المرور الجديدة' : 'كلمة المرور'}
-              value={password}
-              onValueChange={setPassword}
-              startContent={<KeyRound className="size-4 text-zinc-400" aria-hidden="true" />}
-              classNames={{
-                label: 'text-xs font-bold text-zinc-700',
-                inputWrapper:
-                  'bg-zinc-50 border-zinc-200 focus-within:!border-zinc-500 focus-within:!bg-white rounded-2xl shadow-xs transition-colors',
-              }}
-            />
+            <div className="space-y-1.5">
+              <Label htmlFor="login-password" className="text-xs font-bold text-zinc-700">{changePassword ? 'كلمة المرور الجديدة' : 'كلمة المرور'}</Label>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                <Input id="login-password" required name={changePassword ? 'new-password' : 'password'} autoComplete={changePassword ? 'new-password' : 'current-password'} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 ps-10 text-base outline-none focus:border-zinc-500 focus:bg-white focus:ring-2 focus:ring-zinc-950/10" />
+              </div>
+            </div>
             {changePassword && (
-              <Input
-                isRequired
-                name="confirm-password"
-                autoComplete="new-password"
-                type="password"
-                label="تأكيد كلمة المرور"
-                value={confirmPassword}
-                onValueChange={setConfirmPassword}
-                startContent={<KeyRound className="size-4 text-zinc-400" aria-hidden="true" />}
-                classNames={{
-                  label: 'text-xs font-bold text-zinc-700',
-                  inputWrapper:
-                    'bg-zinc-50 border-zinc-200 focus-within:!border-zinc-500 focus-within:!bg-white rounded-2xl shadow-xs transition-colors',
-                }}
-              />
+              <div className="space-y-1.5">
+                <Label htmlFor="login-confirm-password" className="text-xs font-bold text-zinc-700">تأكيد كلمة المرور</Label>
+                <div className="relative">
+                  <KeyRound className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                  <Input id="login-confirm-password" required name="confirm-password" autoComplete="new-password" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 ps-10 text-base outline-none focus:border-zinc-500 focus:bg-white focus:ring-2 focus:ring-zinc-950/10" />
+                </div>
+              </div>
             )}
 
             <Button
               type="submit"
-              isLoading={loading}
+              isPending={loading}
+              isDisabled={loading}
               className="mt-2 min-h-12 w-full rounded-2xl bg-zinc-950 font-black text-white shadow-lg shadow-zinc-950/10 transition-[background-color,transform,box-shadow] hover:bg-zinc-800 active:scale-[0.99] motion-reduce:transform-none"
             >
               {changePassword ? 'حفظ كلمة المرور' : 'تسجيل الدخول'}
@@ -150,14 +124,10 @@ export function LoginForm() {
             {!changePassword && (
               <div className="space-y-3 border-t border-zinc-100 pt-5 text-center">
                 <p className="text-xs font-semibold text-zinc-500">ليس لديك حساب بعد؟</p>
-                <Button
-                  as={Link}
-                  href="/?register=join"
-                  startContent={<UserPlus className="size-4 text-zinc-700" aria-hidden="true" />}
-                  className="min-h-11 w-full rounded-2xl border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900 transition-colors hover:bg-zinc-100"
-                >
+                <Link href="/?register=join" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                  <UserPlus className="size-4 text-zinc-700" aria-hidden="true" />
                   تقديم طلب انضمام جديد
-                </Button>
+                </Link>
               </div>
             )}
 
@@ -171,7 +141,7 @@ export function LoginForm() {
               </Link>
             </div>
           </form>
-        </CardBody>
+        </Card.Content>
       </Card>
     </main>
   );

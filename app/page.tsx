@@ -1,22 +1,29 @@
-import React, { Suspense } from 'react';
-import { fetchHomePageData } from '@/lib/supabase/queries';
-import { DirectoryView } from '@/components/directory/DirectoryView';
-import Loading from './loading';
+import type { Metadata } from 'next';
+import MarketplacePage from '@/app/marketplace/page';
+import { MarketplaceShell } from '@/components/marketplace/marketplace-shell';
 
-export const revalidate = 60;
-export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
 
-export default async function HomePage() {
-  const { places, drivers, directoryError, renderedAt } = await fetchHomePageData();
+export const metadata: Metadata = {
+  title: 'المتجر | دايرتك',
+  description: 'منتجات من متاجر منطقتك مع طلب ودفع عند الاستلام من داخل الموقع.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: 'المتجر | دايرتك',
+    description: 'منتجات من متاجر منطقتك مع طلب ودفع عند الاستلام من داخل الموقع.',
+    url: '/',
+    type: 'website',
+  },
+};
 
+export default function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   return (
-    <Suspense fallback={<Loading />}>
-      <DirectoryView
-        initialPlaces={places}
-        initialDrivers={drivers}
-        directoryError={directoryError}
-        renderedAt={renderedAt}
-      />
-    </Suspense>
+    <MarketplaceShell>
+      <MarketplacePage searchParams={searchParams} />
+    </MarketplaceShell>
   );
 }

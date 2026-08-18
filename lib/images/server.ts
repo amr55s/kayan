@@ -56,6 +56,7 @@ async function encodeWebp(input: Buffer, quality: number, scale = 1) {
  */
 export async function processImageForStorage(
   input: Buffer,
+  options: { alwaysReencode?: boolean } = {},
 ): Promise<ProcessedImage> {
   const source = await inspectImage(input);
   if (!source.width || !source.height) {
@@ -66,6 +67,7 @@ export async function processImageForStorage(
   // compressed. Keeping their original bytes avoids a second lossy encode,
   // which is especially important for menu text and small Arabic lettering.
   if (
+    !options.alwaysReencode &&
     source.format === 'webp' &&
     source.width <= MAX_WIDTH &&
     source.height <= MAX_HEIGHT &&

@@ -13,7 +13,7 @@ import {
   Select,
   SelectItem,
   Image as HeroImage,
-} from '@heroui/react';
+} from '@/components/ui/heroui-compat';
 import { MessageSquarePlus, Send, CheckCircle2, Upload, X, Building, Phone, Star } from 'lucide-react';
 import { submitFeedbackSubmission } from '@/lib/supabase/actions';
 import { uploadOptimizedImages } from '@/lib/images/client';

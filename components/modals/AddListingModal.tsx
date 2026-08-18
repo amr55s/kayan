@@ -14,7 +14,7 @@ import {
   Tab,
   Tabs,
   Textarea,
-} from '@heroui/react';
+} from '@/components/ui/heroui-compat';
 import {
   Building2,
   CheckCircle2,

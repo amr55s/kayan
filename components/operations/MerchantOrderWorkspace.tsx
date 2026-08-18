@@ -1,19 +1,17 @@
 'use client';
 
 import { FormEvent, useMemo, useState, useTransition } from 'react';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Input,
-  Select,
-  SelectItem,
-  Tab,
-  Tabs,
-  Textarea,
-} from '@heroui/react';
+import Link from 'next/link';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Chip } from '@heroui/react/chip';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { ListBox } from '@heroui/react/list-box';
+import { Select } from '@heroui/react/select';
+import { Tabs } from '@heroui/react/tabs';
+import { TextArea } from '@heroui/react/textarea';
+import { TextField } from '@heroui/react/textfield';
 import {
   Bike,
   CircleDollarSign,
@@ -50,7 +48,7 @@ type Branch = {
   address: string;
   area: string;
 };
-type Driver = { id: string; name: string; phone: string; activeUntil: string | null };
+type Driver = { id: string; name: string; vehicleType: string | null; activeUntil: string | null };
 type Order = {
   id: string;
   public_code: string;
@@ -75,6 +73,38 @@ const statusLabels: Record<string, string> = {
   cancelled: 'ملغي',
   issue: 'مشكلة',
 };
+
+type OperationSelectOption = { id: string; label: string; value?: string };
+
+function OperationInput({ label, value, onValueChange, icon, className, isRequired, ...props }: Omit<React.ComponentProps<typeof Input>, 'value' | 'onChange' | 'className'> & { label: string; value: string; onValueChange: (value: string) => void; icon?: React.ReactNode; className?: string; isRequired?: boolean }) {
+  return (
+    <TextField fullWidth isRequired={isRequired} className={`space-y-1.5 ${className || ''}`}>
+      <Label className="text-sm font-bold text-zinc-800">{label}</Label>
+      <div className="relative">
+        {icon ? <span className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-zinc-400">{icon}</span> : null}
+        <Input {...props} required={isRequired} value={value} onChange={(event) => onValueChange(event.target.value)} className={`min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10 ${icon ? 'ps-10' : ''}`} />
+      </div>
+    </TextField>
+  );
+}
+
+function OperationTextarea({ label, value, onValueChange, className, isRequired, ...props }: Omit<React.ComponentProps<typeof TextArea>, 'value' | 'onChange' | 'className'> & { label: string; value: string; onValueChange: (value: string) => void; className?: string; isRequired?: boolean }) {
+  return <TextField fullWidth isRequired={isRequired} className={`space-y-1.5 ${className || ''}`}><Label className="text-sm font-bold text-zinc-800">{label}</Label><TextArea {...props} required={isRequired} value={value} onChange={(event) => onValueChange(event.target.value)} className="min-h-24 w-full rounded-xl border border-zinc-200 bg-white p-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" /></TextField>;
+}
+
+function OperationSelect({ label, value, onValueChange, options, isRequired }: { label: string; value: string; onValueChange: (value: string) => void; options: OperationSelectOption[]; isRequired?: boolean }) {
+  const selectedId = options.find((option) => (option.value ?? option.id) === value)?.id ?? null;
+  return (
+    <Select isRequired={isRequired} selectedKey={selectedId} onSelectionChange={(key) => {
+      const option = options.find((item) => item.id === String(key));
+      onValueChange(option?.value ?? option?.id ?? '');
+    }}>
+      <Label className="text-sm font-bold text-zinc-800">{label}</Label>
+      <Select.Trigger className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/10"><Select.Value /><Select.Indicator /></Select.Trigger>
+      <Select.Popover className="z-[110] rounded-xl border border-zinc-200 bg-white p-1 shadow-xl"><ListBox>{options.map((option) => <ListBox.Item key={option.id} id={option.id} textValue={option.label} className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100 data-[selected]:font-bold">{option.label}</ListBox.Item>)}</ListBox></Select.Popover>
+    </Select>
+  );
+}
 
 export function MerchantOrderWorkspace({
   branches,
@@ -164,7 +194,8 @@ export function MerchantOrderWorkspace({
   }
 
   return (
-    <main className="dir-rtl mx-auto max-w-6xl space-y-5 px-3 py-5 sm:px-6">
+    <main id="main-content" className="dir-rtl mx-auto max-w-6xl space-y-5 px-3 py-5 sm:px-6">
+      <div className="flex justify-end"><Link href="/merchant/marketplace" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-950 bg-zinc-950 px-4 text-sm font-black text-white transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950 focus-visible:ring-offset-2"><Store className="size-4" aria-hidden="true" />إدارة منتجات المتجر</Link></div>
       <section>
         <h1 className="text-2xl font-black">مساحة المحل</h1>
         <p className="mt-1 text-sm text-zinc-500">
@@ -180,45 +211,32 @@ export function MerchantOrderWorkspace({
         </p>
       )}
 
-      <Tabs aria-label="مساحة المحل">
-        <Tab id="orders" key="orders" title="تشغيل التوصيل">
+      <Tabs aria-label="مساحة المحل" defaultSelectedKey="orders">
+        <Tabs.ListContainer><Tabs.List aria-label="أقسام مساحة المحل"><Tabs.Tab id="orders">تشغيل التوصيل</Tabs.Tab><Tabs.Tab id="profile">بيانات الخدمة</Tabs.Tab></Tabs.List></Tabs.ListContainer>
+        <Tabs.Panel id="orders">
           <div className="space-y-5">
             <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
               <Card className="border border-zinc-200">
-                <CardHeader className="gap-2 font-extrabold">
+                <Card.Header className="gap-2 font-extrabold">
                   <Plus className="size-5" />
                   مهمة توصيل جديدة
-                </CardHeader>
-                <CardBody>
+                </Card.Header>
+                <Card.Content>
                   <form onSubmit={submitOrder} className="grid gap-3 sm:grid-cols-2">
-                    <Select
-                      label="فرع الاستلام"
-                      selectedKeys={branchId ? [branchId] : []}
-                      onSelectionChange={(keys) =>
-                        setBranchId(String(Array.from(keys)[0] ?? ''))
-                      }
-                      className="sm:col-span-2"
-                      isRequired
-                    >
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name} — {branch.area}
-                        </SelectItem>
-                      ))}
-                    </Select>
+                    <div className="sm:col-span-2"><OperationSelect label="فرع الاستلام" value={branchId} onValueChange={setBranchId} isRequired options={branches.map((branch) => ({ id: branch.id, label: `${branch.name} — ${branch.area}` }))} /></div>
                     {selectedBranch && (
                       <p className="text-xs text-zinc-500 sm:col-span-2">
                         الاستلام من: {selectedBranch.address}
                       </p>
                     )}
-                    <Input
+                    <OperationInput
                       label="اسم العميل"
                       isRequired
                       value={form.recipientName}
                       onValueChange={(recipientName) => setForm({ ...form, recipientName })}
-                      startContent={<UserRound className="size-4" />}
+                      icon={<UserRound className="size-4" aria-hidden="true" />}
                     />
-                    <Input
+                    <OperationInput
                       label="هاتف العميل"
                       type="tel"
                       isRequired
@@ -227,14 +245,14 @@ export function MerchantOrderWorkspace({
                         setForm({ ...form, recipientPhone })
                       }
                     />
-                    <Input
+                    <OperationInput
                       label="المنطقة"
                       isRequired
                       value={form.deliveryArea}
                       onValueChange={(deliveryArea) => setForm({ ...form, deliveryArea })}
-                      startContent={<MapPin className="size-4" />}
+                      icon={<MapPin className="size-4" aria-hidden="true" />}
                     />
-                    <Input
+                    <OperationInput
                       label="قيمة التحصيل (اختياري)"
                       type="number"
                       min="0"
@@ -242,9 +260,9 @@ export function MerchantOrderWorkspace({
                       onValueChange={(collectionAmount) =>
                         setForm({ ...form, collectionAmount })
                       }
-                      startContent={<CircleDollarSign className="size-4" />}
+                      icon={<CircleDollarSign className="size-4" aria-hidden="true" />}
                     />
-                    <Textarea
+                    <OperationTextarea
                       label="العنوان بالتفصيل"
                       isRequired
                       className="sm:col-span-2"
@@ -253,53 +271,38 @@ export function MerchantOrderWorkspace({
                         setForm({ ...form, deliveryAddress })
                       }
                     />
-                    <Textarea
+                    <OperationTextarea
                       label="ملاحظات للكابتن (اختياري)"
                       className="sm:col-span-2"
                       value={form.notes}
                       onValueChange={(notes) => setForm({ ...form, notes })}
                     />
-                    <Input
+                    <OperationInput
                       label="رسوم التوصيل (اختياري)"
                       type="number"
                       min="0"
                       value={form.deliveryFee}
                       onValueChange={(deliveryFee) => setForm({ ...form, deliveryFee })}
                     />
-                    <Select
-                      label="كابتن معروف (اختياري)"
-                      selectedKeys={directDriverId ? [directDriverId] : ['']}
-                      onSelectionChange={(keys) =>
-                        setDirectDriverId(String(Array.from(keys)[0] ?? ''))
-                      }
-                    >
-                      <SelectItem key="all" value="">
-                        بث لجميع الكباتن المتاحين
-                      </SelectItem>
-                      {drivers.map((driver) => (
-                        <SelectItem key={driver.id} value={driver.id}>
-                          {driver.name} — {driver.phone}
-                        </SelectItem>
-                      ))}
-                    </Select>
+                    <OperationSelect label="كابتن معروف (اختياري)" value={directDriverId} onValueChange={setDirectDriverId} options={[{ id: 'all', value: '', label: 'بث لجميع الكباتن المتاحين' }, ...drivers.map((driver) => ({ id: driver.id, label: driver.name }))]} />
                     <Button
                       type="submit"
-                      isLoading={pending}
+                      isPending={pending}
                       className="bg-zinc-900 font-extrabold text-white sm:col-span-2"
-                      startContent={!pending && <Send className="size-4" />}
                     >
+                      {!pending && <Send className="size-4" aria-hidden="true" />}
                       نشر مهمة التوصيل
                     </Button>
                   </form>
-                </CardBody>
+                </Card.Content>
               </Card>
 
               <Card className="border border-zinc-200">
-                <CardHeader className="gap-2 font-extrabold">
+                <Card.Header className="gap-2 font-extrabold">
                   <Bike className="size-5" />
                   الكباتن المتاحون الآن
-                </CardHeader>
-                <CardBody className="space-y-3">
+                </Card.Header>
+                <Card.Content className="space-y-3">
                   {drivers.length ? (
                     drivers.map((driver) => (
                       <div
@@ -308,7 +311,7 @@ export function MerchantOrderWorkspace({
                       >
                         <div>
                           <p className="font-bold">{driver.name}</p>
-                          <p className="dir-ltr text-zinc-500">{driver.phone}</p>
+                          {driver.vehicleType ? <p className="text-zinc-500">{driver.vehicleType}</p> : null}
                         </div>
                         <Radio className="size-4 text-emerald-600" />
                       </div>
@@ -316,16 +319,16 @@ export function MerchantOrderWorkspace({
                   ) : (
                     <p className="text-sm text-zinc-500">لا يوجد كابتن متاح حالياً.</p>
                   )}
-                </CardBody>
+                </Card.Content>
               </Card>
             </div>
 
             <Card className="border border-zinc-200">
-              <CardHeader className="gap-2 font-extrabold">
+              <Card.Header className="gap-2 font-extrabold">
                 <Clock3 className="size-5" />
                 الطلبات الأخيرة
-              </CardHeader>
-              <CardBody className="gap-3">
+              </Card.Header>
+              <Card.Content className="gap-3">
                 {orders.length ? (
                   orders.map((order) => (
                     <article
@@ -344,7 +347,7 @@ export function MerchantOrderWorkspace({
                         <div className="flex gap-2">
                           {order.status === 'open' && order.assigned_driver_id && (
                             <Button
-                              variant="flat"
+                              variant="secondary"
                               isDisabled={pending}
                               onPress={() => runOrderAction(order.id, 'rebroadcast')}
                               className="border border-zinc-200 bg-zinc-100"
@@ -354,7 +357,7 @@ export function MerchantOrderWorkspace({
                           )}
                           {['open', 'assigned', 'unassigned'].includes(order.status) && (
                             <Button
-                              variant="flat"
+                              variant="danger-soft"
                               isDisabled={pending}
                               onPress={() => runOrderAction(order.id, 'cancel')}
                               className="border border-rose-200 bg-rose-50 text-rose-700"
@@ -371,14 +374,14 @@ export function MerchantOrderWorkspace({
                     لا توجد طلبات حتى الآن.
                   </p>
                 )}
-              </CardBody>
+              </Card.Content>
             </Card>
           </div>
-        </Tab>
+        </Tabs.Panel>
 
-        <Tab id="profile" key="profile" title="بيانات الخدمة">
+        <Tabs.Panel id="profile">
           <MerchantDirectoryManager branches={branches} places={places} />
-        </Tab>
+        </Tabs.Panel>
       </Tabs>
     </main>
   );
@@ -405,13 +408,13 @@ function MerchantDirectoryManager({
   if (!linkedPlaces.length) {
     return (
       <Card className="border border-dashed border-zinc-300">
-        <CardBody className="items-center gap-2 py-10 text-center">
+        <Card.Content className="items-center gap-2 py-10 text-center">
           <Store className="size-8 text-zinc-400" />
           <p className="font-bold">لا يوجد مكان عام مرتبط بحسابك بعد.</p>
           <p className="text-sm text-zinc-500">
             اطلب من الإدارة ربط فرع المحل ببطاقة المكان في ديرتك.
           </p>
-        </CardBody>
+        </Card.Content>
       </Card>
     );
   }
@@ -419,8 +422,8 @@ function MerchantDirectoryManager({
   return (
     <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
       <Card className="border border-zinc-200">
-        <CardHeader className="font-black">الأماكن المرتبطة</CardHeader>
-        <CardBody className="gap-2">
+        <Card.Header className="font-black">الأماكن المرتبطة</Card.Header>
+        <Card.Content className="gap-2">
           {linkedPlaces.map(({ place, branch }) => (
             <button
               key={place.id}
@@ -436,7 +439,7 @@ function MerchantDirectoryManager({
               <span className="block text-xs opacity-70">{branch.name}</span>
             </button>
           ))}
-        </CardBody>
+        </Card.Content>
       </Card>
       {selected && (
         <MerchantPlaceEditor
@@ -457,12 +460,7 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
   const [form, setForm] = useState({
     title: place.title,
     category: place.category,
-    phone: place.phone,
-    whatsapp: place.whatsapp || '',
-    instapayVfcash: place.instapay_vfcash || '',
     description: place.description || '',
-    whatsappGroupUrl: place.whatsapp_group_url || '',
-    telegramUrl: place.telegram_url || '',
     address: place.address || '',
     mapUrl: place.map_url || '',
   });
@@ -509,92 +507,46 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
 
   return (
     <Card className="border border-zinc-200">
-      <CardHeader className="flex flex-col items-start gap-1">
+      <Card.Header className="flex flex-col items-start gap-1">
         <span className="font-black">تعديل بطاقة {place.title}</span>
         <span className="text-xs font-normal text-zinc-500">
           الفرع المرتبط: {branch.name}
         </span>
-      </CardHeader>
-      <CardBody>
+      </Card.Header>
+      <Card.Content>
         <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
           {message && (
             <p className="rounded-xl bg-zinc-100 p-3 text-sm font-semibold sm:col-span-2">
               {message}
             </p>
           )}
-          <Input
+          <p className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-xs leading-6 text-zinc-600 sm:col-span-2">
+            الطلبات والتحديثات تتم من داخل الموقع. بيانات التواصل القديمة محفوظة كسجل تشغيلي ولا تظهر للعملاء.
+          </p>
+          <OperationInput
             isRequired
             label="اسم المكان"
             value={form.title}
             onValueChange={(title) => setForm({ ...form, title })}
           />
-          <Select
-            isRequired
-            label="التصنيف"
-            selectedKeys={[String(form.category)]}
-            onSelectionChange={(keys) =>
-              setForm({ ...form, category: String(Array.from(keys)[0] ?? form.category) })
-            }
-          >
-            {CATEGORY_OPTIONS.map((category) => (
-              <SelectItem key={category.id} value={category.id}>
-                {category.label}
-              </SelectItem>
-            ))}
-          </Select>
-          <Input
-            isRequired
-            type="tel"
-            label="رقم الهاتف"
-            value={form.phone}
-            onValueChange={(phone) => setForm({ ...form, phone })}
-          />
-          <Input
-            type="tel"
-            label="رقم واتساب"
-            value={form.whatsapp}
-            onValueChange={(whatsapp) => setForm({ ...form, whatsapp })}
-          />
-          <Input
-            label="رقم إنستاباي / فودافون كاش"
-            value={form.instapayVfcash}
-            onValueChange={(instapayVfcash) => setForm({ ...form, instapayVfcash })}
-          />
-          <Textarea
+          <OperationSelect isRequired label="التصنيف" value={String(form.category)} onValueChange={(category) => setForm({ ...form, category })} options={CATEGORY_OPTIONS.map((category) => ({ id: category.id, label: category.label }))} />
+          <OperationTextarea
             label={getListingDescriptionLabel(String(form.category))}
             placeholder={form.category === 'stores'
               ? 'أهم المنتجات والماركات، نطاق الأسعار، وخيارات الاستلام أو التوصيل…'
               : undefined}
             className="sm:col-span-2"
-            minRows={3}
+            rows={3}
             value={form.description}
             onValueChange={(description) => setForm({ ...form, description })}
           />
-          <Input
-            type="url"
-            inputMode="url"
-            autoComplete="off"
-            label="رابط جروب أو قناة WhatsApp"
-            placeholder="https://chat.whatsapp.com/…"
-            value={form.whatsappGroupUrl}
-            onValueChange={(whatsappGroupUrl) => setForm({ ...form, whatsappGroupUrl })}
-          />
-          <Input
-            type="url"
-            inputMode="url"
-            autoComplete="off"
-            label="رابط Telegram"
-            placeholder="https://t.me/…"
-            value={form.telegramUrl}
-            onValueChange={(telegramUrl) => setForm({ ...form, telegramUrl })}
-          />
-          <Textarea
+          <OperationTextarea
             autoComplete="street-address"
             label="العنوان"
             value={form.address}
             onValueChange={(address) => setForm({ ...form, address })}
           />
-          <Input
+          <OperationInput
             type="url"
             inputMode="url"
             autoComplete="off"
@@ -650,13 +602,13 @@ function MerchantPlaceEditor({ place, branch }: { place: Place; branch: Branch }
 
           <Button
             type="submit"
-            isLoading={pending}
+            isPending={pending}
             className="bg-zinc-900 font-bold text-white sm:col-span-2"
           >
             إرسال التعديلات للمراجعة
           </Button>
         </form>
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }

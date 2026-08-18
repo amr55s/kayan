@@ -4,12 +4,15 @@ import test from 'node:test';
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 
-test('driver availability hydrates from a server-provided timestamp', () => {
+test('legacy driver availability stays deterministic while the root renders the marketplace', () => {
   const driverCard = read('components/delivery/DriverCard.tsx');
   const page = read('app/page.tsx');
   assert.match(driverCard, /useState\(renderedAt\)/);
   assert.doesNotMatch(driverCard, /useState\(\(\) => Date\.now\(\)\)/);
-  assert.match(page, /renderedAt/);
+  assert.match(page, /<MarketplaceShell>/);
+  assert.match(page, /<MarketplacePage searchParams=\{searchParams\}/);
+  assert.doesNotMatch(page, /redirect\(/);
+  assert.doesNotMatch(page, /renderedAt|Date\.now\(\)/);
 });
 
 test('mobile navigation uses the HeroUI v3 drawer from the physical left edge', () => {
@@ -34,37 +37,20 @@ test('admin navigation covers overview, revenue, activity, publishing, and mobil
   assert.match(page, /collection_amount, delivery_fee/);
 });
 
-test('the public hero is actionable and remains anchored to directory search', () => {
-  const directory = read('components/directory/DirectoryView.tsx');
-  const categoryBar = read('components/directory/CategoryBar.tsx');
-  const placeCard = read('components/directory/PlaceCard.tsx');
-  const couponOffer = read('components/directory/CouponOffer.tsx');
-  const deliveryBar = read('components/delivery/DeliveryBar.tsx');
-  const driverCard = read('components/delivery/DriverCard.tsx');
-  assert.match(directory, /كل اللي تحتاجه في ديرتك، في مكان واحد\./);
-  assert.match(directory, /bg-zinc-950/);
-  assert.doesNotMatch(directory, /FECF34/i);
-  assert.match(directory, /id="directory-search"/);
-  assert.match(directory, /<Input[\s\S]{0,400}value=\{searchQuery\}/);
-  assert.match(directory, /inputWrapper: '[^']*!bg-white/);
-  assert.match(directory, /placeholder:!text-zinc-500/);
-  assert.match(directory, /hero_whatsapp_group/);
-  assert.doesNotMatch(directory, /(?:amber|yellow|orange|emerald)-/);
-  assert.doesNotMatch(placeCard, /\b(?:bg|text|border)-(?:amber|yellow|orange)-/);
-  assert.match(placeCard, /dairtak-orange-soft/);
-  assert.match(placeCard, /MessageCircle className="[^"]*dairtak-orange/);
-  assert.doesNotMatch(couponOffer, /\b(?:bg|text|border)-(?:amber|yellow|orange|emerald)-/);
-  assert.match(couponOffer, /MessageCircle className="[^"]*dairtak-orange/);
-  assert.match(categoryBar, /CATEGORIES\.filter\(\(cat\) => cat\.id !== 'all'\)/);
-  assert.match(categoryBar, /h-16/);
-  assert.match(categoryBar, /bg-zinc-950 text-white/);
-  assert.match(deliveryBar, /bg-zinc-100\/90/);
-  assert.match(deliveryBar, /sortedDrivers\.map/);
-  assert.match(deliveryBar, /Number\(isConnected\(second\)\) - Number\(isConnected\(first\)\)/);
-  assert.match(driverCard, /isAvailable &&/);
-  assert.match(driverCard, />\s*متصل\s*</);
-  assert.match(driverCard, /bg-zinc-950 text-xs font-black text-white/);
-  assert.doesNotMatch(driverCard, /خامل|غير متاح/);
+test('the active services directory has server search, filters, pagination, and private contacts', () => {
+  const services = read('app/services/page.tsx');
+  const queries = read('lib/services/queries.ts');
+
+  assert.match(services, /await fetchPublicServices\(\{ category, page, query \}\)/);
+  assert.match(services, /<form role="search"[\s\S]{0,180}action="\/services"/);
+  assert.match(services, /name="q"/);
+  assert.match(services, /aria-label="تصنيفات الخدمات"/);
+  assert.match(services, /aria-label="صفحات النتائج"/);
+  assert.match(services, /href="\/marketplace"/);
+  assert.match(services, /id="main-content"/);
+  assert.doesNotMatch(services, /item\.phone|item\.whatsapp|href=\{?[`'"]tel:|wa\.me|api\.whatsapp\.com/i);
+  assert.match(queries, /\.range\(from, to\)/);
+  assert.match(queries, /\.ilike\('title'/);
 });
 
 test('place details are deep-linked through Next navigation without patching browser history', () => {
@@ -76,7 +62,7 @@ test('place details are deep-linked through Next navigation without patching bro
   assert.doesNotMatch(directory, /router\.back\(\)|History\.prototype|window\.history\.(?:pushState|replaceState)/);
 });
 
-test('store coupons are public-read-only and open a prefilled WhatsApp order', () => {
+test('store coupons are public-read-only and redeem inside the marketplace', () => {
   const migration = read('supabase/migrations/20260801080152_add_store_coupons.sql');
   const offer = read('components/directory/CouponOffer.tsx');
   const manager = read('components/admin/CouponManager.tsx');
@@ -85,8 +71,9 @@ test('store coupons are public-read-only and open a prefilled WhatsApp order', (
   assert.match(migration, /grant select, insert, update, delete on public\.store_coupons to service_role/);
   assert.match(migration, /'KAYAN10'/);
   assert.match(migration, /where p\.title = 'أكل بيتي مميز'/);
-  assert.match(offer, /استخدم الكوبون على واتساب/);
-  assert.match(offer, /whatsAppMessage\(place, selected\)/);
+  assert.match(offer, /استخدم الكود داخل سلة الموقع/);
+  assert.match(offer, /href="\/marketplace"/);
+  assert.doesNotMatch(offer, /whatsAppMessage|wa\.me|api\.whatsapp\.com|href=\{?[`'"]tel:/i);
   assert.match(manager, /serverUpsertStoreCoupon/);
 });
 
@@ -115,11 +102,13 @@ test('store category follows restaurants and supports product-focused listings',
   assert.match(merchantModal, /أشهر الماركات، نطاق الأسعار/);
 });
 
-test('native place sharing includes the direct URL only once', () => {
-  const share = read('lib/share.ts');
-  assert.match(share, /const text = `\$\{title\}\\n\$\{phone\}\\nعبر ديرتك`/);
-  assert.match(share, /navigator\.share\(\{ title: .* text, url \}\)/);
-  assert.match(share, /fallbackWhatsApp\(`\$\{text\}\\n\$\{url\}`\)/);
+test('native public sharing has an in-site copy fallback without contact leakage', () => {
+  const shareHub = read('components/marketing/PublicShareHub.tsx');
+  assert.match(shareHub, /navigator\.share\(\{ title: item\.title, text \}\)/);
+  assert.match(shareHub, /navigator\.clipboard\.writeText\(text\)/);
+  assert.match(shareHub, /readOnly[\s\S]{0,120}value=\{text\}/);
+  assert.match(shareHub, /حدّد النص التالي وانسخه من داخل الموقع/);
+  assert.doesNotMatch(shareHub, /fallbackWhatsApp|wa\.me|api\.whatsapp\.com|place\.phone|driver\.phone/i);
 });
 
 test('verified merchants update their linked place directly while public suggestions stay moderated', () => {
@@ -174,23 +163,25 @@ test('database migration keeps diagnostics private and storage writes server-onl
   assert.match(migration, /grant execute on function public\.record_client_error/);
 });
 
-test('driver contact actions use a distinct managed field without exposing login data', () => {
+test('driver operational contact stays managed without becoming a public shortcut', () => {
   const migration = read(
     'supabase/migrations/20260729115854_driver_contact_and_pwa_reliability.sql',
   );
   const workspace = read('components/operations/DriverWorkspace.tsx');
   const adminManager = read('components/admin/DriverManager.tsx');
-  const publicCard = read('components/delivery/DriverCard.tsx');
+  const services = read('app/services/page.tsx');
 
   assert.match(migration, /add column if not exists contact_phone text/);
   assert.match(migration, /coalesce\(driver\.contact_phone, legacy\.phone, profile\.phone\)/);
   assert.match(migration, /admin_update_managed_driver/);
   assert.match(migration, /to service_role/);
   assert.match(workspace, /name="contactPhone"/);
-  assert.match(workspace, /pwa|بطاقتك|بيانات البطاقة العامة/i);
-  assert.match(adminManager, /رقم الاتصال العام/);
-  assert.doesNotMatch(publicCard, /driver\.phone\}/);
-  assert.match(publicCard, /formatPhoneForTel\(driver\.phone\)/);
+  assert.match(workspace, /رقم التواصل محفوظ لفريق التشغيل ولا يظهر في دليل الكباتن العام/);
+  assert.doesNotMatch(workspace, /\{order\.recipient_phone\}/);
+  assert.match(adminManager, /رقم التشغيل الداخلي/);
+  assert.match(adminManager, /لا يظهر في الدليل العام/);
+  assert.doesNotMatch(adminManager, /wa\.me|api\.whatsapp\.com|href=\{?[`'"]tel:/i);
+  assert.doesNotMatch(services, /item\.phone|item\.whatsapp|href=\{?[`'"]tel:/i);
 });
 
 test('login resolution is server-side and can repair an incomplete driver link', () => {
@@ -219,7 +210,7 @@ test('post-mutation refresh failures do not turn committed writes into errors', 
 
   assert.match(safeRevalidate, /Cache refresh is best-effort after a committed mutation/);
   assert.doesNotMatch(operations, /\brevalidatePath\(/);
-  assert.match(operations, /metadata update was deferred/);
+  assert.match(operations, /approved_account_metadata_update_deferred/);
   assert.match(driverWorkspace, /transport failed/);
   assert.match(adminWorkspace, /recoverFromActionError/);
 });
@@ -231,11 +222,13 @@ test('PWA caches only public shell data and provides an iOS-safe install path', 
   const layout = read('app/layout.tsx');
   const nextConfig = read('next.config.ts');
 
-  assert.match(serviceWorker, /PRIVATE_PREFIXES = \['\/admin', '\/driver', '\/merchant', '\/login'\]/);
+  for (const privatePrefix of ['/account', '/admin', '/driver', '/merchant', '/login', '/marketplace/cart', '/marketplace/checkout', '/marketplace/orders']) {
+    assert.match(serviceWorker, new RegExp(`'${privatePrefix.replaceAll('/', '\\/')}'`));
+  }
   assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\)/);
   assert.match(serviceWorker, /isNextDataRequest/);
   assert.match(serviceWorker, /offline\.html/);
-  assert.match(serviceWorker, /dairtak-v1-brand/);
+  assert.match(serviceWorker, /dairtak-v2-notifications/);
   assert.match(serviceWorker, /event\.waitUntil\(self\.skipWaiting\(\)\)/);
   assert.match(installer, /إضافة إلى الشاشة الرئيسية/);
   assert.match(installer, /updateViaCache: 'none'/);

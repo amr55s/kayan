@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Modal, ModalBody, ModalContent, ModalHeader } from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Modal } from '@heroui/react/modal';
+import { useOverlayState } from '@heroui/react';
 import { Download, PlusSquare, RefreshCw, Share, Smartphone, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
@@ -44,6 +46,10 @@ export function PwaInstaller() {
   const [isIos, setIsIos] = useState(false);
   const [updateReady, setUpdateReady] = useState(false);
   const [installing, setInstalling] = useState(false);
+  const iosGuideState = useOverlayState({
+    isOpen: INSTALL_ROUTES.has(pathname) && showIosGuide,
+    onOpenChange: setShowIosGuide,
+  });
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
@@ -237,7 +243,8 @@ export function PwaInstaller() {
             <Button
               size="sm"
               onPress={handleInstall}
-              isLoading={installing}
+              isPending={installing}
+              isDisabled={installing}
               className="min-h-9 bg-white px-3 text-xs font-black text-zinc-950 hover:bg-zinc-100"
             >
               {updateReady ? 'تحديث' : 'تثبيت'}
@@ -245,7 +252,7 @@ export function PwaInstaller() {
             <Button
               isIconOnly
               size="sm"
-              variant="light"
+              variant="ghost"
               onPress={handleDismiss}
               aria-label="إغلاق اقتراح تثبيت التطبيق"
               className="size-9 min-w-9 text-zinc-300"
@@ -256,27 +263,20 @@ export function PwaInstaller() {
         </aside>
       )}
 
-      <Modal
-        isOpen={INSTALL_ROUTES.has(pathname) && showIosGuide}
-        onOpenChange={setShowIosGuide}
-        placement="bottom-center"
-        size="sm"
-        classNames={{
-          base: 'dir-rtl mx-3 mb-[calc(.75rem+env(safe-area-inset-bottom))] rounded-[28px] border border-zinc-200 bg-white sm:mx-0 sm:mb-0',
-          body: 'overscroll-contain pb-6',
-        }}
-      >
-        <ModalContent>
-          <ModalHeader className="flex items-center gap-3 border-b border-zinc-100">
+      <Modal state={iosGuideState}>
+        <Modal.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+          <Modal.Container placement="bottom" size="sm" className="pb-[env(safe-area-inset-bottom)] sm:items-center">
+            <Modal.Dialog aria-label="تثبيت التطبيق على iPhone" dir="rtl" className="mx-3 rounded-t-2xl border border-zinc-200 bg-white sm:mx-0 sm:rounded-2xl">
+          <Modal.Header className="flex items-center gap-3 border-b border-zinc-100">
             <span className="flex size-10 items-center justify-center rounded-xl bg-zinc-950 text-white">
               <Smartphone className="size-5" aria-hidden="true" />
             </span>
             <div>
-              <h2 className="font-black">تثبيت التطبيق على iPhone</h2>
+              <Modal.Heading className="font-black">تثبيت التطبيق على iPhone</Modal.Heading>
               <p className="mt-0.5 text-xs font-normal text-zinc-500">خطوتان من Safari</p>
             </div>
-          </ModalHeader>
-          <ModalBody className="gap-3 pt-4">
+          </Modal.Header>
+          <Modal.Body className="gap-3 overscroll-contain pb-6 pt-4">
             <div className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
                 <Share className="size-5 text-sky-600" aria-hidden="true" />
@@ -298,8 +298,10 @@ export function PwaInstaller() {
             >
               فهمت
             </Button>
-          </ModalBody>
-        </ModalContent>
+          </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
     </>
   );

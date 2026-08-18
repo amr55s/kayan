@@ -1,9 +1,10 @@
 import { AdminWorkspace } from '@/components/operations/AdminWorkspace';
 import { DashboardHeader } from '@/components/operations/DashboardHeader';
-import { requireProfile } from '@/lib/auth/guards';
+import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadBehaviorAnalytics } from '@/lib/analytics/admin';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
 import { fetchHomePageData } from '@/lib/supabase/queries';
 import type { Place, StoreCoupon } from '@/types';
 
@@ -17,12 +18,12 @@ async function safeAdminQuery(
   try {
     const result = await query;
     if (result.error) {
-      console.error(`Admin query "${label}" failed:`, result.error);
+      logSafeServerFailure('error', `admin_query_${label}_failed`, { failure: result.error });
       return { data: null };
     }
     return { data: result.data };
   } catch (error) {
-    console.error(`Admin query "${label}" exception:`, error);
+    logSafeServerFailure('error', `admin_query_${label}_exception`, { failure: error });
     return { data: null };
   }
 }
@@ -40,7 +41,7 @@ async function loadClientErrors() {
     if (error) throw error;
     return data ?? [];
   } catch (error) {
-    console.warn('Anonymous client diagnostics are not available yet:', error);
+    logSafeServerFailure('warn', 'client_diagnostics_query_failed', { failure: error });
     return [];
   }
 }
@@ -64,7 +65,7 @@ async function loadAdminPlaces(admin: ReturnType<typeof createAdminClient>) {
 }
 
 export default async function AdminDashboard() {
-  const profile = await requireProfile(['admin']);
+  const { profile } = await requireMarketplaceAdminRole(['super_admin'], { nextPath: '/admin' });
   const supabase = await createClient();
   const adminData = createAdminClient();
 
@@ -95,7 +96,7 @@ export default async function AdminDashboard() {
       .from('profiles')
       .select('id, display_name, phone, role, is_active, merchant_id, must_change_password, created_at')
       .order('created_at', { ascending: false })),
-    safeAdminQuery('delivery_orders', (supabase as any)
+    safeAdminQuery('delivery_orders', (adminData as any)
       .from('delivery_orders')
       .select('id, public_code, status, recipient_name, delivery_area, collection_amount, delivery_fee, created_at')
       .order('created_at', { ascending: false })
@@ -146,7 +147,7 @@ export default async function AdminDashboard() {
       .order('published_at', { ascending: false })
       .limit(5_000)),
     fetchHomePageData().catch((error) => {
-      console.warn('Marketing driver queue could not be loaded:', error);
+      logSafeServerFailure('warn', 'marketing_driver_queue_load_failed', { failure: error });
       return { places: [], drivers: [], renderedAt: 0 };
     }),
   ]);

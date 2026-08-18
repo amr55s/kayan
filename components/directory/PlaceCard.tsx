@@ -11,7 +11,7 @@ import {
   Chip,
   Image as HeroImage,
   Tooltip,
-} from '@heroui/react';
+} from '@/components/ui/heroui-compat';
 import {
   Check,
   Copy,

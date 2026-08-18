@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Button } from '@heroui/react';
+import { Button } from '@/components/ui/heroui-compat';
 import { CATEGORIES, CategoryItem } from '@/lib/constants';
 import { CategoryType } from '@/types';
 

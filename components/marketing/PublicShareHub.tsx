@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Button, Chip } from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Chip } from '@heroui/react/chip';
 import { Check, Copy, Download, ImageOff, RotateCw, Share2 } from 'lucide-react';
 import type { Driver, MarketingEntityType, MarketingTemplateKey, Place } from '@/types';
 import {
   marketingIdeas,
   marketingText,
-  marketingUrl,
 } from '@/lib/marketing/content';
 import { trackSiteEvent } from '@/lib/analytics/client';
 
@@ -34,6 +34,7 @@ function PublicShareCard({
 }) {
   const cardRef = useRef<HTMLElement | null>(null);
   const [copied, setCopied] = useState(false);
+  const [manualCopy, setManualCopy] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
   const [isNearViewport, setIsNearViewport] = useState(prioritizeImage);
   const text = marketingText({
@@ -80,9 +81,10 @@ function PublicShareCard({
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      setManualCopy(false);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      setManualCopy(true);
     }
   };
 
@@ -91,12 +93,15 @@ function PublicShareCard({
       if (navigator.share) {
         await navigator.share({ title: item.title, text });
       } else {
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setManualCopy(false);
+        window.setTimeout(() => setCopied(false), 1800);
       }
       trackSiteEvent('marketing_share_click', target);
     } catch (error) {
       if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+        setManualCopy(true);
       }
     }
   };
@@ -120,11 +125,11 @@ function PublicShareCard({
           <p className="text-sm font-bold">تعذر تحميل المعاينة مؤقتًا</p>
           <Button
             size="sm"
-            variant="flat"
+            variant="secondary"
             onPress={() => setPreviewFailed(false)}
-            startContent={<RotateCw className="size-4" aria-hidden="true" />}
             className="min-h-11 font-bold"
           >
+            <RotateCw className="size-4" aria-hidden="true" />
             إعادة المحاولة
           </Button>
         </div>
@@ -151,18 +156,18 @@ function PublicShareCard({
         <div className="grid grid-cols-3 gap-2">
           <Button
             onPress={copy}
-            startContent={copied
-              ? <Check className="size-4" aria-hidden="true" />
-              : <Copy className="size-4" aria-hidden="true" />}
             className="min-h-11 min-w-0 bg-zinc-100 px-2 text-xs font-bold text-zinc-900"
           >
+            {copied
+              ? <Check className="size-4" aria-hidden="true" />
+              : <Copy className="size-4" aria-hidden="true" />}
             {copied ? 'تم' : 'نسخ'}
           </Button>
           <Button
             onPress={share}
-            startContent={<Share2 className="size-4" aria-hidden="true" />}
             className="min-h-11 min-w-0 bg-zinc-950 px-2 text-xs font-bold text-white"
           >
+            <Share2 className="size-4" aria-hidden="true" />
             مشاركة
           </Button>
           <a
@@ -177,6 +182,20 @@ function PublicShareCard({
             تنزيل
           </a>
         </div>
+        {manualCopy ? (
+          <div role="status" className="space-y-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+            <p className="text-xs font-bold text-zinc-700">
+              تعذر النسخ التلقائي. حدّد النص التالي وانسخه من داخل الموقع.
+            </p>
+            <textarea
+              readOnly
+              value={text}
+              aria-label="نص المشاركة"
+              onFocus={(event) => event.currentTarget.select()}
+              className="min-h-28 w-full resize-y rounded-lg border border-zinc-300 bg-white p-2 text-xs leading-6 text-zinc-800"
+            />
+          </div>
+        ) : null}
       </div>
     </article>
   );

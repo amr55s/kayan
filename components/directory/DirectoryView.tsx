@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Input, Button, Skeleton, Card } from '@heroui/react';
+import { Input, Button, Skeleton, Card } from '@/components/ui/heroui-compat';
 import { BadgePercent, Search, MapPinOff, RefreshCw, Heart, MessageCircle } from 'lucide-react';
 import { Place, Driver, CategoryType } from '@/types';
 import { Header } from '@/components/layout/Header';

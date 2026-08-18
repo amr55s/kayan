@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -102,6 +103,7 @@ function targetIsValid(payload: z.infer<typeof payloadSchema>): boolean {
 }
 
 export async function POST(request: Request) {
+  const requestId = request.headers.get('x-vercel-id') || crypto.randomUUID();
   try {
     const contentLength = Number(request.headers.get('content-length') ?? 0);
     if (contentLength > MAX_BODY_BYTES) {
@@ -143,11 +145,11 @@ export async function POST(request: Request) {
       p_limit: 120,
     });
     if (error) {
-      console.warn('Anonymous behavior analytics could not be recorded:', error);
+      logSafeServerFailure('warn', 'analytics_record_failed', { failure: error, requestId });
     }
     return new Response(null, { status: 204 });
   } catch (error) {
-    console.warn('Anonymous behavior analytics endpoint failed:', error);
+    logSafeServerFailure('warn', 'analytics_endpoint_failed', { failure: error, requestId });
     return new Response(null, { status: 204 });
   }
 }

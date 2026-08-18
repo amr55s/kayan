@@ -1,5 +1,6 @@
 import { createPublicClient } from './public';
 import { createAdminClient } from './admin';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
 import type { Driver, Place, StoreCoupon } from '@/types';
 
 type QueryOutcome<T> =
@@ -189,15 +190,21 @@ export async function fetchHomePageData(): Promise<{
 
   const errors: string[] = [];
   if (placesResult.status === 'rejected') {
-    console.error('Public places query failed:', placesResult.reason);
+    logSafeServerFailure('error', 'public_places_query_failed', {
+      failure: placesResult.reason,
+    });
     errors.push('الأماكن');
   }
   if (legacyResult.status === 'rejected') {
-    console.error('Public drivers query failed:', legacyResult.reason);
+    logSafeServerFailure('error', 'public_legacy_drivers_query_failed', {
+      failure: legacyResult.reason,
+    });
     errors.push('الكباتن المسجلون سريعاً');
   }
   if (registeredResult.status === 'rejected') {
-    console.error('Registered drivers query failed:', registeredResult.reason);
+    logSafeServerFailure('error', 'public_registered_drivers_query_failed', {
+      failure: registeredResult.reason,
+    });
     errors.push('كباتن نظام التشغيل');
   }
 

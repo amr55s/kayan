@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import { SITE_NAME, SITE_NAME_AR, SITE_TAGLINE } from '@/lib/brand';
-import { WhatsAppGroupButton } from '@/components/layout/WhatsAppGroupButton';
 import { PwaInstaller } from '@/components/layout/PwaInstaller';
 import { Providers } from './providers';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ClientErrorReporter } from '@/components/observability/ClientErrorReporter';
 import { BehaviorAnalyticsReporter } from '@/components/observability/BehaviorAnalyticsReporter';
+import { getPublicSiteUrl } from '@/lib/seo/site';
 import '@fontsource/ibm-plex-sans-arabic/400.css';
 import '@fontsource/ibm-plex-sans-arabic/500.css';
 import '@fontsource/ibm-plex-sans-arabic/600.css';
@@ -14,11 +14,9 @@ import '@fontsource/ibm-plex-sans-arabic/700.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || 'https://kayan-hazel.vercel.app',
-  ),
+  metadataBase: getPublicSiteUrl(),
   title: `${SITE_NAME} | ${SITE_TAGLINE}`,
-  description: `${SITE_NAME_AR} يجمع المحلات والمطاعم والصيدليات والخدمات والتوصيل والتواصل المباشر في مكان واحد`,
+  description: `${SITE_NAME_AR} سوق محلي متكامل للمنتجات والخدمات والطلب والتوصيل من داخل الموقع.`,
   applicationName: SITE_NAME,
   manifest: '/manifest.json',
   icons: {
@@ -34,7 +32,6 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  alternates: { canonical: '/' },
 };
 
 export const viewport: Viewport = {
@@ -68,7 +65,6 @@ export default function RootLayout({
         <Providers>
           {children}
           <PwaInstaller />
-          <WhatsAppGroupButton />
         </Providers>
         <Analytics />
         <SpeedInsights />

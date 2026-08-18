@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import type { FeedbackImageMode } from '@/types';
-import { getCurrentProfile } from '@/lib/auth/guards';
+import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
@@ -21,15 +21,7 @@ function refreshDirectory() {
 }
 
 async function requireAdmin() {
-  const profile = await getCurrentProfile();
-  if (
-    !profile ||
-    profile.role !== 'admin' ||
-    !profile.is_active ||
-    profile.must_change_password
-  ) {
-    throw new Error('admin_access_required');
-  }
+  const { profile } = await requireMarketplaceAdminRole(['super_admin'], { failureMode: 'throw' });
   return profile;
 }
 

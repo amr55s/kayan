@@ -1,14 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import {
-  Button,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalHeader,
-  useOverlayState,
-} from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Modal } from '@heroui/react/modal';
+import { useOverlayState } from '@heroui/react';
 import { Drawer } from '@heroui/react/drawer';
 import { Bike, BookOpen, Building2, Home, LayoutDashboard, LogIn, Menu, MessageSquareText, Share2, UserPlus, X } from 'lucide-react';
 import Link from 'next/link';
@@ -35,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [dashboardPath, setDashboardPath] = useState<string | null>(null);
   const menuState = useOverlayState();
+  const joinState = useOverlayState({ isOpen: isJoinOpen, onOpenChange: onJoinOpenChange });
 
   useEffect(() => {
     let mounted = true;
@@ -134,9 +130,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <Button
               onClick={() => onJoinOpenChange(true)}
-              startContent={<UserPlus className="size-4" aria-hidden="true" />}
               className="bg-zinc-950 px-3 text-xs font-black text-white hover:bg-zinc-800 sm:px-4"
             >
+              <UserPlus className="size-4" aria-hidden="true" />
               <span className="sm:hidden">انضم</span>
               <span className="hidden sm:inline">انضم إلى {SITE_NAME_AR}</span>
             </Button>
@@ -170,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <Button
               isIconOnly
-              variant="light"
+              variant="ghost"
               onPress={menuState.close}
               aria-label="إغلاق القائمة"
               className="size-11 min-w-11"
@@ -208,16 +204,16 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="space-y-2">
                 <Button
                   onPress={() => chooseMenu(onOpenDriverModal)}
-                  startContent={<Bike className="size-5" aria-hidden="true" />}
                   className="w-full justify-start border border-zinc-200 bg-white px-4 font-bold text-zinc-950"
                 >
+                  <Bike className="size-5" aria-hidden="true" />
                   طلب حساب كابتن توصيل
                 </Button>
                 <Button
                   onPress={() => chooseMenu(onOpenAddModal)}
-                  startContent={<Building2 className="size-5" aria-hidden="true" />}
                   className="w-full justify-start bg-zinc-950 px-4 font-black text-white hover:bg-zinc-800"
                 >
+                  <Building2 className="size-5" aria-hidden="true" />
                   طلب حساب محل أو خدمة
                 </Button>
               </div>
@@ -231,55 +227,45 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
       </header>
 
-      <Modal isOpen={isJoinOpen} onOpenChange={onJoinOpenChange}>
-        <ModalContent>
-          {() => (
-            <>
-              <ModalHeader className="border-b border-zinc-100">
+      <Modal state={joinState}>
+        <Modal.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+          <Modal.Container placement="bottom" size="md" className="sm:items-center">
+            <Modal.Dialog aria-label={`انضم إلى ${SITE_NAME_AR}`} dir="rtl" className="mx-3 rounded-t-2xl border border-zinc-200 bg-white sm:mx-0 sm:rounded-2xl">
+              <Modal.Header className="border-b border-zinc-100">
                 <div>
-                  <h2 className="text-lg font-black text-zinc-950">انضم إلى {SITE_NAME_AR}</h2>
+                  <Modal.Heading className="text-lg font-black text-zinc-950">انضم إلى {SITE_NAME_AR}</Modal.Heading>
                   <p className="mt-1 text-sm font-normal text-zinc-500">اختر نوع التسجيل المناسب.</p>
                 </div>
-              </ModalHeader>
-              <ModalBody className="space-y-2 py-4">
+              </Modal.Header>
+              <Modal.Body className="space-y-2 py-4">
                 <div className="grid grid-cols-2 gap-2 pb-2">
-                  <Button
-                    as={Link}
-                    href="/guide"
-                    onPress={() => choose()}
-                    startContent={<BookOpen className="size-4" aria-hidden="true" />}
-                    className="border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900"
-                  >
+                  <Link href="/guide" onClick={() => choose()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-bold text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                    <BookOpen className="size-4" aria-hidden="true" />
                     طريقة الاستخدام
-                  </Button>
-                  <Button
-                    as={Link}
-                    href="/share"
-                    onPress={() => choose()}
-                    startContent={<Share2 className="size-4" aria-hidden="true" />}
-                    className="border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900"
-                  >
+                  </Link>
+                  <Link href="/share" onClick={() => choose()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-bold text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                    <Share2 className="size-4" aria-hidden="true" />
                     شارك ديرتك
-                  </Button>
+                  </Link>
                 </div>
                 <Button
                   onClick={() => choose(onOpenDriverModal)}
-                  startContent={<Bike className="size-5" aria-hidden="true" />}
                   className="w-full justify-start border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-950 hover:bg-zinc-50"
                 >
+                  <Bike className="size-5" aria-hidden="true" />
                   طلب حساب كابتن توصيل
                 </Button>
                 <Button
                   onClick={() => choose(onOpenAddModal)}
-                  startContent={<Building2 className="size-5" aria-hidden="true" />}
                   className="w-full justify-start bg-zinc-950 px-4 text-sm font-black text-white hover:bg-zinc-800"
                 >
+                  <Building2 className="size-5" aria-hidden="true" />
                   طلب حساب محل أو خدمة
                 </Button>
-              </ModalBody>
-            </>
-          )}
-        </ModalContent>
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
       </Modal>
     </>
   );

@@ -9,22 +9,17 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from '@heroui/react';
+} from '@/components/ui/heroui-compat';
 import {
   ArrowUpLeft,
   BadgePercent,
   Check,
   Copy,
-  MessageCircle,
   ReceiptText,
   ShoppingBag,
-  Tag,
   X,
 } from 'lucide-react';
 import type { Place, StoreCoupon } from '@/types';
-import { formatWhatsAppUrl } from '@/lib/utils';
-import { SITE_NAME_AR } from '@/lib/brand';
-import { trackSiteEvent } from '@/lib/analytics/client';
 
 function couponDiscount(coupon: StoreCoupon) {
   const value = Number(coupon.discount_value).toLocaleString('ar-EG', {
@@ -39,15 +34,6 @@ function minimumOrder(coupon: StoreCoupon) {
   return coupon.minimum_order_amount == null
     ? 'بدون حد أدنى للأوردر'
     : `على أوردر يبدأ من ${Number(coupon.minimum_order_amount).toLocaleString('ar-EG')} جنيه`;
-}
-
-function whatsAppMessage(place: Place, coupon: StoreCoupon) {
-  return [
-    `مرحباً ${place.title}، أريد الطلب باستخدام كوبون ${coupon.code} عبر ${SITE_NAME_AR}.`,
-    `العرض: ${couponDiscount(coupon)} — ${minimumOrder(coupon)}.`,
-    `يشمل: ${coupon.applies_to}.`,
-    `الشروط: ${coupon.usage_limit_text}`,
-  ].join('\n');
 }
 
 function CouponDetails({ coupon }: { coupon: StoreCoupon }) {
@@ -204,21 +190,11 @@ export function CouponOffer({ place }: { place: Place }) {
                 </Button>
                 <Button
                   as="a"
-                  href={formatWhatsAppUrl(
-                    place.whatsapp || place.phone,
-                    whatsAppMessage(place, selected),
-                  )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackSiteEvent('whatsapp_click', {
-                    targetType: 'place',
-                    targetKey: place.id,
-                  })}
-                  startContent={<MessageCircle className="size-5 text-[var(--dairtak-orange)]" aria-hidden="true" />}
-                  endContent={<Tag className="size-4" aria-hidden="true" />}
+                  href="/marketplace"
+                  startContent={<ShoppingBag className="size-5 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                   className="min-h-12 min-w-0 border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] px-3 text-sm font-black text-zinc-950 hover:bg-[#ffe7d7] sm:px-4 sm:text-base"
                 >
-                  استخدم الكوبون على واتساب
+                  استخدم الكود داخل سلة الموقع
                 </Button>
                 <span className="sr-only" aria-live="polite">{copied ? 'تم نسخ كود الخصم' : ''}</span>
               </ModalFooter>
