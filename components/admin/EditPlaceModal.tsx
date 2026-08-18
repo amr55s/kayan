@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { Button } from '@heroui/react/button';
 import { Input } from '@heroui/react/input';
 import { Label } from '@heroui/react/label';
@@ -433,8 +434,14 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                       {/* New Upload Previews */}
                       {newImagePreviews.map((previewUrl, idx) => (
                         <div key={`new-${idx}`} className="relative group w-full h-20 rounded-xl overflow-hidden border-2 border-zinc-700 bg-zinc-100 dark:bg-zinc-800">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={previewUrl} alt={`صورة جديدة ${idx + 1}`} className="h-full w-full object-cover" />
+                          <Image
+                            src={previewUrl}
+                            alt={`صورة جديدة ${idx + 1}`}
+                            fill
+                            sizes="160px"
+                            unoptimized
+                            className="object-cover"
+                          />
                           <button
                             type="button"
                             onClick={() => handleRemoveNewImage(idx)}
