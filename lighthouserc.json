@@ -4,7 +4,7 @@
       "numberOfRuns": 1,
       "settings": {
         "chromeFlags": "--headless --no-sandbox --disable-dev-shm-usage",
-        "extraHeaders": { "x-vercel-skip-toolbar": "1" },
+        "extraHeaders": { "x-vercel-skip-toolbar": "disabled" },
         "onlyCategories": ["performance", "accessibility", "best-practices"]
       }
     },

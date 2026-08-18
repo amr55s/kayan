@@ -44,6 +44,6 @@ test('Vercel preview gates pin browser dependencies and run Playwright, axe, and
   assert.match(e2e, /AxeBuilder/u);
   assert.match(e2e, /Google sign-in/u);
   assert.match(playwright, /'x-vercel-skip-toolbar': '1'/u);
-  assert.match(lighthouse, /"x-vercel-skip-toolbar": "1"/u);
+  assert.match(lighthouse, /"x-vercel-skip-toolbar": "disabled"/u);
   assert.doesNotMatch(lighthouse, /categories:seo/u);
 });
