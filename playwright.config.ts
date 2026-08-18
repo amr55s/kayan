@@ -18,6 +18,9 @@ export default defineConfig({
   timeout: 30_000,
   use: {
     baseURL: baseURL ?? 'http://127.0.0.1:3000',
+    extraHTTPHeaders: process.env.CI
+      ? { 'x-vercel-skip-toolbar': '1' }
+      : undefined,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

@@ -19,3 +19,6 @@ skills-lock.json
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+.playwright-cli/
+.lighthouseci/

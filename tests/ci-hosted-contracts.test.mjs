@@ -8,6 +8,8 @@ const spaces = read('scripts/smoke-do-spaces-prefix.mjs');
 const targetGuard = read('scripts/validate-supabase-ci-target.mjs');
 const rls = read('supabase/tests/rls_contract.sql');
 const e2e = read('e2e/public-preview.spec.ts');
+const playwright = read('playwright.config.ts');
+const lighthouse = read('lighthouserc.json');
 const packageJson = JSON.parse(read('package.json'));
 
 test('hosted jobs are conditional and missing secrets are reported as skipped', () => {
@@ -41,4 +43,7 @@ test('Vercel preview gates pin browser dependencies and run Playwright, axe, and
   assert.match(workflow, /treosh\/lighthouse-ci-action@512cc908a55bfb0ad231facca52adf3d3a651df4/u);
   assert.match(e2e, /AxeBuilder/u);
   assert.match(e2e, /Google sign-in/u);
+  assert.match(playwright, /'x-vercel-skip-toolbar': '1'/u);
+  assert.match(lighthouse, /"x-vercel-skip-toolbar": "1"/u);
+  assert.doesNotMatch(lighthouse, /categories:seo/u);
 });

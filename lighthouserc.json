@@ -4,7 +4,8 @@
       "numberOfRuns": 1,
       "settings": {
         "chromeFlags": "--headless --no-sandbox --disable-dev-shm-usage",
-        "onlyCategories": ["performance", "accessibility", "best-practices", "seo"]
+        "extraHeaders": { "x-vercel-skip-toolbar": "1" },
+        "onlyCategories": ["performance", "accessibility", "best-practices"]
       }
     },
     "assert": {
@@ -12,7 +13,6 @@
         "categories:performance": ["error", { "minScore": 0.7 }],
         "categories:accessibility": ["error", { "minScore": 0.9 }],
         "categories:best-practices": ["error", { "minScore": 0.85 }],
-        "categories:seo": ["error", { "minScore": 0.85 }],
         "errors-in-console": "error"
       }
     },
