@@ -1,9 +1,3 @@
-'use client';
-
-import { Button } from '@heroui/react/button';
-import { Input } from '@heroui/react/input';
-import { Label } from '@heroui/react/label';
-import { Search } from 'lucide-react';
 import type { MarketplaceSortOption } from './view-models';
 import type { MarketplaceStoreFilter } from './view-models';
 import styles from './marketplace.module.css';
@@ -36,10 +30,10 @@ export function CatalogControls({
   return (
     <form className={styles.controls} action="/marketplace" method="get" role="search">
       <div className={styles.selectWrap}>
-        <Label.Root htmlFor="marketplace-search" className={styles.label}>
+        <label htmlFor="marketplace-search" className={styles.label}>
           ابحث في المنتجات
-        </Label.Root>
-        <Input.Root
+        </label>
+        <input
           id="marketplace-search"
           name="q"
           type="search"
@@ -61,13 +55,13 @@ export function CatalogControls({
       </label>
 
       <div className={styles.selectWrap}>
-        <Label.Root htmlFor="marketplace-min-price" className={styles.label}>أقل سعر (جنيه)</Label.Root>
-        <Input.Root id="marketplace-min-price" name="min_price" type="number" min="0" step="0.01" inputMode="decimal" defaultValue={minPrice} className={styles.field} />
+        <label htmlFor="marketplace-min-price" className={styles.label}>أقل سعر (جنيه)</label>
+        <input id="marketplace-min-price" name="min_price" type="number" min="0" step="0.01" inputMode="decimal" defaultValue={minPrice} className={styles.field} />
       </div>
 
       <div className={styles.selectWrap}>
-        <Label.Root htmlFor="marketplace-max-price" className={styles.label}>أعلى سعر (جنيه)</Label.Root>
-        <Input.Root id="marketplace-max-price" name="max_price" type="number" min="0" step="0.01" inputMode="decimal" defaultValue={maxPrice} className={styles.field} />
+        <label htmlFor="marketplace-max-price" className={styles.label}>أعلى سعر (جنيه)</label>
+        <input id="marketplace-max-price" name="max_price" type="number" min="0" step="0.01" inputMode="decimal" defaultValue={maxPrice} className={styles.field} />
       </div>
 
       <label className={styles.selectWrap} htmlFor="marketplace-rating">
@@ -102,10 +96,13 @@ export function CatalogControls({
       {selectedCategory ? (
         <input type="hidden" name="category" value={selectedCategory} />
       ) : null}
-      <Button.Root type="submit" className={styles.primaryButton}>
-        <Search size={18} aria-hidden="true" />
+      <button type="submit" className={styles.primaryButton}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
         بحث
-      </Button.Root>
+      </button>
     </form>
   );
 }

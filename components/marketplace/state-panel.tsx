@@ -1,5 +1,3 @@
-import { Card } from '@heroui/react/card';
-import { Skeleton } from '@heroui/react/skeleton';
 import { CircleAlert, PackageOpen } from 'lucide-react';
 import Link from 'next/link';
 import styles from './marketplace.module.css';
@@ -22,12 +20,12 @@ export function MarketplaceStatePanel({
   const Icon = kind === 'error' ? CircleAlert : PackageOpen;
 
   return (
-    <Card.Root
+    <section
       className={styles.stateCard}
       role={kind === 'error' ? 'alert' : undefined}
       aria-live={kind === 'error' ? 'assertive' : undefined}
     >
-      <Card.Content className={styles.stateContent}>
+      <div className={styles.stateContent}>
         <span className={styles.stateIcon} aria-hidden="true">
           <Icon size={24} strokeWidth={1.8} />
         </span>
@@ -38,8 +36,8 @@ export function MarketplaceStatePanel({
             {actionLabel}
           </Link>
         ) : null}
-      </Card.Content>
-    </Card.Root>
+      </div>
+    </section>
   );
 }
 
@@ -48,8 +46,8 @@ export function MarketplaceCatalogSkeleton({ cards = 10 }: { cards?: number }) {
     <div role="status" aria-live="polite" aria-label="جارٍ تحميل المنتجات" aria-busy="true">
       <div className={styles.sectionHeader}>
         <div style={{ width: 'min(100%, 32rem)' }}>
-          <Skeleton.Root className={styles.skeletonLine} />
-          <Skeleton.Root
+          <span className={styles.skeletonLine} />
+          <span
             className={`${styles.skeletonLine} ${styles.skeletonLineShort}`}
             style={{ marginTop: '0.75rem' }}
           />
@@ -58,9 +56,9 @@ export function MarketplaceCatalogSkeleton({ cards = 10 }: { cards?: number }) {
       <div className={styles.skeletonGrid}>
         {Array.from({ length: Math.max(1, cards) }, (_, index) => (
           <div key={index} className={styles.skeletonCard}>
-            <Skeleton.Root className={styles.skeletonImage} />
-            <Skeleton.Root className={styles.skeletonLine} />
-            <Skeleton.Root className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
+            <span className={styles.skeletonImage} />
+            <span className={styles.skeletonLine} />
+            <span className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} />
           </div>
         ))}
       </div>

@@ -419,6 +419,11 @@
   padding: 0 0.85rem 0.85rem;
 }
 
+.cardFooter form,
+.cardFooter .primaryButton {
+  width: 100%;
+}
+
 .statusLine {
   min-height: 1.25rem;
   color: #047857;
@@ -441,12 +446,16 @@
 }
 
 .tag {
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
   border: 1px solid #fed7aa;
   border-radius: 999px;
   background: #fff7ed;
   color: #9a3412;
   font-size: 0.68rem;
   font-weight: 800;
+  padding-inline: 0.55rem;
 }
 
 .pagination {
@@ -866,9 +875,35 @@
   background: #e4e4e7;
 }
 
+.skeletonImage,
+.skeletonLine {
+  display: block;
+  overflow: hidden;
+  position: relative;
+  background: #e4e4e7;
+}
+
 .skeletonLine {
   height: 0.8rem;
-  background: #e4e4e7;
+}
+
+.skeletonImage::after,
+.skeletonLine::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  content: '';
+  transform: translateX(-100%);
+  animation: marketplace-skeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes marketplace-skeleton {
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonImage::after,
+  .skeletonLine::after { animation: none; }
 }
 
 .skeletonLineShort {

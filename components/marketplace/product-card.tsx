@@ -1,6 +1,3 @@
-import { Button } from '@heroui/react/button';
-import { Card } from '@heroui/react/card';
-import { Chip } from '@heroui/react/chip';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -28,7 +25,7 @@ export function MarketplaceProductCard({
   const showRating = Boolean(product.rating && product.rating.count > 0);
 
   return (
-    <Card.Root className={styles.productCard}>
+    <article className={styles.productCard}>
       <Link href={productHref} className={styles.productImageLink} tabIndex={-1}>
         {product.primaryImage ? (
           <Image
@@ -45,17 +42,15 @@ export function MarketplaceProductCard({
         )}
         {product.badge ? (
           <span className={styles.tagRow}>
-            <Chip.Root size="sm" className={styles.tag}>
-              <Chip.Label>{product.badge}</Chip.Label>
-            </Chip.Root>
+            <span className={styles.tag}>{product.badge}</span>
           </span>
         ) : null}
       </Link>
 
-      <Card.Header className={styles.cardHeader}>
+      <header className={styles.cardHeader}>
         <span className={styles.storeName}>{product.store.name}</span>
         <Link href={productHref} className={styles.productTitleLink}>
-          <Card.Title className={styles.productTitle}>{product.name}</Card.Title>
+          <h2 className={styles.productTitle}>{product.name}</h2>
         </Link>
         {showRating && product.rating ? (
           <span
@@ -78,9 +73,9 @@ export function MarketplaceProductCard({
             </>
           ) : null}
         </span>
-      </Card.Header>
+      </header>
 
-      <Card.Footer className={styles.cardFooter}>
+      <footer className={styles.cardFooter}>
         <span
           className={`${styles.statusLine} ${product.isInStock ? '' : styles.outOfStock}`}
         >
@@ -93,21 +88,20 @@ export function MarketplaceProductCard({
               <input type="hidden" name="variantId" value={product.defaultVariantId} />
             ) : null}
             <input type="hidden" name="quantity" value="1" />
-            <Button.Root
+            <button
               type="submit"
-              fullWidth
-              isDisabled={!product.isInStock}
+              disabled={!product.isInStock}
               className={styles.primaryButton}
             >
               أضف إلى السلة
-            </Button.Root>
+            </button>
           </form>
         ) : (
           <Link href={productHref} className={styles.secondaryButton}>
             عرض التفاصيل
           </Link>
         )}
-      </Card.Footer>
-    </Card.Root>
+      </footer>
+    </article>
   );
 }
