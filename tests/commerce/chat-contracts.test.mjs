@@ -54,7 +54,7 @@ test('message cards are parsed and must match the message kind', () => {
     value.set('conversationId', crypto.randomUUID());
     value.set('clientMessageId', crypto.randomUUID());
     value.set('kind', kind);
-    if (body !== undefined) value.set('body', body);
+    if (body !== undefined && body !== null) value.set('body', body);
     if (card !== undefined) value.set('card', JSON.stringify(card));
     return parseSendMessageForm(value).success;
   };
@@ -68,5 +68,11 @@ test('message cards are parsed and must match the message kind', () => {
   assert.equal(form('location', null, { type: 'product', id: crypto.randomUUID() }), false);
   assert.equal(form('product', null), false);
   assert.equal(form('image', null), true);
+  assert.equal(form('image', 'unexpected body'), false);
+  assert.equal(form('image', null, { type: 'product', id: crypto.randomUUID() }), false);
+  assert.equal(form('product', 'unexpected body', { type: 'product', id: crypto.randomUUID() }), false);
+  assert.equal(form('product', null, { type: 'product', id: crypto.randomUUID(), url: 'https://evil.example' }), false);
+  assert.equal(form('location', null, { type: 'location', latitude: 30, longitude: 31, href: 'https://evil.example' }), false);
+  assert.equal(form('system', 'client-authored system message'), false);
   assert.equal(form('product', null, '{bad json'), false);
 });

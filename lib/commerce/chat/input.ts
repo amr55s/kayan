@@ -4,16 +4,17 @@ import type { ChatReactionInput, ChatSearchInput, ConversationIntent, SendMessag
 const uuid = z.string().uuid();
 const cursor = z.object({ createdAt: z.string().datetime(), id: uuid });
 const card = z.discriminatedUnion('type', [
-  z.object({ type: z.enum(['product', 'store', 'order']), id: uuid }),
-  z.object({ type: z.literal('location'), latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180) }),
+  z.object({ type: z.enum(['product', 'store', 'order']), id: uuid }).strict(),
+  z.object({ type: z.literal('location'), latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180) }).strict(),
 ]);
-const kind = z.enum(['text', 'image', 'product', 'store', 'order', 'location', 'system']);
+const kind = z.enum(['text', 'image', 'product', 'store', 'order', 'location']);
 const codePointBound = (max: number) => z.string().refine((value) => [...value].length <= max, `Must contain at most ${max} Unicode characters`);
 const body = codePointBound(5000);
 
-export const sendMessageSchema = z.object({ conversationId: uuid, clientMessageId: uuid, kind, body: body.nullable(), replyToId: uuid.nullable(), card: card.nullable() }).superRefine((value, context) => {
+export const sendMessageSchema = z.object({ conversationId: uuid, clientMessageId: uuid, kind, body: body.nullable(), replyToId: uuid.nullable(), card: card.nullable() }).strict().superRefine((value, context) => {
   if (value.kind === 'text' && (!value.body || value.body.trim().length === 0 || value.card !== null)) context.addIssue({ code: 'custom', message: 'Text messages require a nonblank body and no card' });
-  if (['product', 'store', 'order', 'location'].includes(value.kind) && (value.card === null || value.card.type !== value.kind)) context.addIssue({ code: 'custom', message: 'Card must match message kind' });
+  if (value.kind === 'image' && (value.body !== null || value.card !== null)) context.addIssue({ code: 'custom', message: 'Image messages cannot include a body or card' });
+  if (['product', 'store', 'order', 'location'].includes(value.kind) && (value.body !== null || value.card === null || value.card.type !== value.kind)) context.addIssue({ code: 'custom', message: 'Card messages require a matching card and no body' });
 });
 export function parseSendMessageForm(formData: FormData) {
   const value = (name: string) => { const item = formData.get(name); return typeof item === 'string' ? item : null; };

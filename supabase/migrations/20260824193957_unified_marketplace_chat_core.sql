@@ -31,6 +31,15 @@ create table public.marketplace_chat_participants (
   check (removed_at is null or removed_at >= joined_at)
 );
 
+create table public.marketplace_chat_blocks (
+  thread_id uuid not null references public.support_threads(id) on delete cascade,
+  blocker_user_id uuid not null references auth.users(id) on delete cascade,
+  blocked_user_id uuid not null references auth.users(id) on delete cascade,
+  blocked_at timestamptz not null default now(),
+  primary key (thread_id, blocker_user_id, blocked_user_id),
+  check (blocker_user_id <> blocked_user_id)
+);
+
 alter table public.support_messages
   add column if not exists client_message_id uuid,
   add column if not exists message_kind text not null default 'text'
@@ -38,7 +47,10 @@ alter table public.support_messages
   add column if not exists reply_to_id uuid references public.support_messages(id) on delete set null,
   add column if not exists card_data jsonb,
   add column if not exists deleted_at timestamptz,
-  add column if not exists deleted_body text;
+  add column if not exists deleted_body text,
+  add column if not exists search_document tsvector generated always as (
+    to_tsvector('simple', coalesce(body, ''))
+  ) stored;
 
 alter table public.support_messages drop constraint if exists support_messages_sender_kind_check;
 alter table public.support_messages add constraint support_messages_sender_kind_check
@@ -71,8 +83,13 @@ create index marketplace_chat_participants_user_active_idx
   where removed_at is null;
 create index marketplace_chat_reactions_user_idx
   on public.marketplace_chat_reactions(user_id, message_id);
+create index marketplace_chat_blocks_blocked_idx
+  on public.marketplace_chat_blocks(thread_id, blocked_user_id, blocker_user_id);
 create index support_messages_thread_search_idx
   on public.support_messages(thread_id, created_at desc, id desc)
+  where deleted_at is null;
+create index support_messages_search_document_idx
+  on public.support_messages using gin (search_document)
   where deleted_at is null;
 create unique index support_threads_active_presale_key
   on public.support_threads(customer_id, store_id)
@@ -93,6 +110,7 @@ select thread.id, membership.user_id, 'merchant'
 from public.support_threads as thread
 join public.store_memberships as membership on membership.store_id = thread.store_id
 where membership.is_active
+  and membership.role in ('owner', 'manager', 'fulfillment')
 on conflict (thread_id, user_id, participant_role) do nothing;
 
 insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
@@ -106,7 +124,9 @@ insert into public.marketplace_chat_participants (thread_id, user_id, participan
 select thread.id, assignment.driver_id, 'driver'
 from public.support_threads as thread
 join public.marketplace_delivery_assignments as assignment on assignment.order_id = thread.order_id
+join public.profiles as profile on profile.id = assignment.driver_id
 where assignment.driver_id is not null and assignment.status in ('assigned', 'picked_up', 'issue')
+  and profile.role = 'driver' and profile.is_active
 on conflict (thread_id, user_id, participant_role) do nothing;
 
 create or replace function public.can_access_marketplace_chat_thread(p_thread_id uuid)
@@ -157,15 +177,19 @@ begin
             select 1 from public.store_memberships as membership
             where membership.store_id = thread.store_id
               and membership.user_id = v_actor_id and membership.is_active
+              and membership.role in ('owner', 'manager', 'fulfillment')
           )
         )
         or (
           participant.participant_role = 'driver'
           and exists (
-            select 1 from public.marketplace_delivery_assignments as assignment
+            select 1
+            from public.marketplace_delivery_assignments as assignment
+            join public.profiles as profile on profile.id = assignment.driver_id
             where assignment.order_id = thread.order_id
               and assignment.driver_id = v_actor_id
               and assignment.status in ('assigned', 'picked_up', 'issue')
+              and profile.role = 'driver' and profile.is_active
           )
         )
       )
@@ -369,10 +393,14 @@ begin
       select 1 from public.store_memberships as membership
       where membership.store_id = v_order.store_id
         and membership.user_id = v_actor_id and membership.is_active
+        and membership.role in ('owner', 'manager', 'fulfillment')
     ) or exists (
-      select 1 from public.marketplace_delivery_assignments as assignment
+      select 1
+      from public.marketplace_delivery_assignments as assignment
+      join public.profiles as profile on profile.id = assignment.driver_id
       where assignment.order_id = v_order.id and assignment.driver_id = v_actor_id
         and assignment.status in ('assigned', 'picked_up', 'issue')
+        and profile.role = 'driver' and profile.is_active
     );
     if not v_allowed then
       raise exception 'not_found' using errcode = 'P0002';
@@ -404,16 +432,27 @@ begin
   select v_thread.id, membership.user_id, 'merchant'
   from public.store_memberships as membership
   where membership.store_id = v_thread.store_id and membership.is_active
+    and membership.role in ('owner', 'manager', 'fulfillment')
   on conflict (thread_id, user_id, participant_role)
-  do update set removed_at = null;
+  do update set removed_at = null,
+    joined_at = case
+      when public.marketplace_chat_participants.removed_at is not null then now()
+      else public.marketplace_chat_participants.joined_at
+    end;
 
   insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
   select v_thread.id, assignment.driver_id, 'driver'
   from public.marketplace_delivery_assignments as assignment
+  join public.profiles as profile on profile.id = assignment.driver_id
   where assignment.order_id = v_thread.order_id and assignment.driver_id is not null
     and assignment.status in ('assigned', 'picked_up', 'issue')
+    and profile.role = 'driver' and profile.is_active
   on conflict (thread_id, user_id, participant_role)
-  do update set removed_at = null;
+  do update set removed_at = null,
+    joined_at = case
+      when public.marketplace_chat_participants.removed_at is not null then now()
+      else public.marketplace_chat_participants.joined_at
+    end;
 
   if not public.can_access_marketplace_chat_thread(v_thread.id) then
     raise exception 'not_found' using errcode = 'P0002';
@@ -577,7 +616,7 @@ begin
     select message.id, message.created_at
     from public.support_messages as message
     where message.thread_id = p_thread_id and message.deleted_at is null
-      and pg_catalog.strpos(pg_catalog.lower(coalesce(message.body, '')), pg_catalog.lower(v_query)) > 0
+      and message.search_document @@ websearch_to_tsquery('simple', v_query)
       and (
         p_before_created_at is null
         or (message.created_at, message.id) < (p_before_created_at, p_before_id)
@@ -653,12 +692,16 @@ begin
         select 1 from public.store_memberships as membership
         where membership.store_id = v_thread.store_id
           and membership.user_id = v_actor_id and membership.is_active
+          and membership.role in ('owner', 'manager', 'fulfillment')
       ))
       or (participant.participant_role = 'driver' and exists (
-        select 1 from public.marketplace_delivery_assignments as assignment
+        select 1
+        from public.marketplace_delivery_assignments as assignment
+        join public.profiles as profile on profile.id = assignment.driver_id
         where assignment.order_id = v_thread.order_id
           and assignment.driver_id = v_actor_id
           and assignment.status in ('assigned', 'picked_up', 'issue')
+          and profile.role = 'driver' and profile.is_active
       ))
     )
   order by case participant.participant_role
@@ -667,6 +710,36 @@ begin
   if v_sender_kind is null then
     -- Monitors may observe but can never impersonate a participant.
     raise exception 'not_found' using errcode = 'P0002';
+  end if;
+  -- A block names an exact pair. Read access remains intact so delivery and
+  -- support updates stay visible, but neither member of that pair may continue
+  -- a direct exchange in the shared conversation.
+  if exists (
+    select 1
+    from public.marketplace_chat_blocks as block
+    where block.thread_id = p_thread_id
+      and (
+        (
+          block.blocker_user_id = v_actor_id
+          and exists (
+            select 1 from public.marketplace_chat_participants as blocked
+            where blocked.thread_id = p_thread_id
+              and blocked.user_id = block.blocked_user_id
+              and blocked.removed_at is null
+          )
+        )
+        or (
+          block.blocked_user_id = v_actor_id
+          and exists (
+            select 1 from public.marketplace_chat_participants as blocker
+            where blocker.thread_id = p_thread_id
+              and blocker.user_id = block.blocker_user_id
+              and blocker.removed_at is null
+          )
+        )
+      )
+  ) then
+    raise exception 'closed' using errcode = '55000';
   end if;
   if v_thread.status = 'closed' or v_thread.paused_at is not null then
     raise exception 'closed' using errcode = '55000';
@@ -688,12 +761,14 @@ begin
   if p_kind in ('product', 'store', 'order', 'location') and (
     p_body is not null or jsonb_typeof(p_card_data) <> 'object'
     or p_card_data ->> 'type' is distinct from p_kind
+    or octet_length(p_card_data::text) > 512
   ) then
     raise exception 'invalid_input' using errcode = '22023';
   end if;
 
   if p_kind in ('product', 'store', 'order') then
-    if coalesce(p_card_data ->> 'id', '') !~
+    if p_card_data - 'type' - 'id' <> '{}'::jsonb
+       or coalesce(p_card_data ->> 'id', '') !~
        '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' then
       raise exception 'invalid_input' using errcode = '22023';
     end if;
@@ -708,7 +783,8 @@ begin
       raise exception 'invalid_input' using errcode = '22023';
     end if;
   elsif p_kind = 'location' then
-    if jsonb_typeof(p_card_data -> 'latitude') is distinct from 'number'
+    if p_card_data - 'type' - 'latitude' - 'longitude' <> '{}'::jsonb
+       or jsonb_typeof(p_card_data -> 'latitude') is distinct from 'number'
        or jsonb_typeof(p_card_data -> 'longitude') is distinct from 'number'
        or (p_card_data ->> 'latitude')::numeric not between -90 and 90
        or (p_card_data ->> 'longitude')::numeric not between -180 and 180
@@ -732,6 +808,12 @@ begin
     where recent.thread_id = p_thread_id and recent.sender_user_id = v_actor_id
       and recent.created_at >= now() - interval '1 minute'
   ) >= 60 then
+    raise exception 'rate_limited' using errcode = 'P0001';
+  end if;
+  if (
+    select count(*) from public.support_messages as conversation_message
+    where conversation_message.thread_id = p_thread_id
+  ) >= 100000 then
     raise exception 'rate_limited' using errcode = 'P0001';
   end if;
 
@@ -917,6 +999,7 @@ as $$
 declare
   v_actor_id uuid := (select auth.uid());
   v_updated integer;
+  v_active_delivery boolean;
 begin
   if v_actor_id is null then
     raise exception 'authentication_required' using errcode = '28000';
@@ -930,15 +1013,48 @@ begin
      ) then
     raise exception 'not_found' using errcode = 'P0002';
   end if;
+  if p_blocked then
+    insert into public.marketplace_chat_blocks (
+      thread_id, blocker_user_id, blocked_user_id
+    ) values (
+      p_thread_id, v_actor_id, p_counterparty_id
+    )
+    on conflict (thread_id, blocker_user_id, blocked_user_id)
+    do update set blocked_at = excluded.blocked_at;
+  else
+    delete from public.marketplace_chat_blocks
+    where thread_id = p_thread_id
+      and blocker_user_id = v_actor_id
+      and blocked_user_id = p_counterparty_id;
+  end if;
+
+  select exists (
+    select 1
+    from public.support_threads as thread
+    join public.marketplace_delivery_assignments as assignment
+      on assignment.order_id = thread.order_id
+    where thread.id = p_thread_id
+      and assignment.status in ('assigned', 'picked_up', 'issue')
+  ) into v_active_delivery;
+
+  -- Retain the legacy timestamp as a derived compatibility signal. Pairwise
+  -- authorization uses marketplace_chat_blocks exclusively.
   update public.marketplace_chat_participants
-  set counterparty_blocked_at = case when p_blocked then now() else null end
+  set counterparty_blocked_at = (
+    select max(block.blocked_at)
+    from public.marketplace_chat_blocks as block
+    where block.thread_id = p_thread_id and block.blocker_user_id = v_actor_id
+  )
   where thread_id = p_thread_id and user_id = v_actor_id and removed_at is null;
   get diagnostics v_updated = row_count;
   if v_updated = 0 then
     raise exception 'not_found' using errcode = 'P0002';
   end if;
   return jsonb_build_object(
-    'conversationId', p_thread_id, 'counterpartyId', p_counterparty_id, 'blocked', p_blocked
+    'conversationId', p_thread_id,
+    'counterpartyId', p_counterparty_id,
+    'blocked', p_blocked,
+    'deliveryContinuityRequired', v_active_delivery
   );
 end;
 $$;
@@ -953,14 +1069,21 @@ declare
   v_actor_id uuid := (select auth.uid());
   v_driver_id uuid := case when tg_op = 'DELETE' then null else new.driver_id end;
   v_order_id uuid := case when tg_op = 'DELETE' then old.order_id else new.order_id end;
-  v_active boolean := tg_op <> 'DELETE'
-    and new.driver_id is not null
-    and new.status in ('assigned', 'picked_up', 'issue');
+  v_active boolean := false;
 begin
   -- Authorization belongs to the assignment mutation that fired this trigger.
   -- Reading auth.uid() preserves its caller context for audit/debugging while
   -- direct EXECUTE is revoked below.
   perform v_actor_id;
+  if tg_op <> 'DELETE' then
+    v_active := new.driver_id is not null
+      and new.status in ('assigned', 'picked_up', 'issue')
+      and exists (
+        select 1 from public.profiles as profile
+        where profile.id = new.driver_id
+          and profile.role = 'driver' and profile.is_active
+      );
+  end if;
   update public.marketplace_chat_participants
   set removed_at = coalesce(removed_at, now())
   where thread_id in (
@@ -974,7 +1097,11 @@ begin
     select id, v_driver_id, 'driver'
     from public.support_threads where order_id = v_order_id
     on conflict (thread_id, user_id, participant_role)
-    do update set removed_at = null, joined_at = now();
+    do update set removed_at = null,
+      joined_at = case
+        when public.marketplace_chat_participants.removed_at is not null then now()
+        else public.marketplace_chat_participants.joined_at
+      end;
   end if;
   return case when tg_op = 'DELETE' then old else new end;
 end;
@@ -986,6 +1113,51 @@ after insert or update or delete
 on public.marketplace_delivery_assignments
 for each row execute function public.sync_marketplace_chat_driver_participant();
 
+create or replace function public.sync_marketplace_chat_driver_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor_id uuid := (select auth.uid());
+  v_user_id uuid := case when tg_op = 'DELETE' then old.id else new.id end;
+  v_active boolean := false;
+begin
+  perform v_actor_id;
+  if tg_op <> 'DELETE' then
+    v_active := new.role = 'driver' and new.is_active;
+  end if;
+
+  if v_active then
+    insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
+    select thread.id, v_user_id, 'driver'
+    from public.support_threads as thread
+    join public.marketplace_delivery_assignments as assignment
+      on assignment.order_id = thread.order_id
+    where assignment.driver_id = v_user_id
+      and assignment.status in ('assigned', 'picked_up', 'issue')
+    on conflict (thread_id, user_id, participant_role)
+    do update set removed_at = null,
+      joined_at = case
+        when public.marketplace_chat_participants.removed_at is not null then now()
+        else public.marketplace_chat_participants.joined_at
+      end;
+  else
+    update public.marketplace_chat_participants
+    set removed_at = coalesce(removed_at, now())
+    where user_id = v_user_id and participant_role = 'driver' and removed_at is null;
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end;
+$$;
+
+drop trigger if exists marketplace_chat_sync_driver_profile on public.profiles;
+create trigger marketplace_chat_sync_driver_profile
+after update of role, is_active or delete
+on public.profiles
+for each row execute function public.sync_marketplace_chat_driver_profile();
+
 create or replace function public.sync_marketplace_chat_store_participant()
 returns trigger
 language plpgsql
@@ -996,15 +1168,23 @@ declare
   v_actor_id uuid := (select auth.uid());
   v_store_id uuid := case when tg_op = 'DELETE' then old.store_id else new.store_id end;
   v_user_id uuid := case when tg_op = 'DELETE' then old.user_id else new.user_id end;
-  v_active boolean := tg_op <> 'DELETE' and new.is_active;
+  v_active boolean := false;
 begin
   perform v_actor_id;
+  if tg_op <> 'DELETE' then
+    v_active := new.is_active
+      and new.role in ('owner', 'manager', 'fulfillment');
+  end if;
   if v_active then
     insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
     select thread.id, v_user_id, 'merchant'
     from public.support_threads as thread where thread.store_id = v_store_id
     on conflict (thread_id, user_id, participant_role)
-    do update set removed_at = null, joined_at = now();
+    do update set removed_at = null,
+      joined_at = case
+        when public.marketplace_chat_participants.removed_at is not null then now()
+        else public.marketplace_chat_participants.joined_at
+      end;
   else
     update public.marketplace_chat_participants
     set removed_at = coalesce(removed_at, now())
@@ -1034,14 +1214,22 @@ declare
   v_thread_id uuid := coalesce(new.thread_id, old.thread_id);
 begin
   perform v_actor_id;
-  perform realtime.broadcast_changes(
+  -- Send a reconciliation hint only. Clients refetch the participant-scoped
+  -- DTO, so soft-delete audit content and the pre-update row never enter a
+  -- participant channel payload.
+  perform realtime.send(
+    jsonb_build_object(
+      'conversationId', v_thread_id,
+      'messageId', coalesce(new.id, old.id),
+      'operation', tg_op,
+      'deleted', case
+        when tg_op = 'DELETE' then true
+        else new.deleted_at is not null
+      end
+    ),
+    'message_changed',
     'marketplace-chat:' || v_thread_id::text,
-    tg_op,
-    tg_op,
-    tg_table_name,
-    tg_table_schema,
-    new,
-    old
+    true
   );
   return null;
 end;
@@ -1077,6 +1265,7 @@ with check (
 
 alter table public.marketplace_chat_participants enable row level security;
 alter table public.marketplace_chat_reactions enable row level security;
+alter table public.marketplace_chat_blocks enable row level security;
 
 drop policy if exists support_threads_read_participant on public.support_threads;
 create policy support_threads_read_participant
@@ -1107,6 +1296,7 @@ revoke all on table public.support_threads from public, anon, authenticated;
 revoke all on table public.support_messages from public, anon, authenticated;
 revoke all on table public.marketplace_chat_participants from public, anon, authenticated;
 revoke all on table public.marketplace_chat_reactions from public, anon, authenticated;
+revoke all on table public.marketplace_chat_blocks from public, anon, authenticated;
 
 revoke all on function public.can_access_marketplace_chat_thread(uuid)
   from public, anon, authenticated, service_role;
@@ -1117,6 +1307,8 @@ revoke all on function public.marketplace_chat_message_json(uuid, uuid)
 revoke all on function public.marketplace_chat_conversation_summary(uuid, uuid)
   from public, anon, authenticated, service_role;
 revoke all on function public.sync_marketplace_chat_driver_participant()
+  from public, anon, authenticated, service_role;
+revoke all on function public.sync_marketplace_chat_driver_profile()
   from public, anon, authenticated, service_role;
 revoke all on function public.sync_marketplace_chat_store_participant()
   from public, anon, authenticated, service_role;

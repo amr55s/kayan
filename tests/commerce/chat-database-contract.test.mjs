@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const migrationsUrl = new URL('../../supabase/migrations/', import.meta.url);
+const pgTapSql = readFileSync(new URL('../../supabase/tests/rls_contract.sql', import.meta.url), 'utf8');
 const matchingMigrations = readdirSync(migrationsUrl)
   .filter((name) => name.endsWith('_unified_marketplace_chat_core.sql'));
 
@@ -13,6 +14,10 @@ test('the CLI generated exactly one unified marketplace chat migration', () => {
 const sql = matchingMigrations.length === 1
   ? readFileSync(new URL(matchingMigrations[0], migrationsUrl), 'utf8')
   : '';
+
+const routineSql = (name) => sql.match(new RegExp(
+  `create or replace function public\\.${name}\\([\\s\\S]*?\\n\\$\\$;`, 'u',
+))?.[0] ?? '';
 
 test('chat persistence adds participant, message, reaction, and idempotency contracts', () => {
   assert.match(sql, /create table public\.marketplace_chat_participants/u);
@@ -75,4 +80,71 @@ test('message DTOs enrich card inputs to match the Task 1 output contract', () =
   assert.match(sql, /'label', store\.name/u);
   assert.match(sql, /'label', marketplace_order\.public_code/u);
   assert.match(sql, /'label', 'Shared location'/u);
+});
+
+test('Realtime broadcasts only reconciliation hints and never deleted content', () => {
+  const broadcast = routineSql('broadcast_marketplace_chat_change');
+  assert.match(broadcast, /realtime\.send\(/u);
+  assert.match(broadcast, /'messageId'/u);
+  assert.match(broadcast, /'conversationId'/u);
+  assert.doesNotMatch(broadcast, /realtime\.broadcast_changes|deleted_body|old\.body|to_jsonb\(/u);
+});
+
+test('only order-operating store roles become merchant chat participants', () => {
+  const capabilityChecks = sql.match(/membership\.role in \('owner', 'manager', 'fulfillment'\)/gu) ?? [];
+  assert.ok(capabilityChecks.length >= 5, `expected repeated durable capability checks, got ${capabilityChecks.length}`);
+  assert.doesNotMatch(routineSql('sync_marketplace_chat_store_participant'), /joined_at = now\(\)/u);
+  assert.match(routineSql('sync_marketplace_chat_store_participant'), /case when .*removed_at is not null.* then now\(\)/su);
+});
+
+test('blocking stores and enforces one exact participant pair without removing read access', () => {
+  assert.match(sql, /create table public\.marketplace_chat_blocks/u);
+  assert.match(sql, /primary key \(thread_id, blocker_user_id, blocked_user_id\)/u);
+  assert.match(routineSql('block_my_marketplace_chat_counterparty'), /blocked_user_id/u);
+  assert.match(routineSql('send_my_marketplace_chat_message'), /blocker_user_id = v_actor_id/u);
+  assert.match(routineSql('send_my_marketplace_chat_message'), /blocked_user_id = v_actor_id/u);
+  assert.doesNotMatch(routineSql('can_access_marketplace_chat_thread'), /marketplace_chat_blocks/u);
+});
+
+test('SQL accepts only exact bounded card shapes from Task 1', () => {
+  const send = routineSql('send_my_marketplace_chat_message');
+  assert.match(send, /octet_length\(p_card_data::text\) > 512/u);
+  assert.match(send, /p_card_data - 'type' - 'id' <> '\{\}'::jsonb/u);
+  assert.match(send, /p_card_data - 'type' - 'latitude' - 'longitude' <> '\{\}'::jsonb/u);
+});
+
+test('driver authorization requires an active driver profile and deactivation sync', () => {
+  assert.match(routineSql('can_access_marketplace_chat_thread'), /profile\.role = 'driver'.*profile\.is_active/su);
+  assert.match(routineSql('sync_marketplace_chat_driver_participant'), /profile\.role = 'driver'.*profile\.is_active/su);
+  assert.match(sql, /create or replace function public\.sync_marketplace_chat_driver_profile/u);
+  assert.doesNotMatch(routineSql('sync_marketplace_chat_driver_participant'), /joined_at = now\(\)/u);
+});
+
+test('message search uses an indexed document and a hard conversation ceiling', () => {
+  assert.match(sql, /search_document tsvector/u);
+  assert.match(sql, /using gin \(search_document\)/u);
+  assert.match(routineSql('search_my_marketplace_chat_messages'), /message\.search_document @@/u);
+  assert.match(routineSql('send_my_marketplace_chat_message'), />= 100000/u);
+});
+
+test('pgTAP runtime coverage has a correct plan for the review threat matrix', () => {
+  const planned = Number(pgTapSql.match(/extensions\.plan\((\d+)\)/u)?.[1]);
+  const assertions = pgTapSql.match(/select extensions\.(?:is|isnt|ok|throws_ok)\(/gu) ?? [];
+  assert.equal(planned, assertions.length);
+  for (const evidence of [
+    'anon cannot execute',
+    'owner of an unrelated store',
+    'catalog-only store member',
+    'assigned but inactive driver',
+    'Realtime messages has authenticated receive and send policies',
+    'idempotent retries persist one row',
+    'next keyset page',
+    'allowlisted reaction',
+    'cannot move backwards',
+    'tombstoned participant DTO',
+    'clear mute preferences',
+    'exact blocked pair',
+    'preserve joined_at',
+    'indexed full-text search',
+  ]) assert.match(pgTapSql, new RegExp(evidence, 'u'));
 });
