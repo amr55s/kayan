@@ -1216,7 +1216,7 @@ assert.doesNotMatch(styles, /margin-left|margin-right|padding-left|padding-right
 
 - [ ] **Step 2: Run the focused test and verify red**
 
-Run: `node --test tests/commerce/marketplace-filter-sidebar.test.mjs`  
+Run: `node --test tests/commerce/marketplace-filter-sidebar.test.mjs`
 Expected: FAIL because the catalog controls still use the top-toolbar layout.
 
 - [ ] **Step 3: Extract one shared filter form**
@@ -1270,9 +1270,9 @@ Reuse existing DAIRTAK typography, border, surface, focus, and spacing variables
 
 - [ ] **Step 6: Verify desktop, mobile, RTL, and URL behavior**
 
-Run: `node --test tests/commerce/marketplace-filter-sidebar.test.mjs tests/seo-accessibility.test.mjs tests/performance-boundary.test.mjs`  
-Run: `npm run lint && npm run typecheck && npm run build`  
-Run against Preview: `npx playwright test e2e/marketplace-chat.spec.ts --project=chromium-desktop --project=chromium-mobile`  
+Run: `node --test tests/commerce/marketplace-filter-sidebar.test.mjs tests/seo-accessibility.test.mjs tests/performance-boundary.test.mjs`
+Run: `npm run lint && npm run typecheck && npm run build`
+Run against Preview: `npx playwright test e2e/marketplace-chat.spec.ts --project=chromium-desktop --project=chromium-mobile`
 Expected: PASS; the filter query survives open/close/navigation, the drawer restores focus, no horizontal overflow occurs at 320px, and desktop controls remain in the sidebar.
 
 - [ ] **Step 7: Commit the catalog UI alignment**
