@@ -249,7 +249,12 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               </div>
             </div>
 
-            <div id="directory-search" className="w-full scroll-mt-20 lg:justify-self-end">
+            <div
+              id="directory-search"
+              role="search"
+              aria-label="البحث في دليل ديرتك"
+              className="w-full scroll-mt-20 lg:justify-self-end"
+            >
               <Input
                 isClearable
                 size="lg"

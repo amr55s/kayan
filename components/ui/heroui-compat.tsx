@@ -191,12 +191,26 @@ export function Image({
   radius: _radius,
   isZoomed: _isZoomed,
 }: LegacyImageProps) {
+  const safeSrc = (() => {
+    if (!src) return undefined;
+    if (src.startsWith('/') && !src.startsWith('//')) return src;
+
+    try {
+      const parsed = new URL(src);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+        ? parsed.toString()
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+
   return (
     <span className={classNames?.wrapper}>
       {/* Directory images are user supplied and may not be known to Next Image. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={src}
+        src={safeSrc}
         alt={alt || ''}
         draggable={draggable}
         height={height}
