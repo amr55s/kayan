@@ -1,29 +1,31 @@
 import type { Metadata } from 'next';
-import MarketplacePage from '@/app/marketplace/page';
-import { MarketplaceShell } from '@/components/marketplace/marketplace-shell';
+import { DirectoryView } from '@/components/directory/DirectoryView';
+import { fetchHomePageData } from '@/lib/supabase/queries';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
+export const maxDuration = 60;
 
 export const metadata: Metadata = {
-  title: 'المتجر | دايرتك',
-  description: 'منتجات من متاجر منطقتك مع طلب ودفع عند الاستلام من داخل الموقع.',
+  title: 'ديرتك | الأماكن والخدمات والمتجر المحلي',
+  description: 'اكتشف الأماكن والخدمات وكباتن التوصيل، وادخل متجر ديرتك للشراء من المتاجر المحلية داخل نفس الموقع.',
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'المتجر | دايرتك',
-    description: 'منتجات من متاجر منطقتك مع طلب ودفع عند الاستلام من داخل الموقع.',
+    title: 'ديرتك | كل ما تحتاجه في مكان واحد',
+    description: 'دليل الأماكن والخدمات والمتجر المحلي من داخل ديرتك.',
     url: '/',
     type: 'website',
   },
 };
 
-export default function HomePage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function HomePage() {
+  const { places, drivers, directoryError, renderedAt } = await fetchHomePageData();
+
   return (
-    <MarketplaceShell>
-      <MarketplacePage searchParams={searchParams} />
-    </MarketplaceShell>
+    <DirectoryView
+      initialPlaces={places}
+      initialDrivers={drivers}
+      directoryError={directoryError}
+      renderedAt={renderedAt}
+    />
   );
 }

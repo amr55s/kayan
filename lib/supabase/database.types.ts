@@ -4247,6 +4247,197 @@ export type Database = {
           },
         ]
       }
+      product_category_aliases: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          match_scope: string
+          normalized_phrase: string | null
+          phrase: string
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          match_scope?: string
+          normalized_phrase?: string | null
+          phrase: string
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          match_scope?: string
+          normalized_phrase?: string | null
+          phrase?: string
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_category_aliases_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_category_classification_events: {
+        Row: {
+          actor_id: string
+          algorithm_version: string
+          confidence: number | null
+          created_at: string
+          id: string
+          idempotency_key: string
+          outcome: string
+          predicted_category_id: string | null
+          product_id: string
+          selected_category_id: string | null
+          signals: Json
+          store_id: string
+        }
+        Insert: {
+          actor_id: string
+          algorithm_version: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          idempotency_key: string
+          outcome: string
+          predicted_category_id?: string | null
+          product_id: string
+          selected_category_id?: string | null
+          signals?: Json
+          store_id: string
+        }
+        Update: {
+          actor_id?: string
+          algorithm_version?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          idempotency_key?: string
+          outcome?: string
+          predicted_category_id?: string | null
+          product_id?: string
+          selected_category_id?: string | null
+          signals?: Json
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_category_classification_even_predicted_category_id_fkey"
+            columns: ["predicted_category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_category_classification_event_selected_category_id_fkey"
+            columns: ["selected_category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_category_classification_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_category_classification_events_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_category_proposals: {
+        Row: {
+          created_at: string
+          example_product_name: string
+          id: string
+          normalized_name: string
+          product_id: string
+          proposed_by: string
+          proposed_name: string
+          resolved_category_id: string | null
+          review_note: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          status: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          example_product_name: string
+          id?: string
+          normalized_name: string
+          product_id: string
+          proposed_by: string
+          proposed_name: string
+          resolved_category_id?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          example_product_name?: string
+          id?: string
+          normalized_name?: string
+          product_id?: string
+          proposed_by?: string
+          proposed_name?: string
+          resolved_category_id?: string | null
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_category_proposals_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_category_proposals_resolved_category_id_fkey"
+            columns: ["resolved_category_id"]
+            isOneToOne: false
+            referencedRelation: "product_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_category_proposals_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_images: {
         Row: {
           alt_text: string | null
@@ -5943,6 +6134,10 @@ export type Database = {
         Args: { p_id: number; p_worker_id: string }
         Returns: boolean
       }
+      configure_marketplace_worker_vault: {
+        Args: { p_base_url: string; p_cron_secret: string }
+        Returns: boolean
+      }
       consume_account_request_rate_limit: {
         Args: { p_limit?: number; p_request_key: string }
         Returns: boolean
@@ -6780,6 +6975,10 @@ export type Database = {
         Args: { p_before?: string; p_entity?: string; p_limit?: number }
         Returns: Json
       }
+      list_pending_product_category_proposals: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       list_platform_marketplace_coupons_as_admin: { Args: never; Returns: Json }
       list_platform_marketplace_coupons_as_admin_base_180000: {
         Args: never
@@ -7198,6 +7397,10 @@ export type Database = {
         Args: { p_value: string }
         Returns: string
       }
+      normalize_marketplace_category_text: {
+        Args: { p_value: string }
+        Returns: string
+      }
       notify_marketplace_admins: {
         Args: {
           p_body: string
@@ -7323,6 +7526,19 @@ export type Database = {
           p_route: string
         }
         Returns: boolean
+      }
+      record_my_product_category_classification: {
+        Args: {
+          p_algorithm_version: string
+          p_confidence: number
+          p_idempotency_key: string
+          p_predicted_category_id: string
+          p_product_id: string
+          p_proposed_name?: string
+          p_selected_category_id: string
+          p_signals: Json
+        }
+        Returns: Json
       }
       record_place_upvote: {
         Args: { p_place_id: string; p_request_key: string }
@@ -7601,6 +7817,17 @@ export type Database = {
           p_idempotency_key: string
           p_notes: string
           p_return_request_id: string
+        }
+        Returns: Json
+      }
+      review_product_category_proposal_as_admin: {
+        Args: {
+          p_decision: string
+          p_new_name_en?: string
+          p_new_slug?: string
+          p_note?: string
+          p_proposal_id: string
+          p_resolved_category_id?: string
         }
         Returns: Json
       }

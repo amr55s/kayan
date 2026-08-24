@@ -14,6 +14,7 @@ import { AddListingModal } from '@/components/modals/AddListingModal';
 import { FeedbackModal } from '@/components/modals/FeedbackModal';
 import { DriverModal } from '@/components/delivery/DriverModal';
 import { DriverDetailsModal } from '@/components/delivery/DriverDetailsModal';
+import { MarketplaceEntry } from './MarketplaceEntry';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { FeedbackType } from '@/types';
 import { trackSiteEvent } from '@/lib/analytics/client';
@@ -291,6 +292,13 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
         </section>
 
         <div className="mx-auto max-w-7xl space-y-2.5 px-3 py-3 sm:space-y-5 sm:px-4 sm:py-6">
+          <MarketplaceEntry
+            onOpen={() => trackSiteEvent('marketplace_open', {
+              targetType: 'feature',
+              targetKey: 'marketplace_entry',
+            })}
+          />
+
           <section aria-labelledby="daily-categories-title" className="space-y-2 rounded-[24px] bg-white py-1 sm:space-y-3 sm:rounded-[28px]">
             <div className="px-1">
               <h2 id="daily-categories-title" className="text-sm font-black text-zinc-950 sm:text-base">اختار القسم</h2>

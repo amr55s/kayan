@@ -374,6 +374,19 @@ const moderationPageSchema = cursorPage(z.object({
   name: z.string().min(1).max(200), status: z.string().max(40),
   submitted_at: timestamp, primary_image_url: z.url().nullable(),
 }));
+const categoryProposalSchema = z.object({
+  id: uuid,
+  store_id: uuid,
+  store_name: z.string().min(1).max(180),
+  product_id: uuid,
+  product_name: z.string().min(2).max(200),
+  proposed_name: z.string().min(2).max(120),
+  created_at: timestamp,
+});
+const activeCategorySchema = z.object({
+  id: uuid,
+  name_ar: z.string().min(2).max(120),
+});
 const deliveryOfferPageSchema = cursorPage(z.object({
   id: uuid, order_id: uuid, order_code: z.string().max(64), store_name: z.string().max(180),
   delivery_zone_name: z.string().max(180), delivery_fee_piastres: databaseMoney,
@@ -440,6 +453,8 @@ const supportThreadSchema = z.object({
 });
 
 export type MarketplaceModerationItem = z.infer<typeof moderationPageSchema>['items'][number];
+export type ProductCategoryProposal = z.infer<typeof categoryProposalSchema>;
+export type ActiveProductCategory = z.infer<typeof activeCategorySchema>;
 export type MarketplaceDeliveryOffer = z.infer<typeof deliveryOfferPageSchema>['items'][number];
 export type MarketplaceCodCollection = z.infer<typeof codPageSchema>['items'][number];
 export type MarketplaceReconciliation = z.infer<typeof reconciliationPageSchema>['items'][number];
@@ -469,6 +484,30 @@ export async function listPendingMarketplaceModeration(input: { entity?: 'all' |
   return parseCursorPage(moderationPageSchema, await authenticatedRpc('list_pending_marketplace_moderation', {
     p_entity: input.entity ?? 'all', p_limit: Math.min(100, Math.max(1, input.limit ?? 30)), p_before: input.before ?? null,
   }));
+}
+
+export async function listPendingProductCategoryProposals(limit = 50): Promise<ProductCategoryProposal[]> {
+  const parsed = z.array(categoryProposalSchema).max(100).safeParse(
+    await authenticatedRpc('list_pending_product_category_proposals', {
+      p_limit: Math.min(100, Math.max(1, limit)),
+    }),
+  );
+  if (!parsed.success) throw new MarketplaceOperationsError('invalid_contract');
+  return parsed.data;
+}
+
+export async function listActiveProductCategories(): Promise<ActiveProductCategory[]> {
+  const supabase = await authenticatedClient();
+  const { data, error } = await (supabase as any)
+    .from('product_categories')
+    .select('id,name_ar')
+    .eq('is_active', true)
+    .order('sort_order')
+    .limit(500);
+  if (error) throw new MarketplaceOperationsError('service_unavailable');
+  const parsed = z.array(activeCategorySchema).max(500).safeParse(data ?? []);
+  if (!parsed.success) throw new MarketplaceOperationsError('invalid_contract');
+  return parsed.data;
 }
 
 export async function listMyMarketplaceDeliveryOffers(input: { limit?: number; before?: string | null } = {}) {

@@ -13,6 +13,7 @@ export type SiteAnalyticsEvent =
   | 'marketing_share_click'
   | 'card_download'
   | 'guide_open'
+  | 'marketplace_open'
   | 'favorite_click'
   | 'upvote_click'
   | 'search_use'

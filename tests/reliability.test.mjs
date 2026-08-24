@@ -4,15 +4,23 @@ import test from 'node:test';
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
 
-test('legacy driver availability stays deterministic while the root renders the marketplace', () => {
+test('the root keeps the directory deterministic and links into the marketplace', () => {
   const driverCard = read('components/delivery/DriverCard.tsx');
   const page = read('app/page.tsx');
+  const directory = read('components/directory/DirectoryView.tsx');
+  const marketplaceEntry = read('components/directory/MarketplaceEntry.tsx');
+  const marketplaceShell = read('components/marketplace/marketplace-shell.tsx');
   assert.match(driverCard, /useState\(renderedAt\)/);
   assert.doesNotMatch(driverCard, /useState\(\(\) => Date\.now\(\)\)/);
-  assert.match(page, /<MarketplaceShell>/);
-  assert.match(page, /<MarketplacePage searchParams=\{searchParams\}/);
+  assert.match(page, /await fetchHomePageData\(\)/);
+  assert.match(page, /<DirectoryView/);
+  assert.match(page, /renderedAt=\{renderedAt\}/);
+  assert.match(directory, /<MarketplaceEntry/);
+  assert.match(marketplaceEntry, /href="\/marketplace"/);
+  assert.match(marketplaceEntry, /motion-reduce:/);
+  assert.match(marketplaceShell, /<BrandLogo variant="full"/);
+  assert.match(marketplaceShell, /href: '\/'/);
   assert.doesNotMatch(page, /redirect\(/);
-  assert.doesNotMatch(page, /renderedAt|Date\.now\(\)/);
 });
 
 test('mobile navigation uses the HeroUI v3 drawer from the physical left edge', () => {
@@ -23,6 +31,8 @@ test('mobile navigation uses the HeroUI v3 drawer from the physical left edge', 
   assert.match(header, /rounded-r-\[28px\]/);
   assert.match(header, /bg-zinc-950 text-white/);
   assert.match(header, /aria-label="إغلاق القائمة"/);
+  assert.match(header, /href="\/marketplace"/);
+  assert.match(header, /متجر ديرتك/);
 });
 
 test('admin navigation covers overview, revenue, activity, publishing, and mobile drawer access', () => {

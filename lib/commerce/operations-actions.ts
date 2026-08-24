@@ -27,6 +27,25 @@ const moderationSchema = z.object({
   entityType: z.enum(['product', 'store']), entityId: uuid, approve: z.enum(['true', 'false']),
   notes: z.string().trim().max(1_000).optional(), returnTo: returnToSchema,
 });
+const categoryProposalDecisionSchema = z.object({
+  proposalId: uuid,
+  decision: z.enum(['approve_new', 'merge', 'reject']),
+  resolvedCategoryId: uuid.optional(),
+  newSlug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u).max(120).optional(),
+  newNameEn: z.string().trim().min(2).max(120).optional(),
+  note: z.string().trim().max(1_000).optional(),
+  returnTo: returnToSchema,
+}).superRefine((value, context) => {
+  if (value.decision === 'merge' && !value.resolvedCategoryId) {
+    context.addIssue({ code: 'custom', path: ['resolvedCategoryId'], message: 'category_required' });
+  }
+  if (value.decision === 'approve_new' && !value.newSlug) {
+    context.addIssue({ code: 'custom', path: ['newSlug'], message: 'slug_required' });
+  }
+  if (value.decision === 'reject' && (!value.note || value.note.length < 3)) {
+    context.addIssue({ code: 'custom', path: ['note'], message: 'rejection_note_required' });
+  }
+});
 const offerResponseSchema = z.object({ offerId: uuid, accept: z.enum(['true', 'false']), returnTo: returnToSchema });
 const supportCreateSchema = z.object({
   orderId: uuid.optional(), storeId: uuid.optional(), subject: z.string().trim().min(3).max(160),
@@ -274,6 +293,39 @@ export async function moderateMarketplaceEntityAction(formData: FormData): Promi
   if (error) redirect(resultUrl(parsed.data.returnTo, 'error', 'moderation_failed'));
   revalidatePath('/admin/marketplace/orders');
   redirect(resultUrl(parsed.data.returnTo, 'notice', 'moderation_saved'));
+}
+
+export async function reviewProductCategoryProposalAction(formData: FormData): Promise<void> {
+  const parsed = categoryProposalDecisionSchema.safeParse({
+    proposalId: field(formData, 'proposalId'),
+    decision: field(formData, 'decision'),
+    resolvedCategoryId: field(formData, 'resolvedCategoryId'),
+    newSlug: field(formData, 'newSlug'),
+    newNameEn: field(formData, 'newNameEn'),
+    note: field(formData, 'note'),
+    returnTo: field(formData, 'returnTo'),
+  });
+  if (!parsed.success) redirect('/admin/marketplace/orders?error=invalid_category_review');
+  await requireMarketplaceAdminRole(['catalog_reviewer'], { nextPath: parsed.data.returnTo });
+  const supabase = await requireSupabase();
+  const { error } = await (supabase as any).rpc('review_product_category_proposal_as_admin', {
+    p_proposal_id: parsed.data.proposalId,
+    p_decision: parsed.data.decision,
+    p_resolved_category_id: parsed.data.resolvedCategoryId ?? null,
+    p_new_slug: parsed.data.newSlug ?? null,
+    p_new_name_en: parsed.data.newNameEn ?? null,
+    p_note: parsed.data.note ?? null,
+  });
+  if (error) {
+    const code = /duplicate|unique/u.test(error.message ?? '')
+      ? 'category_slug_exists'
+      : 'category_review_failed';
+    redirect(resultUrl(parsed.data.returnTo, 'error', code));
+  }
+  revalidatePath('/admin/marketplace/orders');
+  revalidatePath('/merchant/marketplace');
+  revalidatePath('/marketplace');
+  redirect(resultUrl(parsed.data.returnTo, 'notice', 'category_review_saved'));
 }
 
 export async function respondToMarketplaceDeliveryOfferAction(formData: FormData): Promise<void> {

@@ -4,21 +4,85 @@ import {
   createCashReconciliationAction,
   moderateMarketplaceEntityAction,
   respondToMarketplaceDeliveryOfferAction,
+  reviewProductCategoryProposalAction,
   reviewCashReconciliationAction,
 } from '@/lib/commerce/operations-actions';
 import type {
   AdminMarketplaceCommissionStatement,
+  ActiveProductCategory,
   MarketplaceCodCollection,
   MarketplaceCommissionStatement,
   MarketplaceDeliveryOffer,
   MarketplaceModerationItem,
   MarketplaceReconciliation,
   MarketplaceSupportThreadSummary,
+  ProductCategoryProposal,
 } from '@/lib/commerce/operations';
 import styles from './commerce-operations.module.css';
 
 export function ModerationQueue({ items, returnTo }: { items: MarketplaceModerationItem[]; returnTo: string }) {
   return <section className={styles.panel}><h2>قائمة المراجعة</h2>{items.length === 0 ? <p className={styles.meta}>لا توجد عناصر معلّقة.</p> : <div className={styles.list}>{items.map((item) => <article className={styles.cardContent} key={`${item.entity_type}:${item.id}`}><div><strong>{item.name}</strong><p className={styles.meta}>{item.entity_type === 'product' ? 'منتج' : 'متجر'} · {new Date(item.submitted_at).toLocaleString('ar-EG')}</p></div><div className={styles.actions}>{[true, false].map((approve) => <form action={moderateMarketplaceEntityAction} key={String(approve)}><input type="hidden" name="entityType" value={item.entity_type} /><input type="hidden" name="entityId" value={item.id} /><input type="hidden" name="approve" value={String(approve)} /><input type="hidden" name="returnTo" value={returnTo} /><input className={styles.field} name="notes" maxLength={1000} placeholder={approve ? 'ملاحظات اختيارية' : 'سبب الرفض'} required={!approve} /><button className={`${styles.button} ${approve ? '' : styles.danger}`} type="submit">{approve ? 'اعتماد' : 'رفض'}</button></form>)}</div></article>)}</div>}</section>;
+}
+
+export function CategoryProposalQueue({
+  items,
+  categories,
+  returnTo,
+}: {
+  items: ProductCategoryProposal[];
+  categories: ActiveProductCategory[];
+  returnTo: string;
+}) {
+  return <section className={styles.panel} aria-labelledby="category-proposals-title">
+    <div>
+      <h2 id="category-proposals-title">اقتراحات أقسام المنتجات</h2>
+      <p className={styles.meta}>ادمج المرادف مع قسم قائم، أو أنشئ قسمًا جديدًا، أو ارفضه مع السبب.</p>
+    </div>
+    {items.length === 0 ? <p className={styles.meta}>لا توجد اقتراحات أقسام معلّقة.</p> : <div className={styles.list}>
+      {items.map((item) => <article className={styles.cardContent} key={item.id}>
+        <div>
+          <strong>{item.proposed_name}</strong>
+          <p className={styles.meta}>{item.product_name} · {item.store_name} · {new Date(item.created_at).toLocaleString('ar-EG')}</p>
+        </div>
+        <div className={styles.reviewGrid}>
+          <form className={styles.form} action={reviewProductCategoryProposalAction}>
+            <input type="hidden" name="proposalId" value={item.id} />
+            <input type="hidden" name="decision" value="merge" />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <label className={styles.label}>دمج كمرادف لقسم موجود
+              <select className={styles.field} name="resolvedCategoryId" required defaultValue="">
+                <option value="" disabled>اختر القسم</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name_ar}</option>)}
+              </select>
+            </label>
+            <input className={styles.field} name="note" maxLength={1000} placeholder="ملاحظة اختيارية" />
+            <button className={styles.button} type="submit">دمج واعتماد المرادف</button>
+          </form>
+          <form className={styles.form} action={reviewProductCategoryProposalAction}>
+            <input type="hidden" name="proposalId" value={item.id} />
+            <input type="hidden" name="decision" value="approve_new" />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <label className={styles.label}>رابط القسم بالإنجليزية
+              <input className={styles.field} name="newSlug" required maxLength={120} dir="ltr" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="handmade-tools" />
+            </label>
+            <label className={styles.label}>الاسم الإنجليزي (اختياري)
+              <input className={styles.field} name="newNameEn" minLength={2} maxLength={120} dir="ltr" />
+            </label>
+            <button className={styles.button} type="submit">إنشاء قسم واعتماده</button>
+          </form>
+          <form className={styles.form} action={reviewProductCategoryProposalAction}>
+            <input type="hidden" name="proposalId" value={item.id} />
+            <input type="hidden" name="decision" value="reject" />
+            <input type="hidden" name="returnTo" value={returnTo} />
+            <label className={styles.label}>سبب الرفض
+              <input className={styles.field} name="note" required minLength={3} maxLength={1000} />
+            </label>
+            <button className={`${styles.button} ${styles.danger}`} type="submit">رفض الاقتراح</button>
+          </form>
+        </div>
+      </article>)}
+    </div>}
+  </section>;
 }
 
 export function DeliveryOffers({ items, returnTo }: { items: MarketplaceDeliveryOffer[]; returnTo: string }) {

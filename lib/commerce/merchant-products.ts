@@ -3,6 +3,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type {
+  MerchantCategoryAlias,
   MerchantCategoryOption,
   MerchantProductEditorViewModel,
   MerchantProductListViewModel,
@@ -30,6 +31,14 @@ const storeSchema = z.object({
 const categorySchema = z.object({
   id: uuid,
   name_ar: z.string().min(1).max(120),
+});
+
+const categoryAliasSchema = z.object({
+  category_id: uuid,
+  phrase: z.string().min(2).max(120),
+  normalized_phrase: z.string().min(2).max(120),
+  match_scope: z.enum(['any', 'name', 'brand', 'description']),
+  weight: z.number().int().min(1).max(100),
 });
 
 const listSchema = z.object({
@@ -148,6 +157,7 @@ type MerchantStoreContext = {
   storeId: string;
   storeName: string;
   categories: MerchantCategoryOption[];
+  categoryAliases: MerchantCategoryAlias[];
 };
 
 function mapRpcError(error: { message?: string } | null): MerchantCatalogError {
@@ -167,14 +177,25 @@ export async function resolveMerchantStore(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new MerchantCatalogError('access_denied');
-  const [{ data: stores, error: storeError }, { data: categories, error: categoryError }] = await Promise.all([
+  const [
+    { data: stores, error: storeError },
+    { data: categories, error: categoryError },
+    { data: categoryAliases, error: categoryAliasError },
+  ] = await Promise.all([
     (supabase as any).from('stores').select('id,merchant_id,name').order('created_at').limit(50),
     (supabase as any).from('product_categories').select('id,name_ar').eq('is_active', true).order('sort_order').limit(500),
+    (supabase as any).from('product_category_aliases')
+      .select('category_id,phrase,normalized_phrase,match_scope,weight')
+      .eq('is_active', true)
+      .limit(2_000),
   ]);
-  if (storeError || categoryError) throw new MerchantCatalogError('service_unavailable');
+  if (storeError || categoryError || categoryAliasError) throw new MerchantCatalogError('service_unavailable');
   const parsedStores = z.array(storeSchema).safeParse(stores ?? []);
   const parsedCategories = z.array(categorySchema).safeParse(categories ?? []);
-  if (!parsedStores.success || !parsedCategories.success) throw new MerchantCatalogError('service_unavailable');
+  const parsedAliases = z.array(categoryAliasSchema).safeParse(categoryAliases ?? []);
+  if (!parsedStores.success || !parsedCategories.success || !parsedAliases.success) {
+    throw new MerchantCatalogError('service_unavailable');
+  }
   const selected = parsedStores.data.find((store) => store.id === preferredStoreId)
     ?? parsedStores.data[0];
   if (!selected) return null;
@@ -184,6 +205,13 @@ export async function resolveMerchantStore(
     storeId: selected.id,
     storeName: selected.name,
     categories: parsedCategories.data.map((category) => ({ id: category.id, name: category.name_ar })),
+    categoryAliases: parsedAliases.data.map((alias) => ({
+      categoryId: alias.category_id,
+      phrase: alias.phrase,
+      normalizedPhrase: alias.normalized_phrase,
+      matchScope: alias.match_scope,
+      weight: alias.weight,
+    })),
   };
 }
 
@@ -341,6 +369,7 @@ export async function fetchMerchantProductEditor(
     updatedAt: product.updated_at,
     idempotencyKey: randomUUID(),
     categories: context.categories,
+    categoryAliases: context.categoryAliases,
     variants: product.variants.map(mapVariant),
     gallery: editorImages.map((image) => ({
       id: image.asset_id,
@@ -386,6 +415,7 @@ export async function createBlankMerchantProductEditor(
     updatedAt: null,
     idempotencyKey: randomUUID(),
     categories: context?.categories ?? [],
+    categoryAliases: context?.categoryAliases ?? [],
     variants: [],
     gallery: [],
     pendingMediaDeletions: [],
@@ -402,6 +432,14 @@ type ProductMutationInput = {
   idempotencyKey: string;
   product: Record<string, unknown>;
   variants: Array<Record<string, unknown>>;
+  classification: {
+    algorithmVersion: 'category-v1';
+    predictedCategoryId: string | null;
+    selectedCategoryId: string | null;
+    confidence: number | null;
+    signals: string[];
+    proposedName: string | null;
+  };
 };
 
 function stringValue(form: FormData, name: string): string {
@@ -448,6 +486,17 @@ export function parseMerchantProductForm(form: FormData): ProductMutationInput |
   const brand = stringValue(form, 'brand');
   const categoryId = stringValue(form, 'categoryId');
   const providedKey = stringValue(form, 'productKey');
+  const predictedCategoryId = stringValue(form, 'classificationPredictedCategoryId') || null;
+  const confidenceRaw = stringValue(form, 'classificationConfidence');
+  const proposedCategoryName = stringValue(form, 'proposedCategoryName') || null;
+  let confidence: number | null = null;
+  let signals: string[] = [];
+  try {
+    confidence = confidenceRaw ? Number(confidenceRaw) : null;
+    const rawSignals = JSON.parse(stringValue(form, 'classificationSignals') || '[]') as unknown;
+    if (!Array.isArray(rawSignals) || rawSignals.some((value) => typeof value !== 'string')) return null;
+    signals = rawSignals.map((value) => value.slice(0, 160)).slice(0, 12);
+  } catch { return null; }
   if (
     !UUID_PATTERN.test(storeId)
     || (productId !== null && !UUID_PATTERN.test(productId))
@@ -456,6 +505,9 @@ export function parseMerchantProductForm(form: FormData): ProductMutationInput |
     || description.length < 2 || description.length > 10_000
     || brand.length > 120
     || (categoryId && !UUID_PATTERN.test(categoryId))
+    || (predictedCategoryId && !UUID_PATTERN.test(predictedCategoryId))
+    || (confidence !== null && (!Number.isFinite(confidence) || confidence < 0 || confidence > 1))
+    || (proposedCategoryName !== null && (proposedCategoryName.length < 2 || proposedCategoryName.length > 120))
     || (providedKey && (providedKey.length > 80 || /[\s\p{Cc}]/u.test(providedKey)))
     || EXTERNAL_CONTACT.test(description)
   ) return null;
@@ -532,6 +584,14 @@ export function parseMerchantProductForm(form: FormData): ProductMutationInput |
       is_featured: false,
     },
     variants,
+    classification: {
+      algorithmVersion: 'category-v1',
+      predictedCategoryId,
+      selectedCategoryId: categoryId || null,
+      confidence,
+      signals,
+      proposedName: proposedCategoryName,
+    },
   };
 }
 
@@ -556,6 +616,20 @@ export async function saveMerchantProduct(input: ProductMutationInput): Promise<
   if (error) throw mapRpcError(error);
   const parsed = mutationResponseSchema.safeParse(data);
   if (!parsed.success) throw new MerchantCatalogError('service_unavailable');
+  const { error: classificationError } = await (context.supabase as any).rpc(
+    'record_my_product_category_classification',
+    {
+      p_product_id: parsed.data.id,
+      p_algorithm_version: input.classification.algorithmVersion,
+      p_idempotency_key: input.idempotencyKey,
+      p_predicted_category_id: input.classification.predictedCategoryId,
+      p_selected_category_id: input.classification.selectedCategoryId,
+      p_confidence: input.classification.confidence,
+      p_signals: input.classification.signals,
+      p_proposed_name: input.classification.proposedName,
+    },
+  );
+  if (classificationError) throw mapRpcError(classificationError);
   return parsed.data.id;
 }
 

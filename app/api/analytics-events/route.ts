@@ -26,6 +26,7 @@ const payloadSchema = z.object({
     'marketing_share_click',
     'card_download',
     'guide_open',
+    'marketplace_open',
     'favorite_click',
     'upvote_click',
     'search_use',
@@ -65,6 +66,7 @@ const featureEvents = new Set([
   'marketing_share_click',
   'card_download',
   'guide_open',
+  'marketplace_open',
 ]);
 
 function targetIsValid(payload: z.infer<typeof payloadSchema>): boolean {

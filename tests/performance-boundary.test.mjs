@@ -31,9 +31,12 @@ test('the active root loading state stays flat without decorative gradients', ()
   assert.match(loading, /border-y[\s\S]*bg-zinc-50/u);
 });
 
-test('active driver avatars stay flat and dead legacy UI does not enter Tailwind output', () => {
+test('active directory UI stays flat and Tailwind scans only explicit component files', () => {
   const avatar = read('lib/driver-avatar.ts');
   const css = read('app/globals.css');
   assert.doesNotMatch(avatar, /bg-gradient|from-|to-/u);
-  assert.doesNotMatch(css, /components\/(?:directory|delivery|modals|ui\/heroui-compat)/u);
+  assert.match(css, /components\/directory\/DirectoryView\.tsx/u);
+  assert.match(css, /components\/directory\/MarketplaceEntry\.tsx/u);
+  assert.match(css, /components\/ui\/heroui-compat\.tsx/u);
+  assert.doesNotMatch(css, /@source "\.\.\/components\/(?:directory|delivery|modals)"/u);
 });

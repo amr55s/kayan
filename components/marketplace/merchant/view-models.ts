@@ -56,6 +56,14 @@ export type MerchantCategoryOption = {
   name: string;
 };
 
+export type MerchantCategoryAlias = {
+  categoryId: string;
+  phrase: string;
+  normalizedPhrase: string;
+  matchScope: 'any' | 'name' | 'brand' | 'description';
+  weight: number;
+};
+
 export type MerchantVariantEditorViewModel = {
   clientKey: string;
   id: string | null;
@@ -116,6 +124,7 @@ export type MerchantProductEditorViewModel = {
   updatedAt: string | null;
   idempotencyKey: string;
   categories: MerchantCategoryOption[];
+  categoryAliases: MerchantCategoryAlias[];
   variants: MerchantVariantEditorViewModel[];
   gallery: MerchantGalleryItemViewModel[];
   pendingMediaDeletions: MerchantMediaDeletionViewModel[];

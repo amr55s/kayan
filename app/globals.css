@@ -37,17 +37,33 @@
 @source "../components/admin/MarketingCenter.tsx";
 @source "../components/admin/UserEditorModal.tsx";
 @source "../components/auth/LoginForm.tsx";
+@source "../components/delivery/DeliveryBar.tsx";
+@source "../components/delivery/DriverCard.tsx";
+@source "../components/delivery/DriverDetailsModal.tsx";
+@source "../components/delivery/DriverModal.tsx";
+@source "../components/directory/CategoryBar.tsx";
+@source "../components/directory/CategoryTabs.tsx";
+@source "../components/directory/CouponOffer.tsx";
+@source "../components/directory/DirectoryView.tsx";
+@source "../components/directory/MarketplaceEntry.tsx";
+@source "../components/directory/PlaceCard.tsx";
+@source "../components/directory/PlaceDetailsModal.tsx";
+@source "../components/directory/ShareButton.tsx";
+@source "../components/directory/UpvoteButton.tsx";
 @source "../components/layout/Header.tsx";
 @source "../components/layout/PublicPageHeader.tsx";
 @source "../components/layout/PwaInstaller.tsx";
 @source "../components/marketing/GuideAnalytics.tsx";
 @source "../components/marketing/PublicShareHub.tsx";
+@source "../components/modals/AddListingModal.tsx";
+@source "../components/modals/FeedbackModal.tsx";
 @source "../components/operations/AdminWorkspace.tsx";
 @source "../components/operations/DashboardHeader.tsx";
 @source "../components/operations/DriverWorkspace.tsx";
 @source "../components/operations/MerchantOrderWorkspace.tsx";
 @source "../components/operations/PushSubscriptionButton.tsx";
 @source "../components/observability/ClientErrorReporter.tsx";
+@source "../components/ui/heroui-compat.tsx";
 
 @layer base {
   :root {

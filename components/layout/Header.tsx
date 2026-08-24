@@ -5,7 +5,7 @@ import { Button } from '@heroui/react/button';
 import { Modal } from '@heroui/react/modal';
 import { useOverlayState } from '@heroui/react';
 import { Drawer } from '@heroui/react/drawer';
-import { Bike, BookOpen, Building2, Home, LayoutDashboard, LogIn, Menu, MessageSquareText, Share2, UserPlus, X } from 'lucide-react';
+import { Bike, BookOpen, Building2, Home, LayoutDashboard, LogIn, Menu, MessageSquareText, Share2, ShoppingBag, UserPlus, X } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
@@ -85,6 +85,15 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="hidden min-w-0 shrink items-center justify-end gap-0.5 md:flex md:shrink-0 md:gap-2">
+          <div>
+            <Link
+              href="/marketplace"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-[var(--dairtak-orange-soft)] px-3 text-xs font-black text-[var(--dairtak-orange-deep)] transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-orange-100 motion-reduce:transform-none motion-reduce:transition-none"
+            >
+              <ShoppingBag className="size-4" aria-hidden="true" />
+              المتجر
+            </Link>
+          </div>
           <div className="hidden md:block">
             <Link
               href="/guide"
@@ -178,6 +187,9 @@ export const Header: React.FC<HeaderProps> = ({
             <nav aria-label="روابط الموقع" className="space-y-1.5">
               <Link href="/" onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl bg-zinc-950 px-4 text-sm font-black text-white">
                 <Home className="size-5" aria-hidden="true" /> الصفحة الرئيسية
+              </Link>
+              <Link href="/marketplace" onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl bg-[var(--dairtak-orange-soft)] px-4 text-sm font-black text-[var(--dairtak-orange-deep)] hover:bg-orange-100">
+                <ShoppingBag className="size-5" aria-hidden="true" /> متجر ديرتك
               </Link>
               <Link href="/guide" onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100">
                 <BookOpen className="size-5" aria-hidden="true" /> طريقة الاستخدام

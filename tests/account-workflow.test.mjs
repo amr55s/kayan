@@ -124,7 +124,8 @@ test('public branding uses DAIRTAK consistently', () => {
   assert.match(manifest, /"name": "DAIRTAK",/);
   assert.match(serviceWorker, /DAIRTAK/);
   assert.match(brandLogo, /src: '\/brand\/dairtak-logo\.svg'/);
-  assert.match(marketplaceShell, /aria-label="ديرتك — المتجر"/);
+  assert.match(marketplaceShell, /aria-label="DAIRTAK — العودة إلى الصفحة الرئيسية"/);
+  assert.match(marketplaceShell, /<BrandLogo variant="full"/);
   assert.match(services, /دليل الخدمات المحلية/);
 
   for (const file of publicFiles) {

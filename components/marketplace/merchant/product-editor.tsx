@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useRef, useState } from 'react';
-import { Check, Plus, Save, Send, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Lightbulb, Plus, Save, Send, Sparkles, Trash2 } from 'lucide-react';
 import { Alert } from '@heroui/react/alert';
 import { Button } from '@heroui/react/button';
 import { Checkbox } from '@heroui/react/checkbox';
@@ -11,6 +11,7 @@ import { Label } from '@heroui/react/label';
 import { TextArea } from '@heroui/react/textarea';
 import { ProductGalleryManager } from './product-gallery-manager';
 import { ProductStatusBadge } from './status-badge';
+import { CATEGORY_ALGORITHM_VERSION, rankCategorySuggestions } from '@/lib/commerce/category-classification';
 import type {
   MerchantProductEditorActions,
   MerchantProductEditorViewModel,
@@ -88,6 +89,26 @@ export function MerchantProductEditor({
   const [variants, setVariants] = useState<MerchantVariantEditorViewModel[]>(() => (
     viewModel.variants.length > 0 ? viewModel.variants : [emptyVariant('new-variant-1')]
   ));
+  const [productName, setProductName] = useState(viewModel.name);
+  const [brand, setBrand] = useState(viewModel.brand);
+  const [description, setDescription] = useState(viewModel.description);
+  const [categoryId, setCategoryId] = useState(viewModel.categoryId);
+  const [proposedCategoryName, setProposedCategoryName] = useState('');
+  const hasAutoClassified = useRef(Boolean(viewModel.categoryId));
+  const categorySuggestions = useMemo(() => rankCategorySuggestions({
+    name: productName,
+    brand,
+    description,
+    categories: viewModel.categories,
+    aliases: viewModel.categoryAliases,
+  }), [brand, description, productName, viewModel.categories, viewModel.categoryAliases]);
+  const topSuggestion = categorySuggestions[0] ?? null;
+  useEffect(() => {
+    if (!hasAutoClassified.current && topSuggestion?.confidence >= 0.88) {
+      setCategoryId(topSuggestion.categoryId);
+      hasAutoClassified.current = true;
+    }
+  }, [topSuggestion]);
   const canSave = viewModel.canEdit && Boolean(viewModel.storeId && actions.saveProductAction);
   const isFirstPublish = !viewModel.firstPublishedAt;
 
@@ -176,6 +197,10 @@ export function MerchantProductEditor({
             <input type="hidden" name="productId" value={viewModel.productId || ''} />
             <input type="hidden" name="expectedUpdatedAt" value={viewModel.updatedAt || ''} />
             <input type="hidden" name="idempotencyKey" value={viewModel.idempotencyKey} />
+            <input type="hidden" name="classificationVersion" value={CATEGORY_ALGORITHM_VERSION} />
+            <input type="hidden" name="classificationPredictedCategoryId" value={topSuggestion?.categoryId ?? ''} />
+            <input type="hidden" name="classificationConfidence" value={topSuggestion?.confidence ?? ''} />
+            <input type="hidden" name="classificationSignals" value={JSON.stringify(topSuggestion?.signals ?? [])} />
 
             <section className={styles.editorSection} aria-labelledby="product-basics-title">
               <div className={styles.sectionHeader}>
@@ -193,7 +218,8 @@ export function MerchantProductEditor({
                   <Input.Root
                     id="merchant-product-name"
                     name="name"
-                    defaultValue={viewModel.name}
+                    value={productName}
+                    onChange={(event) => setProductName(event.target.value)}
                     maxLength={200}
                     required
                     disabled={!viewModel.canEdit}
@@ -224,7 +250,11 @@ export function MerchantProductEditor({
                   <select
                     id="merchant-product-category"
                     name="categoryId"
-                    defaultValue={viewModel.categoryId}
+                    value={categoryId}
+                    onChange={(event) => {
+                      setCategoryId(event.target.value);
+                      hasAutoClassified.current = true;
+                    }}
                     disabled={!viewModel.canEdit}
                     className={styles.select}
                   >
@@ -242,7 +272,8 @@ export function MerchantProductEditor({
                   <Input.Root
                     id="merchant-product-brand"
                     name="brand"
-                    defaultValue={viewModel.brand}
+                    value={brand}
+                    onChange={(event) => setBrand(event.target.value)}
                     maxLength={120}
                     disabled={!viewModel.canEdit}
                     className={styles.field}
@@ -251,6 +282,60 @@ export function MerchantProductEditor({
                 </div>
               </div>
 
+              <aside className={styles.classificationPanel} aria-live="polite">
+                <div className={styles.classificationHeading}>
+                  <Sparkles size={18} aria-hidden="true" />
+                  <div>
+                    <h3 className={styles.cardTitle}>تصنيف ذكي قابل للمراجعة</h3>
+                    <p className={styles.helper}>نقترح من الاسم والعلامة والوصف، والقرار النهائي لك.</p>
+                  </div>
+                </div>
+                {categorySuggestions.length ? (
+                  <div className={styles.suggestionList} aria-label="التصنيفات المقترحة">
+                    {categorySuggestions.map((suggestion) => (
+                      <Button.Root
+                        key={suggestion.categoryId}
+                        type="button"
+                        onPress={() => {
+                          setCategoryId(suggestion.categoryId);
+                          hasAutoClassified.current = true;
+                        }}
+                        isDisabled={!viewModel.canEdit}
+                        className={categoryId === suggestion.categoryId
+                          ? styles.suggestionSelected
+                          : styles.suggestionButton}
+                        aria-pressed={categoryId === suggestion.categoryId}
+                      >
+                        <span>{suggestion.categoryName}</span>
+                        <small>{Math.round(suggestion.confidence * 100).toLocaleString('ar-EG')}٪ ثقة</small>
+                      </Button.Root>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={styles.helper}>أكمل اسم المنتج ووصفه لنبحث عن أقرب قسم.</p>
+                )}
+                <div className={styles.proposalField}>
+                  <Lightbulb size={17} aria-hidden="true" />
+                  <div className={styles.fieldGroup}>
+                    <Label.Root htmlFor="merchant-proposed-category" className={styles.label}>
+                      منتج مختلف؟ اقترح قسمًا جديدًا
+                    </Label.Root>
+                    <Input.Root
+                      id="merchant-proposed-category"
+                      name="proposedCategoryName"
+                      value={proposedCategoryName}
+                      onChange={(event) => setProposedCategoryName(event.target.value)}
+                      minLength={2}
+                      maxLength={120}
+                      disabled={!viewModel.canEdit}
+                      className={styles.field}
+                      placeholder="مثال: أدوات صناعة يدوية"
+                    />
+                    <p className={styles.helper}>يصل الاقتراح للمراجعة ولا يظهر كقسم عام قبل الاعتماد.</p>
+                  </div>
+                </div>
+              </aside>
+
               <div className={styles.fieldGroup}>
                 <Label.Root htmlFor="merchant-product-description" className={styles.label} isRequired>
                   وصف المنتج
@@ -258,7 +343,8 @@ export function MerchantProductEditor({
                 <TextArea.Root
                   id="merchant-product-description"
                   name="description"
-                  defaultValue={viewModel.description}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                   maxLength={10_000}
                   required
                   disabled={!viewModel.canEdit}
