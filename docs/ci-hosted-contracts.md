@@ -35,14 +35,16 @@ before making these checks required; do not commit a bypass token.
 The workflow tests the exact deployed commit and retains browser failure evidence
 for seven days. It does not deploy, promote, alias, or roll back Vercel releases.
 
-## DigitalOcean Spaces smoke prefix
+## S3-compatible object-storage smoke prefix
 
-Configure `DO_SPACES_ENDPOINT`, `DO_SPACES_BUCKET`, `DO_SPACES_REGION`,
-`DO_SPACES_ACCESS_KEY_ID`, and `DO_SPACES_SECRET_ACCESS_KEY`. The access key should
-be limited to object read/write/list/delete under `ci-smoke/*` in a non-production
-or explicitly CI-safe bucket policy.
+Configure `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_PRIVATE_BUCKET`,
+`OBJECT_STORAGE_PUBLIC_BUCKET`, `OBJECT_STORAGE_REGION`,
+`OBJECT_STORAGE_ACCESS_KEY_ID`, and `OBJECT_STORAGE_SECRET_ACCESS_KEY`. The
+credentials must be limited to the two staging buckets. The legacy
+`DO_SPACES_*` GitHub secrets remain supported while a Spaces environment is
+migrated.
 
-Each run writes one object under `ci-smoke/<run>/<uuid>/`, verifies head/get/list,
+Each run writes one private object under `ci-smoke/<run>/<uuid>/`, verifies head/get/list,
 and deletes only the exact key recorded by that process in a `finally` block. It
 then verifies that its unique prefix is empty. No bucket-wide listing or wildcard
 cleanup is performed.

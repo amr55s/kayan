@@ -57,7 +57,7 @@ export async function claimLegacyPlaceUploads(
   return validateListingImageUrls(rows.map((row) => row.public_url), 15);
 }
 
-export async function enqueueSpacesDeletion(input: {
+export async function enqueueMediaDeletion(input: {
   eventKey: string;
   objectKey: string;
   staging?: boolean;

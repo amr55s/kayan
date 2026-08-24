@@ -1,6 +1,6 @@
-import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3';
 import {
-  getDigitalOceanSpacesConfig,
+  getObjectStorageConfig,
   getSupabaseAdminSecret,
   getSupabasePublicConfig,
 } from '@/lib/env/server';
@@ -76,7 +76,7 @@ async function probeSchemaVersion(): Promise<void> {
 }
 
 async function probeStorage(): Promise<void> {
-  const config = getDigitalOceanSpacesConfig();
+  const config = getObjectStorageConfig();
   const client = new S3Client({
     region: config.region,
     endpoint: config.endpoint,
@@ -88,9 +88,11 @@ async function probeStorage(): Promise<void> {
   });
 
   try {
-    await client.send(
-      new HeadBucketCommand({ Bucket: config.bucket }),
-      { abortSignal: AbortSignal.timeout(CHECK_TIMEOUT_MS) },
+    await Promise.all(
+      [...new Set([config.privateBucket, config.publicBucket])].map((bucket) => client.send(
+        new ListObjectsV2Command({ Bucket: bucket, MaxKeys: 1 }),
+        { abortSignal: AbortSignal.timeout(CHECK_TIMEOUT_MS) },
+      )),
     );
   } finally {
     client.destroy();

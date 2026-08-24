@@ -1,6 +1,6 @@
 import {
   createPrivateMediaDownload,
-  getSpacesBucketName,
+  getPrivateMediaBucketName,
 } from '@/lib/media/spaces';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
@@ -39,7 +39,7 @@ export async function GET(
     if (
       locatorError
       || locator?.asset_id !== id
-      || locator?.bucket !== getSpacesBucketName()
+      || locator?.bucket !== getPrivateMediaBucketName()
       || typeof locator?.object_key !== 'string'
       || !locator.object_key.startsWith('media/')
     ) {

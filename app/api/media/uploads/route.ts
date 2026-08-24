@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     } catch (error) {
       await (admin as any).from('upload_sessions').update({
         status: 'failed',
-        failure_code: 'spaces_presign_failed',
+        failure_code: 'storage_presign_failed',
       }).eq('id', sessionId);
       throw error;
     }

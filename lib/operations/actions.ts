@@ -13,15 +13,16 @@ import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
 import { processAvatarForStorage } from '@/lib/images/server';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 import {
-  deleteSpaceObject,
+  deleteMediaObject,
+  getPrivateMediaBucketName,
   getPublicMediaUrl,
-  getSpacesBucketName,
+  getPublicMediaBucketName,
   writePrivateMediaObject,
   writePublicMediaObject,
 } from '@/lib/media/spaces';
 import {
   claimLegacyPlaceUploads,
-  enqueueSpacesDeletion,
+  enqueueMediaDeletion,
   splitLegacyPlaceImageReferences,
 } from '@/lib/media/legacy';
 import {
@@ -203,6 +204,7 @@ export async function updateDriverAvatar(
   let stagingKey: string | null = null;
   let finalObjectKey: string | null = null;
   let bucket: string | undefined;
+  let stagingBucket: string | undefined;
   let uploadId: string | null = null;
   let ownerId = 'unknown';
   let committedAvatarUrl: string | null = null;
@@ -239,7 +241,8 @@ export async function updateDriverAvatar(
     const sourceHash = createHash('sha256').update(source).digest('hex');
     uploadId = randomUUID();
     stagingKey = `staging/legacy-driver-avatar/${profile.id}/${uploadId}.${file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'}`;
-    bucket = getSpacesBucketName();
+    stagingBucket = getPrivateMediaBucketName();
+    bucket = getPublicMediaBucketName();
     await writePrivateMediaObject({
       body: source,
       checksumSha256: sourceHash,
@@ -293,15 +296,15 @@ export async function updateDriverAvatar(
     committedAvatarUrl = avatarUrl;
 
     try {
-      await deleteSpaceObject(stagingKey);
+      await deleteMediaObject(stagingKey, stagingBucket);
     } catch (cleanupError) {
-      await enqueueSpacesDeletion({
+      await enqueueMediaDeletion({
         eventKey: `legacy.avatar.stage:${uploadId}`,
         objectKey: stagingKey,
         staging: true,
         aggregateId: profile.id,
         aggregateType: 'driver_avatar',
-        bucket,
+        bucket: stagingBucket,
       }).catch(() => undefined);
       logSafeServerFailure('warn', 'driver_avatar_stage_cleanup_queued', {
         failure: cleanupError,
@@ -323,15 +326,15 @@ export async function updateDriverAvatar(
       }).eq('id', uploadId).eq('owner_id', ownerId).eq('status', 'ready');
     }
     const cleanup: Promise<unknown>[] = [];
-    if (stagingKey) cleanup.push(enqueueSpacesDeletion({
+    if (stagingKey) cleanup.push(enqueueMediaDeletion({
       eventKey: `legacy.avatar.stage.failed:${uploadId ?? randomUUID()}`,
       objectKey: stagingKey,
       staging: true,
       aggregateId: ownerId,
       aggregateType: 'driver_avatar',
-      bucket,
+      bucket: stagingBucket,
     }));
-    if (finalObjectKey) cleanup.push(enqueueSpacesDeletion({
+    if (finalObjectKey) cleanup.push(enqueueMediaDeletion({
       eventKey: `legacy.avatar.media.failed:${uploadId ?? randomUUID()}`,
       objectKey: finalObjectKey,
       aggregateId: ownerId,

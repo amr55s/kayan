@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { PRODUCT_WORKBOOK_LIMITS } from '@/lib/commerce/excel';
 import { MerchantCatalogError, resolveMerchantStore } from '@/lib/commerce/merchant-products';
 import { requireServerEnv } from '@/lib/env/server';
-import { createPrivateStageUpload, getSpacesBucketName } from '@/lib/media/spaces';
+import { createPrivateStageUpload, getPrivateMediaBucketName } from '@/lib/media/spaces';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const { error: metadataError } = await (context.supabase as any).rpc('create_my_catalog_import_file', {
       p_store_id: context.storeId,
       p_file_id: fileId,
-      p_bucket: getSpacesBucketName(),
+      p_bucket: getPrivateMediaBucketName(),
       p_object_key: objectKey,
       p_byte_size: parsed.data.byteSize,
       p_sha256: parsed.data.checksumSha256,

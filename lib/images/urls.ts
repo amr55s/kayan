@@ -10,7 +10,10 @@ export function validateListingImageUrls(
     throw new Error(`يمكن رفع ${max} صور كحد أقصى في المرة الواحدة.`);
   }
   const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const spacesCdnUrl = process.env.DO_SPACES_CDN_BASE_URL?.trim();
+  const spacesCdnUrl = (
+    process.env.OBJECT_STORAGE_PUBLIC_BASE_URL
+    || process.env.DO_SPACES_CDN_BASE_URL
+  )?.trim();
   if (!projectUrl && !spacesCdnUrl && urls.length) {
     throw new Error('إعدادات تخزين الصور غير مكتملة.');
   }
@@ -37,12 +40,12 @@ export function validateListingImageUrls(
       && url.origin === legacySupabase.origin
       && url.pathname.startsWith(legacySupabase.path),
     );
-    const isSpacesMedia = Boolean(
+    const isManagedMedia = Boolean(
       spacesCdn
       && url.origin === spacesCdn.origin
       && url.pathname.startsWith(spacesCdn.path),
     );
-    if (!isLegacySupabase && !isSpacesMedia) {
+    if (!isLegacySupabase && !isManagedMedia) {
       throw new Error('رابط صورة غير صالح.');
     }
     return url.toString();

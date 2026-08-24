@@ -5,13 +5,13 @@ import { fetchSafeRemoteImage, UnsafeImageUrlError } from '@/lib/commerce/excel/
 import { processImageForStorage } from '@/lib/images/server';
 import {
   getPublicMediaUrl,
-  getSpacesBucketName,
+  getPublicMediaBucketName,
   writePublicMediaObject,
 } from '@/lib/media/spaces';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-// A remote fetch (15s), image normalization and a Spaces write (25s) must all
+// A remote fetch (15s), image normalization and an object-storage write (25s) must all
 // fit inside a 60s function invocation. Keep one bounded concurrency window so
 // claimed leases are not left waiting behind earlier work in the same process.
 const MAX_WORKER_BATCH = 2;
@@ -127,7 +127,7 @@ async function processClaim(claim: ImportImageClaim, workerId: string) {
   const { error } = await admin.rpc('complete_catalog_import_image_job', {
     p_row_id: claim.row_id,
     p_worker_id: workerId,
-    p_bucket: getSpacesBucketName(),
+    p_bucket: getPublicMediaBucketName(),
     p_object_key: objectKey,
     p_public_url: publicUrl,
     p_byte_size: processed.buffer.byteLength,

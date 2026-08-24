@@ -9,14 +9,14 @@ import {
   type HeadObjectCommandOutput,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { getDigitalOceanSpacesConfig } from '@/lib/env/server';
+import { getObjectStorageConfig } from '@/lib/env/server';
 import { MEDIA_UPLOAD_URL_TTL_SECONDS } from '@/lib/media/contracts';
 
 let cached:
   | {
       client: S3Client;
       configSignature: string;
-      config: ReturnType<typeof getDigitalOceanSpacesConfig>;
+      config: ReturnType<typeof getObjectStorageConfig>;
     }
   | undefined;
 
@@ -24,12 +24,13 @@ const SPACES_READ_TIMEOUT_MS = 15_000;
 const SPACES_WRITE_TIMEOUT_MS = 25_000;
 const SPACES_DELETE_TIMEOUT_MS = 10_000;
 
-function getSpaces() {
-  const config = getDigitalOceanSpacesConfig();
+function getStorage() {
+  const config = getObjectStorageConfig();
   const configSignature = [
     config.region,
     config.endpoint,
-    config.bucket,
+    config.privateBucket,
+    config.publicBucket,
     config.accessKeyId,
   ].join('|');
   if (!cached || cached.configSignature !== configSignature) {
@@ -51,8 +52,12 @@ function getSpaces() {
   return cached;
 }
 
-export function getSpacesBucketName(): string {
-  return getSpaces().config.bucket;
+export function getPrivateMediaBucketName(): string {
+  return getStorage().config.privateBucket;
+}
+
+export function getPublicMediaBucketName(): string {
+  return getStorage().config.publicBucket;
 }
 
 export function getPublicMediaUrl(objectKey: string): string {
@@ -60,7 +65,7 @@ export function getPublicMediaUrl(objectKey: string): string {
     .split('/')
     .map((segment) => encodeURIComponent(segment))
     .join('/');
-  return `${getSpaces().config.cdnBaseUrl}/${encodedKey}`;
+  return `${getStorage().config.cdnBaseUrl}/${encodedKey}`;
 }
 
 export async function createPrivateStageUpload(input: {
@@ -69,9 +74,9 @@ export async function createPrivateStageUpload(input: {
   objectKey: string;
   sizeBytes: number;
 }) {
-  const { client, config } = getSpaces();
+  const { client, config } = getStorage();
   const command = new PutObjectCommand({
-    Bucket: config.bucket,
+    Bucket: config.privateBucket,
     Key: input.objectKey,
     Body: undefined,
     CacheControl: 'no-store, max-age=0',
@@ -93,18 +98,18 @@ export async function createPrivateStageUpload(input: {
   } as const;
 }
 
-export async function headSpaceObject(objectKey: string): Promise<HeadObjectCommandOutput> {
-  const { client, config } = getSpaces();
+export async function headPrivateMediaObject(objectKey: string): Promise<HeadObjectCommandOutput> {
+  const { client, config } = getStorage();
   return client.send(
-    new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    new HeadObjectCommand({ Bucket: config.privateBucket, Key: objectKey }),
     { abortSignal: AbortSignal.timeout(SPACES_READ_TIMEOUT_MS) },
   );
 }
 
-export async function readSpaceObject(objectKey: string, maximumBytes: number): Promise<Buffer> {
-  const { client, config } = getSpaces();
+export async function readPrivateMediaObject(objectKey: string, maximumBytes: number): Promise<Buffer> {
+  const { client, config } = getStorage();
   const response = await client.send(
-    new GetObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    new GetObjectCommand({ Bucket: config.privateBucket, Key: objectKey }),
     { abortSignal: AbortSignal.timeout(SPACES_READ_TIMEOUT_MS) },
   );
   if (!response.Body) throw new Error('media_object_empty');
@@ -136,11 +141,11 @@ export async function writePublicMediaObject(input: {
   contentType: string;
   objectKey: string;
 }) {
-  const { client, config } = getSpaces();
+  const { client, config } = getStorage();
   await client.send(
     new PutObjectCommand({
-      ACL: 'public-read',
-      Bucket: config.bucket,
+      ...(config.supportsObjectAcl ? { ACL: 'public-read' as const } : {}),
+      Bucket: config.publicBucket,
       Key: input.objectKey,
       Body: input.body,
       CacheControl: 'public, max-age=31536000, immutable',
@@ -158,11 +163,11 @@ export async function writePrivateMediaObject(input: {
   contentType: string;
   objectKey: string;
 }) {
-  const { client, config } = getSpaces();
+  const { client, config } = getStorage();
   await client.send(
     new PutObjectCommand({
-      ACL: 'private',
-      Bucket: config.bucket,
+      ...(config.supportsObjectAcl ? { ACL: 'private' as const } : {}),
+      Bucket: config.privateBucket,
       Key: input.objectKey,
       Body: input.body,
       CacheControl: 'private, no-store, max-age=0',
@@ -175,11 +180,11 @@ export async function writePrivateMediaObject(input: {
 }
 
 export async function createPrivateMediaDownload(objectKey: string, expiresInSeconds = 60) {
-  const { client, config } = getSpaces();
+  const { client, config } = getStorage();
   return getSignedUrl(
     client,
     new GetObjectCommand({
-      Bucket: config.bucket,
+      Bucket: config.privateBucket,
       Key: objectKey,
       ResponseCacheControl: 'private, no-store, max-age=0',
     }),
@@ -187,10 +192,14 @@ export async function createPrivateMediaDownload(objectKey: string, expiresInSec
   );
 }
 
-export async function deleteSpaceObject(objectKey: string): Promise<void> {
-  const { client, config } = getSpaces();
+export async function deleteMediaObject(objectKey: string, bucket?: string): Promise<void> {
+  const { client, config } = getStorage();
+  const targetBucket = bucket ?? config.privateBucket;
+  if (targetBucket !== config.privateBucket && targetBucket !== config.publicBucket) {
+    throw new Error('media_bucket_mismatch');
+  }
   await client.send(
-    new DeleteObjectCommand({ Bucket: config.bucket, Key: objectKey }),
+    new DeleteObjectCommand({ Bucket: targetBucket, Key: objectKey }),
     { abortSignal: AbortSignal.timeout(SPACES_DELETE_TIMEOUT_MS) },
   );
 }

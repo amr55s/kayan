@@ -15,7 +15,7 @@ const privateView = readFileSync(
   'utf8',
 );
 
-test('DigitalOcean staging sessions use the canonical commerce media contract', () => {
+test('private object-storage staging uses the canonical commerce media contract', () => {
   for (const field of [
     'owner_id',
     'store_id',

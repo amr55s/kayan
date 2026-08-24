@@ -19,18 +19,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       supabase: ${{ steps.detect.outputs.supabase }}
-      spaces: ${{ steps.detect.outputs.spaces }}
+      storage: ${{ steps.detect.outputs.storage }}
       preview: ${{ steps.detect.outputs.preview }}
     env:
       HAS_SUPABASE_DB_URL: ${{ secrets.SUPABASE_CI_BRANCH_DB_URL != '' }}
       HAS_SUPABASE_BRANCH_REF: ${{ secrets.SUPABASE_CI_BRANCH_REF != '' }}
       HAS_SUPABASE_PRODUCTION_REF: ${{ secrets.SUPABASE_PRODUCTION_PROJECT_REF != '' }}
       HAS_SUPABASE_GUARD: ${{ secrets.SUPABASE_CI_BRANCH_GUARD != '' }}
-      HAS_SPACES_ENDPOINT: ${{ secrets.DO_SPACES_ENDPOINT != '' }}
-      HAS_SPACES_BUCKET: ${{ secrets.DO_SPACES_BUCKET != '' }}
-      HAS_SPACES_REGION: ${{ secrets.DO_SPACES_REGION != '' }}
-      HAS_SPACES_ACCESS_KEY: ${{ secrets.DO_SPACES_ACCESS_KEY_ID != '' }}
-      HAS_SPACES_SECRET_KEY: ${{ secrets.DO_SPACES_SECRET_ACCESS_KEY != '' }}
+      HAS_STORAGE_ENDPOINT: ${{ secrets.OBJECT_STORAGE_ENDPOINT != '' || secrets.DO_SPACES_ENDPOINT != '' }}
+      HAS_STORAGE_PRIVATE_BUCKET: ${{ secrets.OBJECT_STORAGE_PRIVATE_BUCKET != '' || secrets.OBJECT_STORAGE_BUCKET != '' || secrets.DO_SPACES_BUCKET != '' }}
+      HAS_STORAGE_PUBLIC_BUCKET: ${{ secrets.OBJECT_STORAGE_PUBLIC_BUCKET != '' || secrets.OBJECT_STORAGE_BUCKET != '' || secrets.DO_SPACES_BUCKET != '' }}
+      HAS_STORAGE_REGION: ${{ secrets.OBJECT_STORAGE_REGION != '' || secrets.DO_SPACES_REGION != '' }}
+      HAS_STORAGE_ACCESS_KEY: ${{ secrets.OBJECT_STORAGE_ACCESS_KEY_ID != '' || secrets.DO_SPACES_ACCESS_KEY_ID != '' }}
+      HAS_STORAGE_SECRET_KEY: ${{ secrets.OBJECT_STORAGE_SECRET_ACCESS_KEY != '' || secrets.DO_SPACES_SECRET_ACCESS_KEY != '' }}
     steps:
       - id: detect
         name: Report conditional contracts
@@ -42,7 +43,7 @@ jobs:
           DEPLOYMENT_URL: ${{ github.event.deployment_status.target_url }}
         run: |
           supabase=false
-          spaces=false
+          storage=false
           preview=false
           if [[ "$EVENT_NAME" != "deployment_status" ]] \
             && [[ "$HAS_SUPABASE_DB_URL" == "true" ]] \
@@ -50,22 +51,23 @@ jobs:
             && [[ "$HAS_SUPABASE_PRODUCTION_REF" == "true" ]] \
             && [[ "$HAS_SUPABASE_GUARD" == "true" ]]; then supabase=true; fi
           if [[ "$EVENT_NAME" != "deployment_status" ]] \
-            && [[ "$HAS_SPACES_ENDPOINT" == "true" ]] \
-            && [[ "$HAS_SPACES_BUCKET" == "true" ]] \
-            && [[ "$HAS_SPACES_REGION" == "true" ]] \
-            && [[ "$HAS_SPACES_ACCESS_KEY" == "true" ]] \
-            && [[ "$HAS_SPACES_SECRET_KEY" == "true" ]]; then spaces=true; fi
+            && [[ "$HAS_STORAGE_ENDPOINT" == "true" ]] \
+            && [[ "$HAS_STORAGE_PRIVATE_BUCKET" == "true" ]] \
+            && [[ "$HAS_STORAGE_PUBLIC_BUCKET" == "true" ]] \
+            && [[ "$HAS_STORAGE_REGION" == "true" ]] \
+            && [[ "$HAS_STORAGE_ACCESS_KEY" == "true" ]] \
+            && [[ "$HAS_STORAGE_SECRET_KEY" == "true" ]]; then storage=true; fi
           if [[ "$EVENT_NAME" == "deployment_status" ]] \
             && [[ "$DEPLOYMENT_STATE" == "success" ]] \
             && [[ "$DEPLOYMENT_ENVIRONMENT" == *"Preview"* ]] \
             && [[ "$DEPLOYMENT_URL" =~ ^https://[a-zA-Z0-9.-]+\.vercel\.app$ ]]; then preview=true; fi
           echo "supabase=$supabase" >> "$GITHUB_OUTPUT"
-          echo "spaces=$spaces" >> "$GITHUB_OUTPUT"
+          echo "storage=$storage" >> "$GITHUB_OUTPUT"
           echo "preview=$preview" >> "$GITHUB_OUTPUT"
           {
             echo '## Hosted CI contracts'
             echo "- Supabase disposable branch: $([[ "$supabase" == true ]] && echo READY || echo SKIPPED — required secrets unavailable or event not applicable)"
-            echo "- DigitalOcean Spaces prefix smoke: $([[ "$spaces" == true ]] && echo READY || echo SKIPPED — required secrets unavailable or event not applicable)"
+            echo "- S3-compatible object storage prefix smoke: $([[ "$storage" == true ]] && echo READY || echo SKIPPED — required secrets unavailable or event not applicable)"
             echo "- Vercel Preview browser gates: $([[ "$preview" == true ]] && echo READY || echo SKIPPED — not a successful public vercel.app Preview event)"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -102,13 +104,20 @@ jobs:
           supabase gen types typescript --db-url "$SUPABASE_CI_BRANCH_DB_URL" > /tmp/database.types.ts
           diff --unified lib/supabase/database.types.ts /tmp/database.types.ts
 
-  spaces-prefix-smoke:
-    name: DigitalOcean Spaces exact-prefix smoke
+  storage-prefix-smoke:
+    name: Object storage exact-prefix smoke
     needs: contract-availability
-    if: needs.contract-availability.outputs.spaces == 'true'
+    if: needs.contract-availability.outputs.storage == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
+      OBJECT_STORAGE_ENDPOINT: ${{ secrets.OBJECT_STORAGE_ENDPOINT }}
+      OBJECT_STORAGE_PRIVATE_BUCKET: ${{ secrets.OBJECT_STORAGE_PRIVATE_BUCKET }}
+      OBJECT_STORAGE_PUBLIC_BUCKET: ${{ secrets.OBJECT_STORAGE_PUBLIC_BUCKET }}
+      OBJECT_STORAGE_BUCKET: ${{ secrets.OBJECT_STORAGE_BUCKET }}
+      OBJECT_STORAGE_REGION: ${{ secrets.OBJECT_STORAGE_REGION }}
+      OBJECT_STORAGE_ACCESS_KEY_ID: ${{ secrets.OBJECT_STORAGE_ACCESS_KEY_ID }}
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.OBJECT_STORAGE_SECRET_ACCESS_KEY }}
       DO_SPACES_ENDPOINT: ${{ secrets.DO_SPACES_ENDPOINT }}
       DO_SPACES_BUCKET: ${{ secrets.DO_SPACES_BUCKET }}
       DO_SPACES_REGION: ${{ secrets.DO_SPACES_REGION }}
@@ -122,7 +131,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run smoke:spaces
+      - run: npm run smoke:storage
 
   preview-e2e:
     name: Vercel Preview Playwright and axe

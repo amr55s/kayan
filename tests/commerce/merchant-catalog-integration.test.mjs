@@ -37,8 +37,8 @@ test('Excel persistence keeps workbooks private and writes through catalog RPCs'
   assert.match(prepareRoute, /export async function DELETE/);
   assert.match(excel, /discard_my_catalog_import_file/);
   assert.match(prepareRoute, /imports\/\$\{context\.storeId\}\/\$\{fileId\}\.xlsx/);
-  assert.match(excel, /headSpaceObject/);
-  assert.match(excel, /readSpaceObject/);
+  assert.match(excel, /headPrivateMediaObject/);
+  assert.match(excel, /readPrivateMediaObject/);
   assert.doesNotMatch(excel, /createAdminClient|service_role/i);
   assert.doesNotMatch(excel, /\.from\([^)]*\)[\s\S]{0,120}\.(?:insert|update|delete|upsert)\(/);
   assert.match(exportRoute, /cache-control': 'private, no-store'/);

@@ -16,9 +16,9 @@ import {
 } from '@/lib/commerce/excel';
 import { MerchantCatalogError, resolveMerchantStore } from '@/lib/commerce/merchant-products';
 import {
-  getSpacesBucketName,
-  headSpaceObject,
-  readSpaceObject,
+  getPrivateMediaBucketName,
+  headPrivateMediaObject,
+  readPrivateMediaObject,
 } from '@/lib/media/spaces';
 
 const uuid = z.uuid();
@@ -257,14 +257,14 @@ export async function stageMerchantWorkbook(input: {
   const objectKey = `imports/${context.storeId}/${input.fileId}.xlsx`;
   let buffer: Buffer;
   try {
-    const head = await headSpaceObject(objectKey);
+    const head = await headPrivateMediaObject(objectKey);
     const stagedContentType = head.ContentType?.split(';', 1)[0]?.trim().toLocaleLowerCase('en-US');
     if (
       Number(head.ContentLength ?? 0) !== input.byteSize
       || stagedContentType !== workbookType
       || head.Metadata?.sha256 !== input.checksumSha256
     ) throw new MerchantCatalogError('invalid_input');
-    buffer = await readSpaceObject(objectKey, PRODUCT_WORKBOOK_LIMITS.maxFileBytes);
+    buffer = await readPrivateMediaObject(objectKey, PRODUCT_WORKBOOK_LIMITS.maxFileBytes);
     if (createHash('sha256').update(buffer).digest('hex') !== input.checksumSha256) {
       throw new MerchantCatalogError('invalid_input');
     }
@@ -283,7 +283,7 @@ export async function stageMerchantWorkbook(input: {
     return invalidValidation(filename, [...parsed.issues, ...normalized.issues]);
   }
 
-  const bucket = getSpacesBucketName();
+  const bucket = getPrivateMediaBucketName();
   try {
     const { error: fileError } = await (context.supabase as any).rpc('create_my_catalog_import_file', {
       p_store_id: context.storeId,

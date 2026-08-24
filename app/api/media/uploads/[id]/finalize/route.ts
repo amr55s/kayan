@@ -8,11 +8,12 @@ import {
 } from '@/lib/commerce/auth';
 import { MAX_MEDIA_SOURCE_BYTES } from '@/lib/media/contracts';
 import {
-  deleteSpaceObject,
+  deleteMediaObject,
+  getPrivateMediaBucketName,
   getPublicMediaUrl,
-  getSpacesBucketName,
-  headSpaceObject,
-  readSpaceObject,
+  getPublicMediaBucketName,
+  headPrivateMediaObject,
+  readPrivateMediaObject,
   writePrivateMediaObject,
   writePublicMediaObject,
 } from '@/lib/media/spaces';
@@ -93,6 +94,7 @@ export async function POST(
   const startedAt = Date.now();
   const requestId = request.headers.get('x-vercel-id') || crypto.randomUUID();
   let finalObjectKey: string | null = null;
+  let finalBucket: string | null = null;
   let sessionId: string | null = null;
   try {
     const { id } = await params;
@@ -140,7 +142,7 @@ export async function POST(
       .maybeSingle();
     if (!locked) return Response.json({ error: 'upload_session_busy' }, { status: 409 });
 
-    const head = await headSpaceObject(session.staging_key);
+    const head = await headPrivateMediaObject(session.staging_key);
     const contentLength = Number(head.ContentLength ?? 0);
     const contentType = head.ContentType?.split(';')[0]?.trim().toLowerCase();
     if (contentLength !== Number(session.expected_size_bytes) || contentLength > MAX_MEDIA_SOURCE_BYTES) {
@@ -149,7 +151,7 @@ export async function POST(
     if (contentType !== session.expected_content_type) throw new Error('media_type_mismatch');
     if (head.Metadata?.sha256 !== session.expected_sha256) throw new Error('media_metadata_mismatch');
 
-    const source = await readSpaceObject(session.staging_key, MAX_MEDIA_SOURCE_BYTES);
+    const source = await readPrivateMediaObject(session.staging_key, MAX_MEDIA_SOURCE_BYTES);
     if (sha256(source) !== session.expected_sha256) throw new Error('media_checksum_mismatch');
     const processed = await processImageForStorage(source, { alwaysReencode: true });
     const processedChecksum = sha256(processed.buffer);
@@ -160,6 +162,7 @@ export async function POST(
     const idempotencyKey = `media-finalize:${session.id}`;
     finalObjectKey = `media/${session.merchant_id}/${session.entity_type}/${session.entity_id}/${assetId}.webp`;
     const isPublic = session.entity_type === 'product' || session.entity_type === 'store';
+    finalBucket = isPublic ? getPublicMediaBucketName() : getPrivateMediaBucketName();
     const publicUrl = isPublic ? getPublicMediaUrl(finalObjectKey) : null;
     const writeFinalObject = isPublic ? writePublicMediaObject : writePrivateMediaObject;
 
@@ -172,7 +175,7 @@ export async function POST(
     const { data: finalized, error: finalizeError } = await (admin as any).rpc('finalize_media_upload', {
       p_session_id: id,
       p_asset_id: assetId,
-      p_bucket: getSpacesBucketName(),
+      p_bucket: finalBucket,
       p_object_key: finalObjectKey,
       p_public_url: publicUrl,
       p_content_type: processed.contentType,
@@ -184,7 +187,7 @@ export async function POST(
     });
     if (finalizeError) throw new Error(`media_database_finalize_failed:${finalizeError.code ?? 'unknown'}`);
 
-    await deleteSpaceObject(session.staging_key).catch((cleanupError) => {
+    await deleteMediaObject(session.staging_key).catch((cleanupError) => {
       console.warn(JSON.stringify({ level: 'warn', message: 'media_staging_cleanup_deferred', requestId, error: safeFailureCode(cleanupError) }));
     });
     console.info(JSON.stringify({
@@ -234,7 +237,9 @@ export async function POST(
           }));
           return Response.json({ error: 'media_finalize_state_ambiguous' }, { status: 503 });
         }
-        if (finalObjectKey) await deleteSpaceObject(finalObjectKey).catch(() => undefined);
+        if (finalObjectKey && finalBucket) {
+          await deleteMediaObject(finalObjectKey, finalBucket).catch(() => undefined);
+        }
         await admin.from('upload_sessions').update({
           status: 'failed',
           failure_code: safeFailureCode(error),
@@ -244,8 +249,8 @@ export async function POST(
         // maintenance/retry can reconcile it without corrupting a committed asset.
         return Response.json({ error: 'media_finalize_state_ambiguous' }, { status: 503 });
       }
-    } else if (finalObjectKey) {
-      await deleteSpaceObject(finalObjectKey).catch(() => undefined);
+    } else if (finalObjectKey && finalBucket) {
+      await deleteMediaObject(finalObjectKey, finalBucket).catch(() => undefined);
     }
     console.error(JSON.stringify({
       level: 'error',

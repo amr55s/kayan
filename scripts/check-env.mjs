@@ -14,12 +14,13 @@ const groups = {
     'CLIENT_ERROR_HASH_SALT',
   ],
   media: [
-    'DO_SPACES_REGION',
-    'DO_SPACES_ENDPOINT',
-    'DO_SPACES_BUCKET',
-    'DO_SPACES_ACCESS_KEY_ID',
-    'DO_SPACES_SECRET_ACCESS_KEY',
-    'DO_SPACES_CDN_BASE_URL',
+    ['OBJECT_STORAGE_REGION', 'DO_SPACES_REGION'],
+    ['OBJECT_STORAGE_ENDPOINT', 'DO_SPACES_ENDPOINT'],
+    ['OBJECT_STORAGE_PRIVATE_BUCKET', 'OBJECT_STORAGE_BUCKET', 'DO_SPACES_BUCKET'],
+    ['OBJECT_STORAGE_PUBLIC_BUCKET', 'OBJECT_STORAGE_BUCKET', 'DO_SPACES_BUCKET'],
+    ['OBJECT_STORAGE_ACCESS_KEY_ID', 'DO_SPACES_ACCESS_KEY_ID'],
+    ['OBJECT_STORAGE_SECRET_ACCESS_KEY', 'DO_SPACES_SECRET_ACCESS_KEY'],
+    ['OBJECT_STORAGE_PUBLIC_BASE_URL', 'DO_SPACES_CDN_BASE_URL'],
   ],
   operations: [
     'CRON_SECRET',
@@ -48,6 +49,15 @@ function label(requirement) {
 function hasValue(requirement, source) {
   const keys = Array.isArray(requirement) ? requirement : [requirement];
   return keys.some((key) => typeof source[key] === 'string' && source[key].trim().length > 0);
+}
+
+function resolvedValue(requirement, source = process.env) {
+  const keys = Array.isArray(requirement) ? requirement : [requirement];
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
 }
 
 function parseExample(contents) {
@@ -86,9 +96,16 @@ function validateUrl(name, raw, {
   return value;
 }
 
-function requireLength(name, minimum) {
-  if ((process.env[name]?.length ?? 0) < minimum) {
-    throw new Error(`${name} must contain at least ${minimum} characters.`);
+function requireLength(requirement, minimum) {
+  if ((resolvedValue(requirement)?.length ?? 0) < minimum) {
+    throw new Error(`${label(requirement)} must contain at least ${minimum} characters.`);
+  }
+}
+
+function validateOptionalLength(name, minimum) {
+  const value = process.env[name]?.trim();
+  if (value && value.length < minimum) {
+    throw new Error(`${name} must contain at least ${minimum} characters when configured.`);
   }
 }
 
@@ -114,6 +131,7 @@ async function checkContract() {
 function checkRuntime() {
   const missing = [];
   for (const [groupName, requirements] of Object.entries(groups)) {
+    if (groupName === 'observability') continue;
     const groupMissing = requirements.filter((requirement) => !hasValue(requirement, process.env));
     if (groupMissing.length) {
       missing.push(`${groupName}: ${groupMissing.map(label).join(', ')}`);
@@ -125,19 +143,41 @@ function checkRuntime() {
 
   validateUrl('NEXT_PUBLIC_SITE_URL', process.env.NEXT_PUBLIC_SITE_URL, { originOnly: true });
   validateUrl('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL, { originOnly: true });
-  const spacesEndpoint = validateUrl('DO_SPACES_ENDPOINT', process.env.DO_SPACES_ENDPOINT, { originOnly: true });
-  validateUrl('DO_SPACES_CDN_BASE_URL', process.env.DO_SPACES_CDN_BASE_URL, { originOnly: true });
+  const storageEndpointRaw = resolvedValue(['OBJECT_STORAGE_ENDPOINT', 'DO_SPACES_ENDPOINT']);
+  const storagePublicBaseRaw = resolvedValue(['OBJECT_STORAGE_PUBLIC_BASE_URL', 'DO_SPACES_CDN_BASE_URL']);
+  const storageEndpoint = validateUrl('object storage endpoint', storageEndpointRaw, { originOnly: true });
+  validateUrl('object storage public base URL', storagePublicBaseRaw, { originOnly: true });
   validateUrl('NEXT_PUBLIC_SENTRY_DSN', process.env.NEXT_PUBLIC_SENTRY_DSN, { allowCredentials: true });
   const vapidSubject = validateUrl('VAPID_SUBJECT', process.env.VAPID_SUBJECT, { httpsOnly: false });
 
-  if (!spacesEndpoint?.hostname.endsWith('.digitaloceanspaces.com')) {
-    throw new Error('DO_SPACES_ENDPOINT must use a DigitalOcean Spaces endpoint.');
+  const inferredStorageProvider = storageEndpoint?.hostname.endsWith('.r2.cloudflarestorage.com')
+    ? 'cloudflare-r2'
+    : storageEndpoint?.hostname.endsWith('.digitaloceanspaces.com')
+      ? 'digitalocean-spaces'
+      : undefined;
+  const configuredStorageProvider = process.env.OBJECT_STORAGE_PROVIDER?.trim();
+  if (!inferredStorageProvider) {
+    throw new Error('Object storage endpoint must use Cloudflare R2 or DigitalOcean Spaces.');
   }
-  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/u.test(process.env.DO_SPACES_BUCKET ?? '')) {
-    throw new Error('DO_SPACES_BUCKET is not a valid bucket name.');
+  if (configuredStorageProvider && configuredStorageProvider !== inferredStorageProvider) {
+    throw new Error('OBJECT_STORAGE_PROVIDER does not match the configured endpoint.');
   }
-  if (!/^[a-z]{2,5}\d(?:-\d)?$/u.test(process.env.DO_SPACES_REGION ?? '')) {
-    throw new Error('DO_SPACES_REGION is not a valid Spaces region.');
+  const privateBucket = resolvedValue(['OBJECT_STORAGE_PRIVATE_BUCKET', 'OBJECT_STORAGE_BUCKET', 'DO_SPACES_BUCKET']);
+  const publicBucket = resolvedValue(['OBJECT_STORAGE_PUBLIC_BUCKET', 'OBJECT_STORAGE_BUCKET', 'DO_SPACES_BUCKET']);
+  for (const bucket of [privateBucket, publicBucket]) {
+    if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/u.test(bucket ?? '')) {
+      throw new Error('Object storage bucket is not a valid bucket name.');
+    }
+  }
+  if (inferredStorageProvider === 'cloudflare-r2' && privateBucket === publicBucket) {
+    throw new Error('Cloudflare R2 requires separate private and public buckets.');
+  }
+  const storageRegion = resolvedValue(['OBJECT_STORAGE_REGION', 'DO_SPACES_REGION']);
+  if (inferredStorageProvider === 'cloudflare-r2' && storageRegion !== 'auto') {
+    throw new Error('Cloudflare R2 requires OBJECT_STORAGE_REGION=auto.');
+  }
+  if (inferredStorageProvider === 'digitalocean-spaces' && !/^[a-z]{2,5}\d(?:-\d)?$/u.test(storageRegion ?? '')) {
+    throw new Error('DigitalOcean Spaces region is invalid.');
   }
   if (!vapidSubject || !['https:', 'mailto:'].includes(vapidSubject.protocol)) {
     throw new Error('VAPID_SUBJECT must use https: or mailto:.');
@@ -146,16 +186,16 @@ function checkRuntime() {
   for (const [name, minimum] of [
     ['CLIENT_ERROR_HASH_SALT', 32],
     ['CRON_SECRET', 32],
-    ['DO_SPACES_ACCESS_KEY_ID', 16],
-    ['DO_SPACES_SECRET_ACCESS_KEY', 32],
+    [['OBJECT_STORAGE_ACCESS_KEY_ID', 'DO_SPACES_ACCESS_KEY_ID'], 16],
+    [['OBJECT_STORAGE_SECRET_ACCESS_KEY', 'DO_SPACES_SECRET_ACCESS_KEY'], 32],
     ['NEXT_PUBLIC_TURNSTILE_SITE_KEY', 20],
     ['TURNSTILE_SECRET_KEY', 20],
     ['NEXT_PUBLIC_VAPID_PUBLIC_KEY', 40],
     ['VAPID_PRIVATE_KEY', 20],
-    ['SENTRY_AUTH_TOKEN', 20],
   ]) {
     requireLength(name, minimum);
   }
+  validateOptionalLength('SENTRY_AUTH_TOKEN', 20);
   if (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY === process.env.TURNSTILE_SECRET_KEY) {
     throw new Error('Turnstile public and secret keys must be different.');
   }

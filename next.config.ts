@@ -1,12 +1,22 @@
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
-const spacesCdnUrl = process.env.DO_SPACES_CDN_BASE_URL;
+const storageCdnUrl = process.env.OBJECT_STORAGE_PUBLIC_BASE_URL || process.env.DO_SPACES_CDN_BASE_URL;
+const storageEndpointUrl = process.env.OBJECT_STORAGE_ENDPOINT || process.env.DO_SPACES_ENDPOINT;
 const spacesCdnPattern = (() => {
-  if (!spacesCdnUrl) return null;
+  if (!storageCdnUrl) return null;
   try {
-    const url = new URL(spacesCdnUrl);
+    const url = new URL(storageCdnUrl);
     return { protocol: 'https' as const, hostname: url.hostname, pathname: '/**' };
+  } catch {
+    return null;
+  }
+})();
+const storageEndpointSource = (() => {
+  if (!storageEndpointUrl) return null;
+  try {
+    const url = new URL(storageEndpointUrl);
+    return url.protocol === 'https:' ? url.origin : null;
   } catch {
     return null;
   }
@@ -19,6 +29,7 @@ const imageSources = [
   'https://images.unsplash.com',
   'https://*.supabase.co',
   'https://*.digitaloceanspaces.com',
+  'https://*.r2.dev',
   spacesCdnPattern ? `https://${spacesCdnPattern.hostname}` : null,
 ].filter(Boolean).join(' ');
 
@@ -79,7 +90,7 @@ const nextConfig: NextConfig = {
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
           {
             key: 'Content-Security-Policy',
-            value: `default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; img-src ${imageSources}; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.digitaloceanspaces.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}; font-src 'self' data:; object-src 'none';`,
+            value: `default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; img-src ${imageSources}; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.digitaloceanspaces.com https://*.r2.cloudflarestorage.com${storageEndpointSource ? ` ${storageEndpointSource}` : ''} https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}; font-src 'self' data:; object-src 'none';`,
           },
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
         ],

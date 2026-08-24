@@ -3,7 +3,11 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { deleteSpaceObject, getSpacesBucketName } from '@/lib/media/spaces';
+import {
+  deleteMediaObject,
+  getPrivateMediaBucketName,
+  getPublicMediaBucketName,
+} from '@/lib/media/spaces';
 
 const deletionTopics = [
   'media.staging_delete_requested',
@@ -44,10 +48,14 @@ function objectKeyFor(row: z.infer<typeof claimSchema>): string {
   return validateObjectKey(row.payload.object_key);
 }
 
-function verifyBucket(payload: Record<string, unknown>): void {
-  if (payload.bucket != null && payload.bucket !== getSpacesBucketName()) {
+function resolveBucket(payload: Record<string, unknown>): string {
+  const privateBucket = getPrivateMediaBucketName();
+  const publicBucket = getPublicMediaBucketName();
+  if (payload.bucket == null) return privateBucket;
+  if (payload.bucket !== privateBucket && payload.bucket !== publicBucket) {
     throw new Error('outbox_bucket_mismatch');
   }
+  return payload.bucket;
 }
 
 function safeWorkerError(error: unknown): string {
@@ -58,8 +66,7 @@ function safeWorkerError(error: unknown): string {
 async function processClaim(admin: any, workerId: string, raw: unknown) {
   const row = claimSchema.parse(raw);
   try {
-    verifyBucket(row.payload);
-    await deleteSpaceObject(objectKeyFor(row));
+    await deleteMediaObject(objectKeyFor(row), resolveBucket(row.payload));
     const { data: completed, error } = await admin.rpc('complete_marketplace_outbox', {
       p_id: row.id,
       p_worker_id: workerId,

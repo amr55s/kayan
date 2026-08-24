@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const workflow = read('.github/workflows/hosted-contracts.yml');
-const spaces = read('scripts/smoke-do-spaces-prefix.mjs');
+const storage = read('scripts/smoke-object-storage-prefix.mjs');
 const targetGuard = read('scripts/validate-supabase-ci-target.mjs');
 const rls = read('supabase/tests/rls_contract.sql');
 const e2e = read('e2e/public-preview.spec.ts');
@@ -16,7 +16,7 @@ test('hosted jobs are conditional and missing secrets are reported as skipped', 
   assert.match(workflow, /Hosted contract availability/u);
   assert.match(workflow, /SKIPPED — required secrets unavailable/u);
   assert.match(workflow, /if: needs\.contract-availability\.outputs\.supabase == 'true'/u);
-  assert.match(workflow, /if: needs\.contract-availability\.outputs\.spaces == 'true'/u);
+  assert.match(workflow, /if: needs\.contract-availability\.outputs\.storage == 'true'/u);
 });
 
 test('Supabase CI refuses production and checks migrations, RLS, and generated types', () => {
@@ -27,11 +27,13 @@ test('Supabase CI refuses production and checks migrations, RLS, and generated t
   assert.match(rls, /SECURITY DEFINER routines pin a trusted search_path/u);
 });
 
-test('Spaces smoke cleanup is confined to its unique exact prefix', () => {
-  assert.match(spaces, /ci-smoke\/\$\{runId\}\/\$\{randomUUID\(\)\}\//u);
-  assert.match(spaces, /createdKeys = new Set/u);
-  assert.match(spaces, /if \(!createdKey\.startsWith\(prefix\)\)/u);
-  assert.doesNotMatch(spaces, /DeleteObjectsCommand|ListBucketsCommand/u);
+test('object storage smoke supports R2 and Spaces with exact-prefix cleanup', () => {
+  assert.match(storage, /\.r2\.cloudflarestorage\.com/u);
+  assert.match(storage, /\.digitaloceanspaces\.com/u);
+  assert.match(storage, /ci-smoke\/\$\{runId\}\/\$\{randomUUID\(\)\}\//u);
+  assert.match(storage, /createdKeys = new Set/u);
+  assert.match(storage, /if \(!createdKey\.startsWith\(prefix\)\)/u);
+  assert.doesNotMatch(storage, /DeleteObjectsCommand|ListBucketsCommand/u);
 });
 
 test('Vercel preview gates pin browser dependencies and run Playwright, axe, and Lighthouse', () => {

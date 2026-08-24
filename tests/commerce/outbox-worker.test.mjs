@@ -11,12 +11,12 @@ const cron = readFileSync(
   'utf8',
 );
 
-test('the Spaces deletion worker claims and completes through lease-bound RPCs', () => {
+test('the object-storage deletion worker claims and completes through lease-bound RPCs', () => {
   assert.match(worker, /claim_marketplace_outbox/);
   assert.match(worker, /complete_marketplace_outbox/);
   assert.match(worker, /fail_marketplace_outbox/);
   assert.match(worker, /p_worker_id: workerId/);
-  assert.match(worker, /deleteSpaceObject/);
+  assert.match(worker, /deleteMediaObject/);
 });
 
 test('outbox object keys cannot escape their expected storage prefix', () => {

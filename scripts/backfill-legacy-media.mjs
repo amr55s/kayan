@@ -56,6 +56,14 @@ function requireEnv(name) {
   return value;
 }
 
+function requireOneEnv(names) {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  throw new Error(`missing_${names.join('_or_').toLowerCase()}`);
+}
+
 function getServiceKey() {
   return process.env.SUPABASE_SECRET_KEY?.trim()
     || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
@@ -263,7 +271,7 @@ async function transformImage(source) {
   return output;
 }
 
-async function ensureSpaceObject(s3, config, body, sha256, objectKey) {
+async function ensureStorageObject(s3, config, body, sha256, objectKey) {
   let head;
   try {
     head = await s3.send(new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey }), {
@@ -275,7 +283,7 @@ async function ensureSpaceObject(s3, config, body, sha256, objectKey) {
   }
   if (!head) {
     await s3.send(new PutObjectCommand({
-      ACL: 'public-read',
+      ...(config.supportsObjectAcl ? { ACL: 'public-read' } : {}),
       Bucket: config.bucket,
       Key: objectKey,
       Body: body,
@@ -301,13 +309,13 @@ async function processItem(context, item) {
     const outputSha = createHash('sha256').update(transformed.data).digest('hex');
     const kind = item.target_kind === 'place_image' ? 'place' : 'driver';
     const objectKey = `media/legacy-backfill/${kind}/${outputSha.slice(0, 2)}/${outputSha}.webp`;
-    await ensureSpaceObject(context.s3, context.spaces, transformed.data, outputSha, objectKey);
-    const publicUrl = `${context.spaces.cdnBaseUrl}/${objectKey}`;
+    await ensureStorageObject(context.s3, context.storage, transformed.data, outputSha, objectKey);
+    const publicUrl = `${context.storage.cdnBaseUrl}/${objectKey}`;
     const result = await rpc(context.supabase, 'complete_legacy_media_backfill_item', {
       p_item_id: item.item_id,
       p_lease_token: item.lease_token,
       p_source_sha256: sourceSha,
-      p_output_bucket: context.spaces.bucket,
+      p_output_bucket: context.storage.bucket,
       p_output_object_key: objectKey,
       p_output_public_url: publicUrl,
       p_output_sha256: outputSha,
@@ -345,20 +353,23 @@ async function mapConcurrent(values, concurrency, mapper) {
   return results;
 }
 
-function spacesConfig() {
-  const endpoint = new URL(requireEnv('DO_SPACES_ENDPOINT'));
-  const cdnBaseUrl = new URL(requireEnv('DO_SPACES_CDN_BASE_URL'));
-  if (endpoint.protocol !== 'https:' || !endpoint.hostname.endsWith('.digitaloceanspaces.com')) {
-    throw new Error('invalid_spaces_endpoint');
+function objectStorageConfig() {
+  const endpoint = new URL(requireOneEnv(['OBJECT_STORAGE_ENDPOINT', 'DO_SPACES_ENDPOINT']));
+  const cdnBaseUrl = new URL(requireOneEnv(['OBJECT_STORAGE_PUBLIC_BASE_URL', 'DO_SPACES_CDN_BASE_URL']));
+  const isR2 = endpoint.hostname.endsWith('.r2.cloudflarestorage.com');
+  const isSpaces = endpoint.hostname.endsWith('.digitaloceanspaces.com');
+  if (endpoint.protocol !== 'https:' || (!isR2 && !isSpaces)) {
+    throw new Error('invalid_object_storage_endpoint');
   }
-  if (cdnBaseUrl.protocol !== 'https:' || cdnBaseUrl.pathname !== '/') throw new Error('invalid_spaces_cdn');
-  const accessKeyId = requireEnv('DO_SPACES_ACCESS_KEY_ID');
-  const bucket = requireEnv('DO_SPACES_BUCKET');
-  const region = requireEnv('DO_SPACES_REGION');
-  const secretAccessKey = requireEnv('DO_SPACES_SECRET_ACCESS_KEY');
-  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/u.test(bucket)) throw new Error('invalid_spaces_bucket');
-  if (!/^[a-z]{2,5}\d(?:-\d)?$/u.test(region)) throw new Error('invalid_spaces_region');
-  if (accessKeyId.length < 16 || secretAccessKey.length < 32) throw new Error('invalid_spaces_credentials');
+  if (cdnBaseUrl.protocol !== 'https:' || cdnBaseUrl.pathname !== '/') throw new Error('invalid_object_storage_public_url');
+  const accessKeyId = requireOneEnv(['OBJECT_STORAGE_ACCESS_KEY_ID', 'DO_SPACES_ACCESS_KEY_ID']);
+  const bucket = requireOneEnv(['OBJECT_STORAGE_PUBLIC_BUCKET', 'OBJECT_STORAGE_BUCKET', 'DO_SPACES_BUCKET']);
+  const region = requireOneEnv(['OBJECT_STORAGE_REGION', 'DO_SPACES_REGION']);
+  const secretAccessKey = requireOneEnv(['OBJECT_STORAGE_SECRET_ACCESS_KEY', 'DO_SPACES_SECRET_ACCESS_KEY']);
+  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/u.test(bucket)) throw new Error('invalid_object_storage_bucket');
+  if (isR2 && region !== 'auto') throw new Error('invalid_r2_region');
+  if (isSpaces && !/^[a-z]{2,5}\d(?:-\d)?$/u.test(region)) throw new Error('invalid_spaces_region');
+  if (accessKeyId.length < 16 || secretAccessKey.length < 32) throw new Error('invalid_object_storage_credentials');
   return {
     accessKeyId,
     bucket,
@@ -366,6 +377,7 @@ function spacesConfig() {
     endpoint: endpoint.origin,
     region,
     secretAccessKey,
+    supportsObjectAcl: isSpaces,
   };
 }
 
@@ -386,12 +398,12 @@ async function main() {
     return;
   }
 
-  const spaces = spacesConfig();
+  const storage = objectStorageConfig();
   const s3 = new S3Client({
-    region: spaces.region,
-    endpoint: spaces.endpoint,
+    region: storage.region,
+    endpoint: storage.endpoint,
     forcePathStyle: false,
-    credentials: { accessKeyId: spaces.accessKeyId, secretAccessKey: spaces.secretAccessKey },
+    credentials: { accessKeyId: storage.accessKeyId, secretAccessKey: storage.secretAccessKey },
   });
   const runId = options.runId || randomUUID();
   activeRunId = runId;
@@ -416,7 +428,7 @@ async function main() {
     await rpc(supabase, 'seal_legacy_media_backfill_discovery', { p_run_id: runId });
   }
 
-  const context = { s3, serviceKey, sourceOrigin, spaces, supabase };
+  const context = { s3, serviceKey, sourceOrigin, storage, supabase };
   const processed = { completed: 0, stale: 0, retry: 0, deadLetter: 0, leaseFailure: 0 };
   let handled = 0;
   let noWork = false;

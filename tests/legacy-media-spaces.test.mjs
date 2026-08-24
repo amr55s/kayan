@@ -22,7 +22,7 @@ test('active legacy uploads no longer write to Supabase Storage', () => {
 
 test('place uploads are private staged, verified and normalized before an owned token is returned', () => {
   assert.match(imageClient, /crypto\.subtle\.digest\('SHA-256'/u);
-  assert.match(finalize, /headSpaceObject/u);
+  assert.match(finalize, /headPrivateMediaObject/u);
   assert.match(finalize, /metadataHash !== row\.expected_sha256/u);
   assert.match(finalize, /sourceHash !== row\.expected_sha256/u);
   assert.match(finalize, /alwaysReencode: true/u);
@@ -46,7 +46,7 @@ test('cleanup uses the durable marketplace outbox for staging, orphans and repla
   assert.match(migration, /media\.staging_delete_requested/iu);
   assert.match(migration, /media\.delete_requested/iu);
   assert.match(migration, /for update skip locked/iu);
-  assert.match(finalize, /enqueueSpacesDeletion/iu);
+  assert.match(finalize, /enqueueMediaDeletion/iu);
   assert.match(operations, /legacy\.avatar\.media\.failed/iu);
 });
 

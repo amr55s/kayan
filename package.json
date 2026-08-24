@@ -17,7 +17,7 @@
     "check:migrations": "node scripts/check-migrations.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "test:e2e:preview": "playwright test",
-    "smoke:spaces": "node scripts/smoke-do-spaces-prefix.mjs",
+    "smoke:storage": "node scripts/smoke-object-storage-prefix.mjs",
     "verify": "npm run check:env && npm run check:migrations && npm run lint && npm run typecheck && npm test && npm audit --omit=dev --audit-level=high",
     "bootstrap:admin": "node scripts/bootstrap-admin.mjs",
     "media:backfill:dry-run": "node scripts/backfill-legacy-media.mjs",

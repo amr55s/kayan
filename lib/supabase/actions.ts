@@ -101,7 +101,7 @@ function triggerInstantRevalidation(tags?: ('places' | 'drivers')[]) {
 }
 
 /**
- * Creates a short-lived DigitalOcean Spaces upload URL without sending image
+ * Creates a short-lived private object-storage upload URL without sending image
  * bytes through the Next.js/Vercel function. The object remains private until
  * the server validates and normalizes it.
  */
@@ -199,13 +199,13 @@ export async function prepareImageUpload(
     } catch (error) {
       await (supabase as any).from('legacy_media_uploads').update({
         status: 'failed',
-        failure_code: 'spaces_presign_failed',
+        failure_code: 'storage_presign_failed',
         updated_at: new Date().toISOString(),
       }).eq('id', sessionId);
       throw error;
     }
   } catch (error) {
-    logSafeServerFailure('error', 'spaces_upload_preparation_failed', { failure: error });
+    logSafeServerFailure('error', 'storage_upload_preparation_failed', { failure: error });
     return {
       success: false,
       message: 'تعذر الاتصال بخدمة الصور حالياً. حاول مرة أخرى.',
@@ -215,7 +215,7 @@ export async function prepareImageUpload(
 
 /**
  * Retained only as a compatibility export for inactive legacy modals. Active
- * screens use private, direct-to-Spaces staging through prepareImageUpload.
+ * screens use private direct-to-object-storage staging through prepareImageUpload.
  */
 export async function uploadImageToStorage(
   file: File,

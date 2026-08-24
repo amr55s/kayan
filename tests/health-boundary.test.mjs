@@ -15,12 +15,14 @@ test('liveness is dependency-free and cannot be cached', () => {
   assert.doesNotMatch(source, /createAdminClient|S3Client|fetch\(/);
 });
 
-test('readiness probes database, exact schema marker, Spaces, and worker configuration with bounded waits', () => {
+test('readiness probes database, exact schema marker, S3-compatible storage, and workers with bounded waits', () => {
   const source = read('app/api/health/ready/route.ts');
   assert.match(source, /EXPECTED_SCHEMA_VERSION\s*=\s*'\d{14}'/);
   assert.match(source, /marketplace_runtime_settings/);
   assert.match(source, /key:\s*'eq\.schema_version'/);
-  assert.match(source, /HeadBucketCommand/);
+  assert.match(source, /ListObjectsV2Command/);
+  assert.match(source, /MaxKeys:\s*1/);
+  assert.match(source, /getObjectStorageConfig/);
   assert.match(source, /marketplace_release_ready/);
   assert.doesNotMatch(source, /rpc\/catalog_image_worker_configured/);
   assert.ok((source.match(/AbortSignal\.timeout\(CHECK_TIMEOUT_MS\)/g) || []).length >= 4);

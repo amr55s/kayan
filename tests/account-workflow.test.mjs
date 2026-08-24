@@ -287,7 +287,7 @@ test('image and admin server actions return safe results instead of crashing RSC
   );
   assert.match(
     storageAction,
-    /spaces_upload_preparation_failed[\s\S]*success: false/,
+    /storage_upload_preparation_failed[\s\S]*success: false/,
   );
   assert.match(clientPipeline, /failedFiles: string\[\]/);
   assert.match(clientPipeline, /failedFiles\.push\(originalFile\.name\)/);
@@ -312,7 +312,7 @@ test('new places wait for verified images and retry only failed files', () => {
   assert.match(clientPipeline, /sourceMimeType\(file\)/);
   assert.match(clientPipeline, /failures: Array/);
   const finalizeAction = read('app/api/legacy-media/uploads/[id]/finalize/route.ts');
-  assert.match(finalizeAction, /headSpaceObject/);
+  assert.match(finalizeAction, /headPrivateMediaObject/);
   assert.match(finalizeAction, /sourceHash !== row\.expected_sha256/);
   assert.match(storageAction, /p_limit: 24/);
   const imageConfig = read('next.config.ts');

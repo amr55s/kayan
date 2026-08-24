@@ -4,14 +4,15 @@ import { getCurrentProfile, requireAdminAal2 } from '@/lib/auth/guards';
 import { processImageForStorage } from '@/lib/images/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
-  deleteSpaceObject,
+  deleteMediaObject,
+  getPrivateMediaBucketName,
   getPublicMediaUrl,
-  getSpacesBucketName,
-  headSpaceObject,
-  readSpaceObject,
+  getPublicMediaBucketName,
+  headPrivateMediaObject,
+  readPrivateMediaObject,
   writePublicMediaObject,
 } from '@/lib/media/spaces';
-import { enqueueSpacesDeletion, legacyUploadToken } from '@/lib/media/legacy';
+import { enqueueMediaDeletion, legacyUploadToken } from '@/lib/media/legacy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,6 +61,7 @@ export async function POST(
   const admin = createAdminClient() as any;
   let finalObjectKey: string | null = null;
   let bucket: string | undefined;
+  let privateBucket: string | undefined;
   let stagingKey: string | null = null;
   let finalized = false;
 
@@ -101,7 +103,8 @@ export async function POST(
     if (claimError) throw claimError;
     if (!claimed) return Response.json({ error: 'upload_finalize_conflict' }, { status: 409 });
 
-    const head = await headSpaceObject(row.staging_key);
+    privateBucket = getPrivateMediaBucketName();
+    const head = await headPrivateMediaObject(row.staging_key);
     const sourceLength = Number(head.ContentLength ?? 0);
     const sourceType = String(head.ContentType ?? '').split(';', 1)[0].trim().toLowerCase();
     const metadataHash = String(head.Metadata?.sha256 ?? '').toLowerCase();
@@ -113,7 +116,7 @@ export async function POST(
       throw new Error('staged_media_metadata_mismatch');
     }
 
-    const source = await readSpaceObject(row.staging_key, Number(row.expected_size_bytes));
+    const source = await readPrivateMediaObject(row.staging_key, Number(row.expected_size_bytes));
     const sourceHash = createHash('sha256').update(source).digest('hex');
     if (source.byteLength !== Number(row.expected_size_bytes) || sourceHash !== row.expected_sha256) {
       throw new Error('staged_media_checksum_mismatch');
@@ -123,7 +126,7 @@ export async function POST(
     const processedHash = createHash('sha256').update(processed.buffer).digest('hex');
     const assetId = row.id;
     finalObjectKey = `media/legacy/place/pending/${assetId}.webp`;
-    bucket = getSpacesBucketName();
+    bucket = getPublicMediaBucketName();
     await writePublicMediaObject({
       body: processed.buffer,
       checksumSha256: processedHash,
@@ -157,15 +160,15 @@ export async function POST(
     finalized = true;
 
     try {
-      await deleteSpaceObject(row.staging_key);
+      await deleteMediaObject(row.staging_key, privateBucket);
     } catch {
-      await enqueueSpacesDeletion({
+      await enqueueMediaDeletion({
         eventKey: `legacy.stage.finalized:${row.id}`,
         objectKey: row.staging_key,
         staging: true,
         aggregateId: row.id,
         aggregateType: 'place',
-        bucket,
+        bucket: privateBucket,
       }).catch(() => undefined);
     }
 
@@ -186,15 +189,15 @@ export async function POST(
     }).eq('id', uploadId).eq('owner_id', profile.id).eq('status', 'processing');
 
     const cleanup = [] as Promise<unknown>[];
-    if (stagingKey) cleanup.push(enqueueSpacesDeletion({
+    if (stagingKey) cleanup.push(enqueueMediaDeletion({
       eventKey: `legacy.stage.failed:${uploadId}`,
       objectKey: stagingKey,
       staging: true,
       aggregateId: uploadId,
       aggregateType: 'place',
-      bucket,
+      bucket: privateBucket,
     }));
-    if (finalObjectKey) cleanup.push(enqueueSpacesDeletion({
+    if (finalObjectKey) cleanup.push(enqueueMediaDeletion({
       eventKey: `legacy.media.failed:${uploadId}`,
       objectKey: finalObjectKey,
       aggregateId: uploadId,
