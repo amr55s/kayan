@@ -5,11 +5,11 @@ import { MarketplaceShell } from '@/components/marketplace/marketplace-shell';
 export const metadata: Metadata = {
   title: 'المتجر | ديرتك',
   description: 'منتجات من متاجر منطقتك مع طلب ودفع عند الاستلام من داخل الموقع.',
-  alternates: { canonical: '/' },
+  alternates: { canonical: '/marketplace' },
   openGraph: {
     title: 'المتجر | ديرتك',
     description: 'منتجات من متاجر منطقتك مع طلب ودفع عند الاستلام من داخل الموقع.',
-    url: '/',
+    url: '/marketplace',
     type: 'website',
   },
 };

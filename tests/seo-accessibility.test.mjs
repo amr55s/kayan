@@ -41,7 +41,8 @@ test('canonical metadata is route-specific and products emit injection-safe JSON
   const services = read('app/services/page.tsx');
   const product = read('app/marketplace/products/[id]/[slug]/page.tsx');
   assert.doesNotMatch(root, /alternates:\s*\{\s*canonical:\s*['"]\/['"]/);
-  assert.match(marketplace, /alternates:\s*\{\s*canonical:\s*['"]\/['"]/);
+  assert.match(marketplace, /alternates:\s*\{\s*canonical:\s*['"]\/marketplace['"]/);
+  assert.match(marketplace, /openGraph:[\s\S]*url:\s*['"]\/marketplace['"]/);
   assert.match(services, /alternates:\s*\{\s*canonical:\s*['"]\/services['"]/);
   assert.match(product, /application\/ld\+json/);
   assert.match(product, /product\.rating\.count > 0[\s\S]*aggregateRating/);
