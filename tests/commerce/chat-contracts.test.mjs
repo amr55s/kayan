@@ -23,7 +23,9 @@ test('intent permits presale store chat and order chat only', () => {
 });
 
 test('search and message bodies are bounded', () => {
-  assert.equal(parseChatSearchInput({ query: 'سعر المنتج', limit: 30 }).success, true);
+  assert.equal(parseChatSearchInput({ conversationId: crypto.randomUUID(), query: 'سعر المنتج', limit: 30 }).success, true);
+  assert.equal(parseChatSearchInput({ query: 'سعر المنتج', limit: 30 }).success, false);
+  assert.equal(parseChatSearchInput({ conversationId: 'not-a-uuid', query: 'سعر المنتج', limit: 30 }).success, false);
   assert.equal(parseChatSearchInput({ query: 'x'.repeat(201), limit: 30 }).success, false);
   const form = new FormData();
   form.set('conversationId', crypto.randomUUID());

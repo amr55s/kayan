@@ -23,7 +23,7 @@ export const conversationIntentSchema = z.discriminatedUnion('kind', [
 ]) satisfies z.ZodType<ConversationIntent>;
 export const parseConversationIntent = (input: unknown) => conversationIntentSchema.safeParse(input);
 
-export const chatSearchSchema = z.object({ conversationId: uuid.optional(), query: z.string().max(200), limit: z.number().int().min(1).max(50).default(50), cursor: cursor.nullable().default(null) });
+export const chatSearchSchema = z.object({ conversationId: uuid, query: z.string().max(200), limit: z.number().int().min(1).max(50).default(50), cursor: cursor.nullable().default(null) });
 export const parseChatSearchInput = (input: unknown) => chatSearchSchema.safeParse(input) as ReturnType<typeof chatSearchSchema.safeParse>;
 
 export const reactionSchema = z.object({ messageId: uuid, emoji: z.enum(['👍', '❤️', '✅', '🙏', '😄']), active: z.boolean() }) satisfies z.ZodType<ChatReactionInput>;
