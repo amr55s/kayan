@@ -40,6 +40,17 @@ create table public.marketplace_chat_blocks (
   check (blocker_user_id <> blocked_user_id)
 );
 
+create table public.marketplace_chat_block_escalations (
+  source_thread_id uuid not null references public.support_threads(id) on delete cascade,
+  blocker_user_id uuid not null references auth.users(id) on delete cascade,
+  blocked_user_id uuid not null references auth.users(id) on delete cascade,
+  escalation_thread_id uuid not null unique references public.support_threads(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (source_thread_id, blocker_user_id, blocked_user_id),
+  check (blocker_user_id <> blocked_user_id),
+  check (source_thread_id <> escalation_thread_id)
+);
+
 alter table public.support_messages
   add column if not exists client_message_id uuid,
   add column if not exists message_kind text not null default 'text'
@@ -127,6 +138,7 @@ join public.marketplace_delivery_assignments as assignment on assignment.order_i
 join public.profiles as profile on profile.id = assignment.driver_id
 where assignment.driver_id is not null and assignment.status in ('assigned', 'picked_up', 'issue')
   and profile.role = 'driver' and profile.is_active
+  and thread.conversation_kind = 'order'
 on conflict (thread_id, user_id, participant_role) do nothing;
 
 create or replace function public.can_access_marketplace_chat_thread(p_thread_id uuid)
@@ -190,6 +202,20 @@ begin
               and assignment.driver_id = v_actor_id
               and assignment.status in ('assigned', 'picked_up', 'issue')
               and profile.role = 'driver' and profile.is_active
+          )
+        )
+        or (
+          participant.participant_role = 'admin'
+          and thread.assigned_admin_id = v_actor_id
+          and coalesce((select auth.jwt() ->> 'aal'), 'aal1') = 'aal2'
+          and exists (
+            select 1
+            from public.profiles as profile
+            join public.admin_memberships as membership on membership.user_id = profile.id
+            where profile.id = v_actor_id
+              and profile.role = 'admin' and profile.is_active
+              and not profile.must_change_password and membership.is_active
+              and membership.role::text in ('support', 'super_admin', 'chat_monitor')
           )
         )
       )
@@ -703,6 +729,19 @@ begin
           and assignment.status in ('assigned', 'picked_up', 'issue')
           and profile.role = 'driver' and profile.is_active
       ))
+      or (participant.participant_role = 'admin'
+        and v_thread.assigned_admin_id = v_actor_id
+        and coalesce((select auth.jwt() ->> 'aal'), 'aal1') = 'aal2'
+        and exists (
+          select 1
+          from public.profiles as profile
+          join public.admin_memberships as membership on membership.user_id = profile.id
+          where profile.id = v_actor_id
+            and profile.role = 'admin' and profile.is_active
+            and not profile.must_change_password and membership.is_active
+            and membership.role::text in ('support', 'super_admin', 'chat_monitor')
+        )
+      )
     )
   order by case participant.participant_role
     when 'customer' then 0 when 'merchant' then 1 when 'driver' then 2 else 3 end
@@ -1000,6 +1039,12 @@ declare
   v_actor_id uuid := (select auth.uid());
   v_updated integer;
   v_active_delivery boolean;
+  v_actor_role text;
+  v_counterparty_role text;
+  v_assigned_driver_id uuid;
+  v_source_thread public.support_threads;
+  v_escalation_thread_id uuid;
+  v_assigned_admin_id uuid;
 begin
   if v_actor_id is null then
     raise exception 'authentication_required' using errcode = '28000';
@@ -1013,6 +1058,38 @@ begin
      ) then
     raise exception 'not_found' using errcode = 'P0002';
   end if;
+
+  select * into v_source_thread
+  from public.support_threads as thread
+  where thread.id = p_thread_id
+  for update;
+
+  select participant.participant_role into v_actor_role
+  from public.marketplace_chat_participants as participant
+  where participant.thread_id = p_thread_id and participant.user_id = v_actor_id
+    and participant.removed_at is null
+  order by case participant.participant_role
+    when 'customer' then 0 when 'driver' then 1 when 'merchant' then 2 else 3 end
+  limit 1;
+
+  select participant.participant_role into v_counterparty_role
+  from public.marketplace_chat_participants as participant
+  where participant.thread_id = p_thread_id and participant.user_id = p_counterparty_id
+    and participant.removed_at is null
+  order by case participant.participant_role
+    when 'customer' then 0 when 'driver' then 1 when 'merchant' then 2 else 3 end
+  limit 1;
+
+  select assignment.driver_id into v_assigned_driver_id
+  from public.marketplace_delivery_assignments as assignment
+  join public.profiles as profile on profile.id = assignment.driver_id
+  where assignment.order_id = v_source_thread.order_id
+    and assignment.status in ('assigned', 'picked_up', 'issue')
+    and profile.role = 'driver' and profile.is_active
+  order by assignment.assigned_at desc, assignment.id desc
+  limit 1;
+
+  v_active_delivery := v_assigned_driver_id is not null;
   if p_blocked then
     insert into public.marketplace_chat_blocks (
       thread_id, blocker_user_id, blocked_user_id
@@ -1028,14 +1105,114 @@ begin
       and blocked_user_id = p_counterparty_id;
   end if;
 
-  select exists (
-    select 1
+  if p_blocked and v_active_delivery and (
+    (v_actor_role = 'customer' and v_counterparty_role = 'driver'
+      and p_counterparty_id = v_assigned_driver_id)
+    or
+    (v_actor_role = 'driver' and v_actor_id = v_assigned_driver_id
+      and v_counterparty_role = 'customer')
+  ) then
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
+      'marketplace-chat:block-escalation:' || p_thread_id::text || ':' ||
+      v_actor_id::text || ':' || p_counterparty_id::text,
+      0
+    ));
+
+    select escalation.escalation_thread_id into v_escalation_thread_id
+    from public.marketplace_chat_block_escalations as escalation
+    where escalation.source_thread_id = p_thread_id
+      and escalation.blocker_user_id = v_actor_id
+      and escalation.blocked_user_id = p_counterparty_id;
+
+    if v_escalation_thread_id is null then
+      select profile.id into v_assigned_admin_id
+      from public.profiles as profile
+      join public.admin_memberships as membership on membership.user_id = profile.id
+      where profile.role = 'admin' and profile.is_active
+        and not profile.must_change_password and membership.is_active
+        and membership.role::text in ('support', 'super_admin', 'chat_monitor')
+      order by case membership.role::text
+        when 'support' then 0 when 'chat_monitor' then 1 else 2 end,
+        profile.id
+      limit 1;
+
+      insert into public.support_threads (
+        customer_id, store_id, order_id, subject, status,
+        assigned_admin_id, conversation_kind
+      ) values (
+        v_source_thread.customer_id,
+        v_source_thread.store_id,
+        v_source_thread.order_id,
+        'Constrained order support after participant block',
+        'open',
+        v_assigned_admin_id,
+        'support'
+      ) returning id into v_escalation_thread_id;
+
+      insert into public.marketplace_chat_block_escalations (
+        source_thread_id, blocker_user_id, blocked_user_id, escalation_thread_id
+      ) values (
+        p_thread_id, v_actor_id, p_counterparty_id, v_escalation_thread_id
+      );
+
+      insert into public.marketplace_chat_participants (
+        thread_id, user_id, participant_role
+      ) values (
+        v_escalation_thread_id, v_actor_id, v_actor_role
+      );
+
+      insert into public.marketplace_chat_participants (
+        thread_id, user_id, participant_role
+      )
+      select v_escalation_thread_id, participant.user_id, 'merchant'
+      from public.marketplace_chat_participants as participant
+      where participant.thread_id = p_thread_id
+        and participant.participant_role = 'merchant'
+        and participant.removed_at is null
+        and participant.user_id is distinct from p_counterparty_id
+        and exists (
+          select 1 from public.store_memberships as membership
+          where membership.store_id = v_source_thread.store_id
+            and membership.user_id = participant.user_id and membership.is_active
+            and membership.role in ('owner', 'manager', 'fulfillment')
+        )
+      on conflict (thread_id, user_id, participant_role) do nothing;
+
+      insert into public.marketplace_chat_participants (
+        thread_id, user_id, participant_role
+      )
+      select v_escalation_thread_id, v_assigned_admin_id, 'admin'
+      where v_assigned_admin_id is not null
+      on conflict (thread_id, user_id, participant_role) do nothing;
+
+      insert into public.support_messages (
+        thread_id, sender_user_id, sender_kind, body, message_kind
+      ) values (
+        v_escalation_thread_id,
+        null,
+        'system',
+        'Direct participant messaging is blocked. Order-support messages remain available here.',
+        'system'
+      );
+    else
+      update public.support_threads
+      set status = 'open', resolved_at = null, paused_at = null,
+          paused_by = null, updated_at = now()
+      where id = v_escalation_thread_id;
+    end if;
+  else
+    select escalation.escalation_thread_id into v_escalation_thread_id
+    from public.marketplace_chat_block_escalations as escalation
+    where escalation.source_thread_id = p_thread_id
+      and escalation.blocker_user_id = v_actor_id
+      and escalation.blocked_user_id = p_counterparty_id;
+  end if;
+
+  if v_escalation_thread_id is not null and v_assigned_admin_id is null then
+    select thread.assigned_admin_id into v_assigned_admin_id
     from public.support_threads as thread
-    join public.marketplace_delivery_assignments as assignment
-      on assignment.order_id = thread.order_id
-    where thread.id = p_thread_id
-      and assignment.status in ('assigned', 'picked_up', 'issue')
-  ) into v_active_delivery;
+    where thread.id = v_escalation_thread_id;
+  end if;
 
   -- Retain the legacy timestamp as a derived compatibility signal. Pairwise
   -- authorization uses marketplace_chat_blocks exclusively.
@@ -1054,7 +1231,13 @@ begin
     'conversationId', p_thread_id,
     'counterpartyId', p_counterparty_id,
     'blocked', p_blocked,
-    'deliveryContinuityRequired', v_active_delivery
+    'deliveryContinuityRequired', v_active_delivery,
+    'supportEscalationConversationId', v_escalation_thread_id,
+    'orderSupportAvailable', v_escalation_thread_id is not null,
+    'administrationAssigned', v_assigned_admin_id is not null,
+    'safeCopy', case when v_escalation_thread_id is not null then
+      'Direct messages are blocked. Order-support messages remain available.'
+      else 'The participant block was updated.' end
   );
 end;
 $$;
@@ -1094,8 +1277,17 @@ begin
     and removed_at is null;
   if v_active then
     insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
-    select id, v_driver_id, 'driver'
-    from public.support_threads where order_id = v_order_id
+    select thread.id, v_driver_id, 'driver'
+    from public.support_threads as thread
+    where thread.order_id = v_order_id
+      and (
+        thread.conversation_kind = 'order'
+        or exists (
+          select 1 from public.marketplace_chat_block_escalations as escalation
+          where escalation.escalation_thread_id = thread.id
+            and escalation.blocker_user_id = v_driver_id
+        )
+      )
     on conflict (thread_id, user_id, participant_role)
     do update set removed_at = null,
       joined_at = case
@@ -1137,6 +1329,14 @@ begin
       on assignment.order_id = thread.order_id
     where assignment.driver_id = v_user_id
       and assignment.status in ('assigned', 'picked_up', 'issue')
+      and (
+        thread.conversation_kind = 'order'
+        or exists (
+          select 1 from public.marketplace_chat_block_escalations as escalation
+          where escalation.escalation_thread_id = thread.id
+            and escalation.blocker_user_id = v_user_id
+        )
+      )
     on conflict (thread_id, user_id, participant_role)
     do update set removed_at = null,
       joined_at = case
@@ -1266,6 +1466,7 @@ with check (
 alter table public.marketplace_chat_participants enable row level security;
 alter table public.marketplace_chat_reactions enable row level security;
 alter table public.marketplace_chat_blocks enable row level security;
+alter table public.marketplace_chat_block_escalations enable row level security;
 
 drop policy if exists support_threads_read_participant on public.support_threads;
 create policy support_threads_read_participant
@@ -1297,6 +1498,7 @@ revoke all on table public.support_messages from public, anon, authenticated;
 revoke all on table public.marketplace_chat_participants from public, anon, authenticated;
 revoke all on table public.marketplace_chat_reactions from public, anon, authenticated;
 revoke all on table public.marketplace_chat_blocks from public, anon, authenticated;
+revoke all on table public.marketplace_chat_block_escalations from public, anon, authenticated;
 
 revoke all on function public.can_access_marketplace_chat_thread(uuid)
   from public, anon, authenticated, service_role;

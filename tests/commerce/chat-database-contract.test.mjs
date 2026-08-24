@@ -106,6 +106,20 @@ test('blocking stores and enforces one exact participant pair without removing r
   assert.doesNotMatch(routineSql('can_access_marketplace_chat_thread'), /marketplace_chat_blocks/u);
 });
 
+test('active customer-driver blocks create one constrained assigned-admin support escalation', () => {
+  const block = routineSql('block_my_marketplace_chat_counterparty');
+  assert.match(sql, /create table public\.marketplace_chat_block_escalations/u);
+  assert.match(sql, /primary key \(source_thread_id, blocker_user_id, blocked_user_id\)/u);
+  assert.match(block, /pg_advisory_xact_lock/u);
+  assert.match(block, /conversation_kind[\s\S]*'support'/u);
+  assert.match(block, /marketplace_chat_block_escalations/u);
+  assert.match(block, /participant\.user_id is distinct from p_counterparty_id/u);
+  assert.match(block, /'supportEscalationConversationId'/u);
+  assert.match(block, /'orderSupportAvailable'/u);
+  assert.match(routineSql('can_access_marketplace_chat_thread'), /thread\.assigned_admin_id = v_actor_id[\s\S]*membership\.role::text in \('support', 'super_admin', 'chat_monitor'\)/u);
+  assert.match(routineSql('send_my_marketplace_chat_message'), /participant\.participant_role = 'admin'[\s\S]*v_thread\.assigned_admin_id = v_actor_id/u);
+});
+
 test('SQL accepts only exact bounded card shapes from Task 1', () => {
   const send = routineSql('send_my_marketplace_chat_message');
   assert.match(send, /octet_length\(p_card_data::text\) > 512/u);
@@ -129,8 +143,13 @@ test('message search uses an indexed document and a hard conversation ceiling', 
 
 test('pgTAP runtime coverage has a correct plan for the review threat matrix', () => {
   const planned = Number(pgTapSql.match(/extensions\.plan\((\d+)\)/u)?.[1]);
-  const assertions = pgTapSql.match(/select extensions\.(?:is|isnt|ok|throws_ok)\(/gu) ?? [];
-  assert.equal(planned, assertions.length);
+  const extensionAssertions = pgTapSql.match(/select extensions\.(?:is|isnt|ok|throws_ok)\(/gu) ?? [];
+  const realtimePolicyAssertions = pgTapSql.match(/select pg_temp\.assert_marketplace_realtime_insert_policy\(/gu) ?? [];
+  const helperImplementationAssertions = pgTapSql.match(/select extensions\.is\(v_allowed,/gu) ?? [];
+  const runtimeAssertionCount = extensionAssertions.length
+    - helperImplementationAssertions.length
+    + realtimePolicyAssertions.length;
+  assert.equal(planned, runtimeAssertionCount);
   for (const evidence of [
     'anon cannot execute',
     'owner of an unrelated store',
@@ -146,5 +165,11 @@ test('pgTAP runtime coverage has a correct plan for the review threat matrix', (
     'exact blocked pair',
     'preserve joined_at',
     'indexed full-text search',
+    'customer-driver block returns one stable support escalation',
+    'blocked driver cannot access the substitute support thread',
+    'actual realtime.messages INSERT policy accepts the participant topic',
+    'catalog-only membership synchronization removes chat participation',
   ]) assert.match(pgTapSql, new RegExp(evidence, 'u'));
+  assert.match(pgTapSql, /created_at = timestamp with time zone/u);
+  assert.match(pgTapSql, /insert into realtime\.messages/u);
 });

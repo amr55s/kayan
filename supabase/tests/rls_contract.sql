@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(50);
+select extensions.plan(63);
 
 select extensions.is(
   (select count(*)::integer from pg_catalog.pg_class as relation
@@ -111,6 +111,16 @@ insert into public.stores (
 )
 on conflict (id) do nothing;
 
+insert into public.products (
+  id, store_id, product_key, slug, name, status, first_published_at
+) values (
+  'd0000000-0000-4000-8000-000000000001',
+  '40000000-0000-0000-0000-000000000001',
+  'CHAT-PRODUCT-1', 'chat-contract-product', 'Chat contract product',
+  'active', timestamp with time zone '2026-08-24 09:00:00+00'
+)
+on conflict (id) do nothing;
+
 insert into public.store_memberships (store_id, user_id, role, is_active)
 values
   ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003', 'owner', true),
@@ -171,8 +181,14 @@ on conflict (id) do nothing;
 insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
 values
   ('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'customer'),
-  ('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003', 'merchant')
+  ('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000003', 'merchant'),
+  ('90000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000009', 'merchant')
 on conflict (thread_id, user_id, participant_role) do update set removed_at = null;
+
+update public.store_memberships
+set updated_at = now()
+where store_id = '40000000-0000-0000-0000-000000000001'
+  and user_id = '10000000-0000-0000-0000-000000000009';
 
 insert into public.marketplace_delivery_assignments (
   id, order_id, driver_id, driver_name_snapshot, status, assigned_at
@@ -189,14 +205,55 @@ set driver_id = '10000000-0000-0000-0000-000000000004',
 where id = 'a0000000-0000-0000-0000-000000000001';
 
 insert into public.support_messages (
-  id, thread_id, sender_user_id, sender_kind, body, client_message_id
+  id, thread_id, sender_user_id, sender_kind, body, client_message_id, created_at
 ) values (
   'b0000000-0000-0000-0000-000000000001',
   '90000000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-000000000001', 'customer', 'Fixture message',
-  'c0000000-0000-0000-0000-000000000001'
+  'c0000000-0000-0000-0000-000000000001',
+  timestamp with time zone '2026-08-24 10:00:00+00'
 )
 on conflict (id) do nothing;
+
+create or replace function pg_temp.assert_marketplace_realtime_insert_policy(
+  p_topic text,
+  p_expected boolean,
+  p_description text
+)
+returns text
+language plpgsql
+as $$
+declare
+  v_allowed boolean;
+  v_error_message text;
+  v_result text;
+begin
+  perform pg_catalog.set_config('realtime.topic', p_topic, true);
+  begin
+    insert into realtime.messages (topic, extension, payload, event, private)
+    values (p_topic, 'broadcast', '{}'::jsonb, 'marketplace_policy_probe', true);
+    v_allowed := true;
+  exception
+    when insufficient_privilege then
+      v_allowed := false;
+    when check_violation then
+      get stacked diagnostics v_error_message = message_text;
+      if v_error_message not like 'no partition of relation "messages" found for row%' then
+        raise;
+      end if;
+      -- Realtime creates daily partitions on demand. If a local stack has not
+      -- created today's partition, report the policy probe as skipped rather
+      -- than treating tuple-routing failure as authorization success.
+      select result
+      into v_result
+      from extensions.skip(p_description || ' (current Realtime partition unavailable)', 1) as result;
+      return v_result;
+  end;
+
+  select extensions.is(v_allowed, p_expected, p_description) into v_result;
+  return v_result;
+end;
+$$;
 
 set local role authenticated;
 
@@ -308,6 +365,15 @@ select extensions.ok(
 );
 
 reset role;
+select extensions.ok(
+  (select removed_at is not null
+   from public.marketplace_chat_participants
+   where thread_id = '90000000-0000-0000-0000-000000000001'
+     and user_id = '10000000-0000-0000-0000-000000000009'
+     and participant_role = 'merchant'),
+  'catalog-only membership synchronization removes chat participation'
+);
+
 select extensions.is(
   (select count(*)::integer
    from pg_catalog.pg_policies
@@ -318,6 +384,21 @@ select extensions.is(
   'Realtime messages has authenticated receive and send policies'
 );
 
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select pg_temp.assert_marketplace_realtime_insert_policy(
+  'marketplace-chat:90000000-0000-0000-0000-000000000001',
+  true,
+  'actual realtime.messages INSERT policy accepts the participant topic'
+);
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000002","role":"authenticated","aal":"aal1"}', true);
+select pg_temp.assert_marketplace_realtime_insert_policy(
+  'marketplace-chat:90000000-0000-0000-0000-000000000001',
+  false,
+  'actual realtime.messages INSERT policy rejects an unrelated JWT on the topic'
+);
+
+reset role;
 update public.marketplace_delivery_assignments
 set driver_id = '10000000-0000-0000-0000-000000000010',
     driver_name_snapshot = 'Inactive driver'
@@ -368,6 +449,12 @@ select extensions.is(
   1,
   'idempotent retries persist one row'
 );
+
+update public.support_messages
+set created_at = timestamp with time zone '2026-08-24 10:01:00+00'
+where thread_id = '90000000-0000-0000-0000-000000000001'
+  and sender_user_id = '10000000-0000-0000-0000-000000000001'
+  and client_message_id = 'c0000000-0000-0000-0000-000000000004';
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
@@ -555,6 +642,122 @@ select extensions.ok(
   'sending resumes after the exact pair is unblocked'
 );
 
+select extensions.is(
+  public.block_my_marketplace_chat_counterparty(
+    '90000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000004', true
+  ) ->> 'supportEscalationConversationId',
+  public.block_my_marketplace_chat_counterparty(
+    '90000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000004', true
+  ) ->> 'supportEscalationConversationId',
+  'customer-driver block returns one stable support escalation'
+);
+
+reset role;
+create temporary table chat_escalation_state (
+  escalation_thread_id uuid primary key
+) on commit drop;
+insert into chat_escalation_state
+select escalation.escalation_thread_id
+from public.marketplace_chat_block_escalations as escalation
+where escalation.source_thread_id = '90000000-0000-0000-0000-000000000001'
+  and escalation.blocker_user_id = '10000000-0000-0000-0000-000000000001'
+  and escalation.blocked_user_id = '10000000-0000-0000-0000-000000000004';
+grant select on table chat_escalation_state to authenticated;
+
+select extensions.is(
+  (select count(*)::integer from chat_escalation_state),
+  1,
+  'active delivery blocking persists one mapped escalation thread'
+);
+select extensions.ok(
+  (select count(*) = 0
+   from public.marketplace_chat_participants as participant
+   join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+   where participant.user_id = '10000000-0000-0000-0000-000000000004'
+     and participant.removed_at is null)
+  and (select count(*) >= 1
+       from public.marketplace_chat_participants as participant
+       join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+       where participant.participant_role = 'merchant' and participant.removed_at is null)
+  and (select count(*) = 1
+       from public.marketplace_chat_participants as participant
+       join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+       where participant.user_id = '10000000-0000-0000-0000-000000000006'
+         and participant.participant_role = 'admin' and participant.removed_at is null)
+  and (select count(*) = 1
+       from public.support_messages as message
+       join chat_escalation_state as state on state.escalation_thread_id = message.thread_id
+       where message.sender_kind = 'system'
+         and message.body = 'Direct participant messaging is blocked. Order-support messages remain available here.'),
+  'substitute support excludes the blocked driver and routes merchants plus assigned administration'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select extensions.throws_ok(
+  $$select public.send_my_marketplace_chat_message(
+    '90000000-0000-0000-0000-000000000001',
+    'c0000000-0000-0000-0000-000000000012', 'text', 'blocked customer to driver', null, null
+  )$$,
+  '55000', 'closed', 'the customer cannot continue the blocked direct driver exchange'
+);
+
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000004","role":"authenticated","aal":"aal1"}', true);
+select extensions.throws_ok(
+  $$select public.send_my_marketplace_chat_message(
+    '90000000-0000-0000-0000-000000000001',
+    'c0000000-0000-0000-0000-000000000013', 'text', 'blocked driver to customer', null, null
+  )$$,
+  '55000', 'closed', 'the assigned driver cannot continue the blocked direct customer exchange'
+);
+select extensions.throws_ok(
+  $$select public.get_my_marketplace_conversation_page(
+    (select escalation_thread_id from chat_escalation_state), 20, null, null
+  )$$,
+  'P0002', 'not_found', 'blocked driver cannot access the substitute support thread'
+);
+
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select extensions.ok(
+  (public.send_my_marketplace_chat_message(
+    (select escalation_thread_id from chat_escalation_state),
+    'c0000000-0000-0000-0000-000000000014', 'text', 'Customer order-support request', null, null
+  ) ->> 'id') is not null,
+  'the customer can continue through constrained order support'
+);
+
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000006","role":"authenticated","aal":"aal2"}', true);
+select extensions.ok(
+  public.get_my_marketplace_conversation_page(
+    (select escalation_thread_id from chat_escalation_state), 20, null, null
+  ) #>> '{conversation,id}' = (select escalation_thread_id::text from chat_escalation_state)
+  and (public.send_my_marketplace_chat_message(
+    (select escalation_thread_id from chat_escalation_state),
+    'c0000000-0000-0000-0000-000000000015', 'text', 'Assigned support response', null, null
+  ) ->> 'id') is not null,
+  'the narrowly assigned AAL2 support admin can read and respond'
+);
+
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000003","role":"authenticated","aal":"aal1"}', true);
+select extensions.is(
+  public.get_my_marketplace_conversation_page(
+    (select escalation_thread_id from chat_escalation_state), 20, null, null
+  ) #>> '{conversation,id}',
+  (select escalation_thread_id::text from chat_escalation_state),
+  'order-operating merchant can access the substitute support path'
+);
+
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select extensions.ok(
+  not (public.block_my_marketplace_chat_counterparty(
+    '90000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000004', false
+  ) ->> 'blocked')::boolean,
+  'customer can unblock the driver after support escalation'
+);
+
 reset role;
 create temporary table chat_joined_snapshots (
   participant_role text primary key,
@@ -610,17 +813,18 @@ select extensions.throws_ok(
   $$select public.send_my_marketplace_chat_message(
     '90000000-0000-0000-0000-000000000001',
     'c0000000-0000-0000-0000-000000000009', 'product', null, null,
-    '{"type":"product","id":"40000000-0000-0000-0000-000000000001","url":"https://evil.example"}'::jsonb
+    '{"type":"product","id":"d0000000-0000-4000-8000-000000000001","url":"https://evil.example"}'::jsonb
   )$$,
   '22023', 'invalid_input', 'SQL rejects card keys outside the Task 1 shape'
 );
 select extensions.throws_ok(
   $$select public.send_my_marketplace_chat_message(
     '90000000-0000-0000-0000-000000000001',
-    'c0000000-0000-0000-0000-000000000010', 'product', null, null,
+    'c0000000-0000-0000-0000-000000000010', 'location', null, null,
     jsonb_build_object(
-      'type', 'product', 'id', '40000000-0000-0000-0000-000000000001',
-      'padding', repeat('x', 600)
+      'type', 'location',
+      'latitude', ('0.' || repeat('0', 600) || '1')::numeric,
+      'longitude', 31
     )
   )$$,
   '22023', 'invalid_input', 'SQL rejects oversized encoded card payloads'

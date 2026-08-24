@@ -10,6 +10,10 @@ const card = z.discriminatedUnion('type', [
 const kind = z.enum(['text', 'image', 'product', 'store', 'order', 'location']);
 const codePointBound = (max: number) => z.string().refine((value) => [...value].length <= max, `Must contain at most ${max} Unicode characters`);
 const body = codePointBound(5000);
+const searchQuery = z.string().trim().refine(
+  (value) => [...value].length >= 1 && [...value].length <= 200,
+  'Must contain between 1 and 200 Unicode characters',
+);
 
 export const sendMessageSchema = z.object({ conversationId: uuid, clientMessageId: uuid, kind, body: body.nullable(), replyToId: uuid.nullable(), card: card.nullable() }).strict().superRefine((value, context) => {
   if (value.kind === 'text' && (!value.body || value.body.trim().length === 0 || value.card !== null)) context.addIssue({ code: 'custom', message: 'Text messages require a nonblank body and no card' });
@@ -33,7 +37,7 @@ export const conversationIntentSchema = z.discriminatedUnion('kind', [
 ]) satisfies z.ZodType<ConversationIntent>;
 export const parseConversationIntent = (input: unknown) => conversationIntentSchema.safeParse(input);
 
-export const chatSearchSchema = z.object({ conversationId: uuid, query: codePointBound(200), limit: z.number().int().min(1).max(50).default(50), cursor: cursor.nullable().default(null) });
+export const chatSearchSchema = z.object({ conversationId: uuid, query: searchQuery, limit: z.number().int().min(1).max(50).default(50), cursor: cursor.nullable().default(null) });
 export const parseChatSearchInput = (input: unknown) => chatSearchSchema.safeParse(input) as ReturnType<typeof chatSearchSchema.safeParse>;
 
 export const reactionSchema = z.object({ messageId: uuid, emoji: z.enum(['👍', '❤️', '✅', '🙏', '😄']), active: z.boolean() }) satisfies z.ZodType<ChatReactionInput>;
