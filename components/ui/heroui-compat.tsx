@@ -170,18 +170,26 @@ export function Tooltip({
   return <>{children}</>;
 }
 
-type LegacyImageProps = Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'className'> &
-  LegacyStyleProps & {
-    isZoomed?: boolean;
-  };
+type LegacyImageProps = LegacyStyleProps & {
+  alt?: string;
+  draggable?: boolean | 'true' | 'false';
+  height?: number | string;
+  isZoomed?: boolean;
+  loading?: 'eager' | 'lazy';
+  src?: string;
+  width?: number | string;
+};
 export function Image({
   src,
   alt,
+  draggable,
+  height,
+  loading,
+  width,
   classNames,
   className,
   radius: _radius,
   isZoomed: _isZoomed,
-  ...props
 }: LegacyImageProps) {
   return (
     <span className={classNames?.wrapper}>
@@ -190,8 +198,11 @@ export function Image({
       <img
         src={src}
         alt={alt || ''}
+        draggable={draggable}
+        height={height}
+        loading={loading}
+        width={width}
         className={cx(classNames?.img, className)}
-        {...props}
       />
     </span>
   );
