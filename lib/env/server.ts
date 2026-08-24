@@ -45,7 +45,8 @@ export type ObjectStorageConfig = {
   cdnBaseUrl: string;
   endpoint: string;
   privateBucket: string;
-  provider: 'cloudflare-r2' | 'digitalocean-spaces';
+  forcePathStyle: boolean;
+  provider: 'cloudflare-r2' | 'digitalocean-spaces' | 'supabase-storage';
   publicBucket: string;
   region: string;
   secretAccessKey: string;
@@ -59,15 +60,19 @@ export function getObjectStorageConfig(): ObjectStorageConfig {
   const hostname = new URL(endpoint).hostname;
   const isR2Endpoint = hostname.endsWith('.r2.cloudflarestorage.com');
   const isSpacesEndpoint = hostname.endsWith('.digitaloceanspaces.com');
-  if (!isR2Endpoint && !isSpacesEndpoint) {
-    throw new Error('Object storage endpoint must use Cloudflare R2 or DigitalOcean Spaces.');
+  const isSupabaseStorageEndpoint = hostname.endsWith('.storage.supabase.co')
+    && new URL(endpoint).pathname === '/storage/v1/s3';
+  if (!isR2Endpoint && !isSpacesEndpoint && !isSupabaseStorageEndpoint) {
+    throw new Error('Object storage endpoint must use Cloudflare R2, DigitalOcean Spaces, or Supabase Storage.');
   }
   const inferredProvider = isR2Endpoint
     ? 'cloudflare-r2'
-    : 'digitalocean-spaces';
+    : isSpacesEndpoint
+      ? 'digitalocean-spaces'
+      : 'supabase-storage';
   const provider = process.env.OBJECT_STORAGE_PROVIDER?.trim() || inferredProvider;
-  if (provider !== 'cloudflare-r2' && provider !== 'digitalocean-spaces') {
-    throw new Error('OBJECT_STORAGE_PROVIDER must be cloudflare-r2 or digitalocean-spaces.');
+  if (!['cloudflare-r2', 'digitalocean-spaces', 'supabase-storage'].includes(provider)) {
+    throw new Error('OBJECT_STORAGE_PROVIDER must be cloudflare-r2, digitalocean-spaces, or supabase-storage.');
   }
   if (provider !== inferredProvider) {
     throw new Error('OBJECT_STORAGE_PROVIDER does not match OBJECT_STORAGE_ENDPOINT.');
@@ -82,8 +87,8 @@ export function getObjectStorageConfig(): ObjectStorageConfig {
     'OBJECT_STORAGE_BUCKET',
     'DO_SPACES_BUCKET',
   ]);
-  if (provider === 'cloudflare-r2' && privateBucket === publicBucket) {
-    throw new Error('Cloudflare R2 requires separate private and public buckets.');
+  if (provider !== 'digitalocean-spaces' && privateBucket === publicBucket) {
+    throw new Error('This object storage provider requires separate private and public buckets.');
   }
 
   return {
@@ -92,6 +97,7 @@ export function getObjectStorageConfig(): ObjectStorageConfig {
       ? 'OBJECT_STORAGE_PUBLIC_BASE_URL'
       : 'DO_SPACES_CDN_BASE_URL'),
     endpoint,
+    forcePathStyle: provider === 'supabase-storage',
     privateBucket,
     provider,
     publicBucket,

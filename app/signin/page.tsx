@@ -1,6 +1,9 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { safeNextPath } from '@/lib/auth/safe-next';
+import { createClient } from '@/lib/supabase/server';
+import { BrandLogo } from '@/components/layout/BrandLogo';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,14 +20,19 @@ export default async function SignInPage({
   const params = await searchParams;
   const next = safeNextPath(typeof params.next === 'string' ? params.next : null);
   const errorCode = typeof params.error === 'string' ? params.error : '';
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) redirect(next);
 
   return (
     <main id="main-content" className="flex min-h-screen items-center justify-center bg-zinc-100 px-4 py-10">
-      <section className="w-full max-w-md border border-zinc-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="signin-title">
-        <p className="text-sm font-black text-orange-700">ديرتك</p>
-        <h1 id="signin-title" className="mt-2 text-2xl font-black text-zinc-950">تسجيل دخول العميل</h1>
+      <section className="w-full max-w-md rounded-[28px] border border-zinc-200 bg-white p-6 shadow-[0_24px_70px_-45px_rgba(0,0,0,.55)] sm:p-8" aria-labelledby="signin-title">
+        <Link href="/" aria-label="العودة إلى ديرتك" className="mx-auto flex h-20 max-w-[250px] items-center justify-center overflow-hidden rounded-2xl bg-white px-3 ring-1 ring-zinc-200">
+          <BrandLogo variant="full" className="h-auto w-full" priority />
+        </Link>
+        <h1 id="signin-title" className="mt-6 text-2xl font-black text-zinc-950">دخول واحد لكل ديرتك</h1>
         <p className="mt-3 text-sm leading-7 text-zinc-600">
-          سجّل بجوجل لإتمام الطلب وربط السلة بحسابك. لا تظهر بيانات التسليم إلا للمسؤول عن تنفيذ الطلب وفي الوقت اللازم.
+          ادخل بجوجل للشراء أو لتقديم طلب تاجر أو كابتن. سنستخدم الاسم والبريد لتقليل الخطوات، ولن نمنح أي صلاحية تشغيلية قبل المراجعة.
         </p>
         {errors[errorCode] ? <p role="alert" className="mt-4 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{errors[errorCode]}</p> : null}
         <div className="mt-6"><GoogleSignInButton next={next} /></div>

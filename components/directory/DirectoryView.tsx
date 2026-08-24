@@ -207,14 +207,14 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
             targetType: 'feature',
             targetKey: 'add_listing',
           });
-          setIsAddOpen(true);
+          router.push(`/signin?next=${encodeURIComponent('/?register=place')}`);
         }}
         onOpenDriverModal={() => {
           trackSiteEvent('driver_signup_open', {
             targetType: 'feature',
             targetKey: 'driver_signup',
           });
-          setIsDriverOpen(true);
+          router.push(`/signin?next=${encodeURIComponent('/?register=driver')}`);
         }}
         onOpenFeedbackModal={() => {
           trackSiteEvent('feedback_open', {
@@ -310,6 +310,14 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
             <CategoryTabs
               selectedCategory={selectedCategory}
               onCategoryChange={(cat) => {
+                if (cat === 'stores') {
+                  trackSiteEvent('marketplace_open', {
+                    targetType: 'category',
+                    targetKey: 'stores',
+                  });
+                  router.push('/marketplace');
+                  return;
+                }
                 setSelectedCategory(cat);
                 setShowFavoritesOnly(false);
                 trackSiteEvent('category_select', {

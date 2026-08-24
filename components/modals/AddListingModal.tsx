@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Button,
   Input,
@@ -38,6 +39,7 @@ import {
 import { isValidEgyptianPhone } from '@/lib/utils';
 import type { Place } from '@/types';
 import { useUnsavedChanges } from '@/hooks/useUnsavedChanges';
+import { useGoogleApplicant } from '@/hooks/useGoogleApplicant';
 
 interface AddListingModalProps {
   isOpen: boolean;
@@ -73,6 +75,9 @@ export function AddListingModal({
   const [successWarning, setSuccessWarning] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [processingMsg, setProcessingMsg] = useState('');
+  const { identity, isLoading: isIdentityLoading } = useGoogleApplicant(isOpen);
+
+  const effectiveDisplayName = displayName || identity?.displayName || '';
   const hasUnsavedChanges = Boolean(
     displayName
     || phone
@@ -140,11 +145,11 @@ export function AddListingModal({
       setErrorMsg('رقم واتساب غير صحيح.');
       return;
     }
-    if (password.length < 12) {
+    if (!identity && password.length < 12) {
       setErrorMsg('كلمة المرور يجب أن تتكون من 12 حرفاً على الأقل.');
       return;
     }
-    if (password !== confirmPassword) {
+    if (!identity && password !== confirmPassword) {
       setErrorMsg('كلمتا المرور غير متطابقتين.');
       return;
     }
@@ -188,7 +193,7 @@ export function AddListingModal({
       const result = await submitAccountRequest(
         {
           kind: 'merchant',
-          displayName,
+          displayName: effectiveDisplayName,
           phone,
           whatsapp: whatsapp || phone,
           password,
@@ -297,6 +302,20 @@ export function AddListingModal({
                       {processingMsg}
                     </p>
                   )}
+                  {!isIdentityLoading && !identity ? (
+                    <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-7 text-zinc-800">
+                      <p className="font-black">اربط الطلب بحساب Google أولًا، ثم سنملأ اسمك تلقائيًا.</p>
+                      <Link href="/signin?next=%2F%3Fregister%3Dplace" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-zinc-950 px-4 font-black text-white">
+                        المتابعة باستخدام Google
+                      </Link>
+                    </div>
+                  ) : null}
+                  {identity ? (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                      <p className="font-black text-emerald-900">حساب Google متصل</p>
+                      <p className="truncate text-xs text-emerald-800">{identity.email}</p>
+                    </div>
+                  ) : null}
 
                   <Tabs
                     fullWidth
@@ -471,7 +490,7 @@ export function AddListingModal({
                       name="displayName"
                       autoComplete="name"
                       label="اسم صاحب أو مسؤول النشاط"
-                      value={displayName}
+                      value={effectiveDisplayName}
                       onValueChange={setDisplayName}
                     />
                     <Input
@@ -493,26 +512,10 @@ export function AddListingModal({
                       value={whatsapp}
                       onValueChange={setWhatsapp}
                     />
-                    <Input
-                      isRequired
-                      name="new-password"
-                      autoComplete="new-password"
-                      type="password"
-                      label="كلمة المرور"
-                      value={password}
-                      onValueChange={setPassword}
-                      startContent={<KeyRound className="size-4 text-zinc-400" />}
-                    />
-                    <Input
-                      isRequired
-                      name="confirm-password"
-                      autoComplete="new-password"
-                      type="password"
-                      label="تأكيد كلمة المرور"
-                      value={confirmPassword}
-                      onValueChange={setConfirmPassword}
-                      className="sm:col-span-2"
-                    />
+                    {!identity ? <>
+                      <Input isRequired name="new-password" autoComplete="new-password" type="password" label="كلمة المرور" value={password} onValueChange={setPassword} startContent={<KeyRound className="size-4 text-zinc-400" />} />
+                      <Input isRequired name="confirm-password" autoComplete="new-password" type="password" label="تأكيد كلمة المرور" value={confirmPassword} onValueChange={setConfirmPassword} className="sm:col-span-2" />
+                    </> : null}
                   </div>
                 </form>
               )}
@@ -527,6 +530,7 @@ export function AddListingModal({
                   type="submit"
                   form="merchant-account-form"
                   isLoading={isSubmitting}
+                  isDisabled={isSubmitting || isIdentityLoading || !identity}
                   startContent={!isSubmitting && <Send className="size-4" />}
                   className="bg-zinc-950 font-black text-white hover:bg-zinc-800"
                 >

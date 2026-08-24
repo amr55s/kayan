@@ -19,8 +19,9 @@ function requiredOne(names) {
 const endpoint = new URL(requiredOne(['OBJECT_STORAGE_ENDPOINT', 'DO_SPACES_ENDPOINT']));
 const isR2 = endpoint.hostname.endsWith('.r2.cloudflarestorage.com');
 const isSpaces = endpoint.hostname.endsWith('.digitaloceanspaces.com');
-if (endpoint.protocol !== 'https:' || (!isR2 && !isSpaces)) {
-  throw new Error('Object storage must use an HTTPS Cloudflare R2 or DigitalOcean Spaces endpoint.');
+const isSupabaseStorage = endpoint.hostname.endsWith('.storage.supabase.co') && endpoint.pathname === '/storage/v1/s3';
+if (endpoint.protocol !== 'https:' || (!isR2 && !isSpaces && !isSupabaseStorage)) {
+  throw new Error('Object storage must use a supported HTTPS S3 endpoint.');
 }
 
 const region = requiredOne(['OBJECT_STORAGE_REGION', 'DO_SPACES_REGION']);
@@ -28,17 +29,17 @@ if (isR2 && region !== 'auto') throw new Error('Cloudflare R2 requires region au
 
 const bucket = requiredOne(['OBJECT_STORAGE_PRIVATE_BUCKET', 'OBJECT_STORAGE_BUCKET', 'DO_SPACES_BUCKET']);
 const publicBucket = requiredOne(['OBJECT_STORAGE_PUBLIC_BUCKET', 'OBJECT_STORAGE_BUCKET', 'DO_SPACES_BUCKET']);
-if (isR2 && bucket === publicBucket) {
-  throw new Error('Cloudflare R2 requires separate private and public buckets.');
+if (!isSpaces && bucket === publicBucket) {
+  throw new Error('This object storage provider requires separate private and public buckets.');
 }
 const runId = requiredOne(['CI_RUN_ID']).replace(/[^a-zA-Z0-9._-]/gu, '-').slice(0, 80);
 const prefix = `ci-smoke/${runId}/${randomUUID()}/`;
 const key = `${prefix}probe.txt`;
 const createdKeys = new Set();
 const client = new S3Client({
-  endpoint: endpoint.origin,
+  endpoint: endpoint.toString().replace(/\/$/u, ''),
   region,
-  forcePathStyle: false,
+  forcePathStyle: isSupabaseStorage,
   credentials: {
     accessKeyId: requiredOne(['OBJECT_STORAGE_ACCESS_KEY_ID', 'DO_SPACES_ACCESS_KEY_ID']),
     secretAccessKey: requiredOne(['OBJECT_STORAGE_SECRET_ACCESS_KEY', 'DO_SPACES_SECRET_ACCESS_KEY']),
@@ -71,9 +72,9 @@ try {
 }
 
 const verificationClient = new S3Client({
-  endpoint: endpoint.origin,
+  endpoint: endpoint.toString().replace(/\/$/u, ''),
   region,
-  forcePathStyle: false,
+  forcePathStyle: isSupabaseStorage,
   credentials: {
     accessKeyId: requiredOne(['OBJECT_STORAGE_ACCESS_KEY_ID', 'DO_SPACES_ACCESS_KEY_ID']),
     secretAccessKey: requiredOne(['OBJECT_STORAGE_SECRET_ACCESS_KEY', 'DO_SPACES_SECRET_ACCESS_KEY']),

@@ -145,8 +145,8 @@ function checkRuntime() {
   validateUrl('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL, { originOnly: true });
   const storageEndpointRaw = resolvedValue(['OBJECT_STORAGE_ENDPOINT', 'DO_SPACES_ENDPOINT']);
   const storagePublicBaseRaw = resolvedValue(['OBJECT_STORAGE_PUBLIC_BASE_URL', 'DO_SPACES_CDN_BASE_URL']);
-  const storageEndpoint = validateUrl('object storage endpoint', storageEndpointRaw, { originOnly: true });
-  validateUrl('object storage public base URL', storagePublicBaseRaw, { originOnly: true });
+  const storageEndpoint = validateUrl('object storage endpoint', storageEndpointRaw);
+  validateUrl('object storage public base URL', storagePublicBaseRaw);
   validateUrl('NEXT_PUBLIC_SENTRY_DSN', process.env.NEXT_PUBLIC_SENTRY_DSN, { allowCredentials: true });
   const vapidSubject = validateUrl('VAPID_SUBJECT', process.env.VAPID_SUBJECT, { httpsOnly: false });
 
@@ -154,10 +154,13 @@ function checkRuntime() {
     ? 'cloudflare-r2'
     : storageEndpoint?.hostname.endsWith('.digitaloceanspaces.com')
       ? 'digitalocean-spaces'
-      : undefined;
+      : storageEndpoint?.hostname.endsWith('.storage.supabase.co')
+        && storageEndpoint.pathname === '/storage/v1/s3'
+        ? 'supabase-storage'
+        : undefined;
   const configuredStorageProvider = process.env.OBJECT_STORAGE_PROVIDER?.trim();
   if (!inferredStorageProvider) {
-    throw new Error('Object storage endpoint must use Cloudflare R2 or DigitalOcean Spaces.');
+    throw new Error('Object storage endpoint must use Cloudflare R2, DigitalOcean Spaces, or Supabase Storage.');
   }
   if (configuredStorageProvider && configuredStorageProvider !== inferredStorageProvider) {
     throw new Error('OBJECT_STORAGE_PROVIDER does not match the configured endpoint.');
@@ -169,8 +172,8 @@ function checkRuntime() {
       throw new Error('Object storage bucket is not a valid bucket name.');
     }
   }
-  if (inferredStorageProvider === 'cloudflare-r2' && privateBucket === publicBucket) {
-    throw new Error('Cloudflare R2 requires separate private and public buckets.');
+  if (inferredStorageProvider !== 'digitalocean-spaces' && privateBucket === publicBucket) {
+    throw new Error('This object storage provider requires separate private and public buckets.');
   }
   const storageRegion = resolvedValue(['OBJECT_STORAGE_REGION', 'DO_SPACES_REGION']);
   if (inferredStorageProvider === 'cloudflare-r2' && storageRegion !== 'auto') {

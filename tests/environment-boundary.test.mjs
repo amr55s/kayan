@@ -44,9 +44,25 @@ test('storage runtime supports R2 without sending its unsupported ACL header', (
   const config = read('next.config.ts');
   assert.match(env, /cloudflare-r2/);
   assert.match(env, /digitalocean-spaces/);
+  assert.match(env, /supabase-storage/);
+  assert.match(storage, /forcePathStyle: config\.forcePathStyle/);
   assert.match(storage, /config\.supportsObjectAcl\s*\?\s*\{ ACL: 'public-read'/);
   assert.match(storage, /config\.supportsObjectAcl\s*\?\s*\{ ACL: 'private'/);
   assert.match(config, /https:\/\/\*\.r2\.cloudflarestorage\.com/);
+});
+
+test('runtime preflight accepts Supabase S3 storage on the existing free project', () => {
+  const result = runPreflight({
+    OBJECT_STORAGE_PROVIDER: 'supabase-storage',
+    OBJECT_STORAGE_REGION: 'eu-west-1',
+    OBJECT_STORAGE_ENDPOINT: 'https://staging.storage.supabase.co/storage/v1/s3',
+    OBJECT_STORAGE_PRIVATE_BUCKET: 'marketplace-media-private',
+    OBJECT_STORAGE_PUBLIC_BUCKET: 'marketplace-media-public',
+    OBJECT_STORAGE_ACCESS_KEY_ID: 'r'.repeat(32),
+    OBJECT_STORAGE_SECRET_ACCESS_KEY: 's'.repeat(64),
+    OBJECT_STORAGE_PUBLIC_BASE_URL: 'https://staging.supabase.co/storage/v1/object/public/marketplace-media-public',
+  });
+  assert.equal(result.status, 0, result.stderr);
 });
 
 const baseRuntimeEnv = {

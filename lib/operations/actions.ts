@@ -351,6 +351,7 @@ export async function submitAccountRequest(
   imageUrls: string[] = [],
 ): Promise<ActionResult<{ requestId: string }>> {
   let authUserId: string | null = null;
+  let createdAuthUser = false;
   try {
     const data = accountRequestSchema.parse(input);
     const uploadedImages = validateListingImageUrls(imageUrls, 3);
@@ -363,6 +364,17 @@ export async function submitAccountRequest(
     }
 
     const admin = createAdminClient();
+    const sessionClient = await createClient();
+    const { data: sessionData, error: sessionError } = await sessionClient.auth.getUser();
+    if (sessionError) throw new Error('تعذر التحقق من جلسة Google. سجّل الدخول مرة أخرى.');
+    const googleUser = sessionData.user?.identities?.some(
+      (identity) => identity.provider === 'google',
+    )
+      ? sessionData.user
+      : null;
+    if (!googleUser && data.password.length < 12) {
+      throw new Error('ابدأ التسجيل باستخدام Google، أو استخدم كلمة مرور من 12 حرفاً على الأقل.');
+    }
     const rateLimitSecret =
       process.env.SUPABASE_SECRET_KEY
       || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -401,6 +413,25 @@ export async function submitAccountRequest(
     if (pendingRequest) {
       throw new Error('يوجد طلب حساب قيد المراجعة بالفعل لهذا الرقم.');
     }
+    if (googleUser) {
+      const { data: operationalProfile } = await (admin as any)
+        .from('profiles')
+        .select('id')
+        .eq('id', googleUser.id)
+        .maybeSingle();
+      if (operationalProfile) {
+        throw new Error('هذا الحساب مرتبط بالفعل بدور تشغيلي. تواصل مع الإدارة لتغييره.');
+      }
+      const { data: requestForAccount } = await (admin as any)
+        .from('account_requests')
+        .select('id')
+        .eq('auth_user_id', googleUser.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      if (requestForAccount) {
+        throw new Error('يوجد طلب حساب قيد المراجعة بالفعل لهذا الحساب.');
+      }
+    }
 
     let legacyDriverId: string | null = null;
     if (data.kind === 'driver') {
@@ -425,26 +456,31 @@ export async function submitAccountRequest(
       if (linkedBranch) throw new Error('هذا المكان مرتبط بالفعل بحساب نشاط.');
     }
 
-    const { data: authData, error: authError } = await admin.auth.admin.createUser({
-      email: authEmailForPhone(data.phone),
-      email_confirm: true,
-      phone: `+2${data.phone}`,
-      phone_confirm: true,
-      password: data.password,
-      user_metadata: {
-        display_name: data.displayName,
-        account_status: 'pending_review',
-        requested_role: data.kind,
-      },
-    });
-    if (authError || !authData.user) {
-      const authMessage = authError?.message.toLowerCase() ?? '';
-      if (authMessage.includes('already') || authMessage.includes('registered')) {
-        throw new Error('رقم الهاتف لديه حساب أو طلب سابق. جرّب تسجيل الدخول أو تواصل مع الإدارة.');
+    if (googleUser) {
+      authUserId = googleUser.id;
+    } else {
+      const { data: authData, error: authError } = await admin.auth.admin.createUser({
+        email: authEmailForPhone(data.phone),
+        email_confirm: true,
+        phone: `+2${data.phone}`,
+        phone_confirm: true,
+        password: data.password,
+        user_metadata: {
+          display_name: data.displayName,
+          account_status: 'pending_review',
+          requested_role: data.kind,
+        },
+      });
+      if (authError || !authData.user) {
+        const authMessage = authError?.message.toLowerCase() ?? '';
+        if (authMessage.includes('already') || authMessage.includes('registered')) {
+          throw new Error('رقم الهاتف لديه حساب أو طلب سابق. جرّب تسجيل الدخول أو تواصل مع الإدارة.');
+        }
+        throw authError ?? new Error('تعذر إنشاء طلب الدخول.');
       }
-      throw authError ?? new Error('تعذر إنشاء طلب الدخول.');
+      authUserId = authData.user.id;
+      createdAuthUser = true;
     }
-    authUserId = authData.user.id;
 
     const { data: request, error: requestError } = await (admin as any)
       .from('account_requests')
@@ -504,10 +540,24 @@ export async function submitAccountRequest(
       .single();
     if (requestError || !request) throw requestError ?? new Error('تعذر حفظ طلب الحساب.');
 
+    if (googleUser) {
+      const { error: metadataError } = await admin.auth.admin.updateUserById(googleUser.id, {
+        user_metadata: {
+          ...googleUser.user_metadata,
+          display_name: data.displayName,
+          account_status: 'pending_review',
+          requested_role: data.kind,
+        },
+      });
+      if (metadataError) {
+        logSafeServerFailure('warn', 'google_account_request_metadata_sync_failed');
+      }
+    }
+
     safeRevalidatePaths('/admin');
     return { success: true, data: { requestId: request.id } };
   } catch (error) {
-    if (authUserId) {
+    if (authUserId && createdAuthUser) {
       try {
         await createAdminClient().auth.admin.deleteUser(authUserId);
       } catch {

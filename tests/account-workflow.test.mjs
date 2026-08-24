@@ -30,6 +30,29 @@ test('public account requests use reviewed Auth accounts', () => {
   assert.match(adminManager, /موافقة وتفعيل/);
 });
 
+test('Google is the first step for merchant and driver applications', async () => {
+  const actions = read('lib/operations/actions.ts');
+  const signin = read('app/signin/page.tsx');
+  const driverModal = read('components/delivery/DriverModal.tsx');
+  const merchantModal = read('components/modals/AddListingModal.tsx');
+  const directory = read('components/directory/DirectoryView.tsx');
+  const { accountRequestSchema } = await import('../lib/operations/validation.ts');
+
+  assert.match(actions, /identity\.provider === 'google'/);
+  assert.match(actions, /\.eq\('auth_user_id', googleUser\.id\)/);
+  assert.match(actions, /operationalProfile/);
+  assert.match(signin, /if \(user\) redirect\(next\)/);
+  assert.match(driverModal, /register%3Ddriver/);
+  assert.match(merchantModal, /register%3Dplace/);
+  assert.match(directory, /cat === 'stores'[\s\S]{0,260}router\.push\('\/marketplace'\)/);
+  assert.equal(accountRequestSchema.parse({
+    kind: 'driver',
+    displayName: 'كابتن تجريبي',
+    phone: '01008747011',
+    whatsapp: '01008747011',
+  }).password, '');
+});
+
 test('select options submit stable values and legacy labels are normalized', async () => {
   const merchantModal = read('components/modals/AddListingModal.tsx');
   const userEditor = read('components/admin/UserEditorModal.tsx');

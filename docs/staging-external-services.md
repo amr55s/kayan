@@ -53,14 +53,14 @@ Configure private-bucket CORS for direct uploads from the stable branch alias:
 Add these sensitive branch-scoped Preview variables in Vercel:
 
 ```text
-OBJECT_STORAGE_PROVIDER=cloudflare-r2
-OBJECT_STORAGE_REGION=auto
-OBJECT_STORAGE_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-OBJECT_STORAGE_PRIVATE_BUCKET=dairtak-staging-private
-OBJECT_STORAGE_PUBLIC_BUCKET=dairtak-staging-public
+OBJECT_STORAGE_PROVIDER=supabase-storage
+OBJECT_STORAGE_REGION=eu-west-1
+OBJECT_STORAGE_ENDPOINT=https://swsobooavcvmyejsuwlg.storage.supabase.co/storage/v1/s3
+OBJECT_STORAGE_PRIVATE_BUCKET=marketplace-media-private
+OBJECT_STORAGE_PUBLIC_BUCKET=marketplace-media-public
 OBJECT_STORAGE_ACCESS_KEY_ID=<sensitive>
 OBJECT_STORAGE_SECRET_ACCESS_KEY=<sensitive>
-OBJECT_STORAGE_PUBLIC_BASE_URL=https://<PUBLIC_BUCKET_ID>.r2.dev
+OBJECT_STORAGE_PUBLIC_BASE_URL=https://swsobooavcvmyejsuwlg.supabase.co/storage/v1/object/public/marketplace-media-public
 ```
 
 The legacy `DO_SPACES_*` variables remain a temporary compatibility fallback.

@@ -41,7 +41,7 @@ function getStorage() {
       client: new S3Client({
         region: config.region,
         endpoint: config.endpoint,
-        forcePathStyle: false,
+        forcePathStyle: config.forcePathStyle,
         credentials: {
           accessKeyId: config.accessKeyId,
           secretAccessKey: config.secretAccessKey,

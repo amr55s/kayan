@@ -358,10 +358,11 @@ function objectStorageConfig() {
   const cdnBaseUrl = new URL(requireOneEnv(['OBJECT_STORAGE_PUBLIC_BASE_URL', 'DO_SPACES_CDN_BASE_URL']));
   const isR2 = endpoint.hostname.endsWith('.r2.cloudflarestorage.com');
   const isSpaces = endpoint.hostname.endsWith('.digitaloceanspaces.com');
-  if (endpoint.protocol !== 'https:' || (!isR2 && !isSpaces)) {
+  const isSupabaseStorage = endpoint.hostname.endsWith('.storage.supabase.co') && endpoint.pathname === '/storage/v1/s3';
+  if (endpoint.protocol !== 'https:' || (!isR2 && !isSpaces && !isSupabaseStorage)) {
     throw new Error('invalid_object_storage_endpoint');
   }
-  if (cdnBaseUrl.protocol !== 'https:' || cdnBaseUrl.pathname !== '/') throw new Error('invalid_object_storage_public_url');
+  if (cdnBaseUrl.protocol !== 'https:' || cdnBaseUrl.search || cdnBaseUrl.hash) throw new Error('invalid_object_storage_public_url');
   const accessKeyId = requireOneEnv(['OBJECT_STORAGE_ACCESS_KEY_ID', 'DO_SPACES_ACCESS_KEY_ID']);
   const bucket = requireOneEnv(['OBJECT_STORAGE_PUBLIC_BUCKET', 'OBJECT_STORAGE_BUCKET', 'DO_SPACES_BUCKET']);
   const region = requireOneEnv(['OBJECT_STORAGE_REGION', 'DO_SPACES_REGION']);
@@ -373,8 +374,9 @@ function objectStorageConfig() {
   return {
     accessKeyId,
     bucket,
-    cdnBaseUrl: cdnBaseUrl.origin,
-    endpoint: endpoint.origin,
+    cdnBaseUrl: cdnBaseUrl.toString().replace(/\/$/u, ''),
+    endpoint: endpoint.toString().replace(/\/$/u, ''),
+    forcePathStyle: isSupabaseStorage,
     region,
     secretAccessKey,
     supportsObjectAcl: isSpaces,
@@ -402,7 +404,7 @@ async function main() {
   const s3 = new S3Client({
     region: storage.region,
     endpoint: storage.endpoint,
-    forcePathStyle: false,
+    forcePathStyle: storage.forcePathStyle,
     credentials: { accessKeyId: storage.accessKeyId, secretAccessKey: storage.secretAccessKey },
   });
   const runId = options.runId || randomUUID();
