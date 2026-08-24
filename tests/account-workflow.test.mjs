@@ -136,6 +136,7 @@ test('public branding uses DAIRTAK consistently', () => {
 test('active public routes keep support and sharing inside the site', () => {
   const layout = read('app/layout.tsx');
   const installer = read('components/layout/PwaInstaller.tsx');
+  const installExperience = read('components/layout/PwaInstallExperience.tsx');
   const activePublicSurfaces = [
     'app/layout.tsx',
     'app/services/page.tsx',
@@ -157,7 +158,7 @@ test('active public routes keep support and sharing inside the site', () => {
   assert.match(read('components/marketing/PublicShareHub.tsx'), /navigator\.share/);
   assert.match(read('components/marketing/PublicShareHub.tsx'), /حدّد النص التالي وانسخه من داخل الموقع/);
   assert.match(
-    installer,
+    installExperience,
     /bottom-\[calc\(5\.5rem\+env\(safe-area-inset-bottom\)\)\][\s\S]*sm:bottom-4/,
   );
 });

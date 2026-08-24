@@ -133,7 +133,7 @@ test('verified merchants update their linked place directly while public suggest
 
 test('restricted browser storage cannot crash common public components', () => {
   for (const file of [
-    'components/layout/PwaInstaller.tsx',
+    'components/layout/PwaInstallExperience.tsx',
     'components/directory/UpvoteButton.tsx',
     'hooks/useFavorites.ts',
   ]) {
@@ -228,6 +228,7 @@ test('post-mutation refresh failures do not turn committed writes into errors', 
 test('PWA caches only public shell data and provides an iOS-safe install path', () => {
   const serviceWorker = read('public/sw.js');
   const installer = read('components/layout/PwaInstaller.tsx');
+  const installExperience = read('components/layout/PwaInstallExperience.tsx');
   const manifest = read('public/manifest.json');
   const layout = read('app/layout.tsx');
   const nextConfig = read('next.config.ts');
@@ -240,9 +241,11 @@ test('PWA caches only public shell data and provides an iOS-safe install path', 
   assert.match(serviceWorker, /offline\.html/);
   assert.match(serviceWorker, /dairtak-v2-notifications/);
   assert.match(serviceWorker, /event\.waitUntil\(self\.skipWaiting\(\)\)/);
-  assert.match(installer, /إضافة إلى الشاشة الرئيسية/);
-  assert.match(installer, /updateViaCache: 'none'/);
-  assert.match(installer, /SKIP_WAITING/);
+  assert.match(installer, /INSTALL_ROUTES/);
+  assert.match(installer, /dynamic\(/);
+  assert.match(installExperience, /إضافة إلى الشاشة الرئيسية/);
+  assert.match(installExperience, /updateViaCache: 'none'/);
+  assert.match(installExperience, /SKIP_WAITING/);
   assert.match(manifest, /"display": "standalone"/);
   assert.match(manifest, /apple-touch-icon|maskable/);
   assert.match(layout, /<PwaInstaller \/>/);
