@@ -18,7 +18,6 @@ import { MarketplaceEntry } from './MarketplaceEntry';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { FeedbackType } from '@/types';
 import { trackSiteEvent } from '@/lib/analytics/client';
-import { WHATSAPP_GROUP_URL } from '@/lib/community';
 
 interface DirectoryViewProps {
   initialPlaces: Place[];
@@ -278,18 +277,17 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               <div className="mt-3 hidden items-center justify-between gap-3 sm:flex">
                 <p className="text-xs font-semibold text-zinc-400">اكتب الاسم، نوع الخدمة، أو رقم الهاتف.</p>
                 <Button
-                  as="a"
-                  href={WHATSAPP_GROUP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackSiteEvent('support_click', {
-                    targetType: 'feature',
-                    targetKey: 'hero_whatsapp_group',
-                  })}
+                  onClick={() => {
+                    trackSiteEvent('feedback_open', {
+                      targetType: 'feature',
+                      targetKey: 'hero_feedback',
+                    });
+                    setIsFeedbackOpen(true);
+                  }}
                   startContent={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                   className="shrink-0 border border-zinc-200 bg-white px-4 text-xs font-black text-zinc-950 hover:bg-zinc-100"
                 >
-                  اسأل جروب ديرتك
+                  ابعت اقتراحك
                 </Button>
               </div>
             </div>
@@ -473,20 +471,20 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
               ساعدنا في نشر ديرتك
             </a>
           </div>
-          <a
-            href={WHATSAPP_GROUP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => trackSiteEvent('support_click', {
-              targetType: 'feature',
-              targetKey: 'support_whatsapp_group',
-            })}
+          <button
+            type="button"
+            onClick={() => {
+              trackSiteEvent('feedback_open', {
+                targetType: 'feature',
+                targetKey: 'footer_feedback',
+              });
+              setIsFeedbackOpen(true);
+            }}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
-            aria-label="الانضمام إلى جروب ديرتك عبر واتساب"
           >
             <MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />
-            <span>انضم لجروب DAIRTAK على واتساب</span>
-          </a>
+            <span>شاركنا اقتراحك داخل ديرتك</span>
+          </button>
           <div>© {new Date(renderedAt).getFullYear()} DAIRTAK — ديرتك</div>
         </div>
       </footer>
