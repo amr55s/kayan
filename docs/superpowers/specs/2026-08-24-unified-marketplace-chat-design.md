@@ -115,6 +115,8 @@ Contextual chat actions appear on store, product, order, merchant-order, and dri
 
 Desktop uses a split inbox and active-conversation view. Mobile uses a full-screen conversation with a composer positioned above the keyboard and device safe area. Navigation preserves the previous list position and selected filters.
 
+The marketplace catalog must continue to look and behave like the main DAIRTAK site. On desktop, search, category, availability, price, and sorting controls live in a calm persistent sidebar beside the results rather than a crowded top toolbar. On mobile, the same controls open in an accessible HeroUI drawer with an applied-filter count, clear/apply actions, preserved scroll position, and no horizontal overflow. Spacing, typography, cards, empty states, and motion reuse the main site's design tokens and RTL rhythm.
+
 The header shows the participant/store identity, linked order when applicable, connection state, and a reliable back action. System events are visually distinct from user messages.
 
 ### 5.3 Composer and message states
@@ -256,4 +258,3 @@ Next.js framework upgrades are a separate change. The current project uses Next.
 ### 12.5 Release gate
 
 Release readiness remains closed until the primary database schema, Google authentication, private Storage, Realtime authorization, workers, Push, email configuration, role journeys, security advisors, automated tests, and final health endpoint all pass. Production activation requires an explicit confirmation separate from approval of this design.
-

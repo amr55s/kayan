@@ -22,3 +22,4 @@ skills-lock.json
 
 .playwright-cli/
 .lighthouseci/
+.worktrees/

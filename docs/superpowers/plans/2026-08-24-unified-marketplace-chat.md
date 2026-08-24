@@ -45,6 +45,7 @@
 - `components/marketplace/chat/message-card.tsx`: text, system events, cards, tombstones, reactions, and status.
 - `components/marketplace/chat/message-composer.tsx`: text, reply, image, location consent, send, cancel, and retry.
 - `components/marketplace/chat/chat.module.css`: DAIRTAK RTL/mobile/desktop layout and reduced-motion rules.
+- `components/marketplace/catalog-controls.tsx`, `components/marketplace/catalog-view.tsx`, `components/marketplace/marketplace.module.css`: main-site-aligned catalog shell with desktop filter sidebar and mobile HeroUI drawer.
 
 ### Routes and integrations
 
@@ -1185,6 +1186,101 @@ git commit -m "docs: prepare safe marketplace chat rollout"
 - [ ] **Step 7: Stop at the production confirmation gate**
 
 Present Staging evidence, the exact additive migration list, read-only primary counts, advisor results, environment changes, rollback switch, and estimated maintenance impact. Do not apply migrations to `gkpogxmyioleypzrceib`, change its Auth/Storage/Realtime settings, or enable the feature until the user explicitly confirms that exact production action.
+
+### Task 15: Align Marketplace Catalog UI and Move Filters to a Responsive Sidebar
+
+**Files:**
+- Modify: `components/marketplace/catalog-controls.tsx`
+- Modify: `components/marketplace/catalog-view.tsx`
+- Modify: `components/marketplace/marketplace.module.css`
+- Modify: `components/marketplace/marketplace-shell.tsx`
+- Create: `tests/commerce/marketplace-filter-sidebar.test.mjs`
+- Modify: `e2e/marketplace-chat.spec.ts`
+
+**Interfaces:**
+- Preserves the current catalog query-string contract and `CatalogControls` behavior.
+- Produces a desktop `<aside aria-label="تصفية المنتجات">` and a mobile HeroUI drawer driven by the same filter form/state.
+
+- [ ] **Step 1: Write failing structure and responsive tests**
+
+Assert desktop search/category/availability/price/sort controls render inside an `aside`, the old top filter strip is absent, mobile exposes one 44px filter button with applied-count text, the HeroUI drawer contains the same form fields, logical CSS properties support RTL, widths do not create horizontal overflow, and reduced motion disables drawer/content transitions.
+
+```js
+assert.match(view, /<aside[^>]+aria-label="تصفية المنتجات"/u);
+assert.match(controls, /عرض الفلاتر/u);
+assert.match(controls, /مسح الفلاتر/u);
+assert.match(styles, /grid-template-columns:\s*minmax\(14rem,\s*18rem\)\s+minmax\(0,\s*1fr\)/u);
+assert.match(styles, /@media \(max-width:\s*767px\)/u);
+assert.doesNotMatch(styles, /margin-left|margin-right|padding-left|padding-right/u);
+```
+
+- [ ] **Step 2: Run the focused test and verify red**
+
+Run: `node --test tests/commerce/marketplace-filter-sidebar.test.mjs`  
+Expected: FAIL because the catalog controls still use the top-toolbar layout.
+
+- [ ] **Step 3: Extract one shared filter form**
+
+Render the same field component in the desktop sidebar and mobile drawer so labels, URL serialization, reset behavior, and validation cannot drift.
+
+```tsx
+function CatalogFilterFields(props: CatalogFilterFieldsProps) {
+  return (
+    <div className={styles.filterFields}>
+      <SearchField {...props.search} />
+      <CategoryFilter {...props.category} />
+      <AvailabilityFilter {...props.availability} />
+      <PriceFilter {...props.price} />
+      <SortFilter {...props.sort} />
+    </div>
+  );
+}
+```
+
+- [ ] **Step 4: Build the desktop sidebar and mobile drawer**
+
+Use a two-column catalog grid at 768px and wider. Keep the sidebar visible and sticky below the shared DAIRTAK header without covering content. Below 768px, collapse it into a HeroUI drawer with explicit Apply/Clear actions, focus restoration, Escape close, safe-area padding, and an applied-filter count.
+
+```tsx
+<aside aria-label="تصفية المنتجات" className={styles.filterSidebar}>
+  <CatalogFilterFields {...filterProps} />
+</aside>
+<Button.Root className={styles.mobileFilterButton} onPress={() => setOpen(true)}>
+  عرض الفلاتر{activeCount > 0 ? ` (${activeCount})` : ''}
+</Button.Root>
+```
+
+- [ ] **Step 5: Match the main site's visual rhythm**
+
+Reuse existing DAIRTAK typography, border, surface, focus, and spacing variables. Keep card density calm, use 16px mobile page padding and 24px desktop gaps, align Arabic labels consistently, and remove any duplicated decorative marketing block from the catalog shell.
+
+```css
+.catalogLayout { display: grid; grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.filterSidebar { position: sticky; inset-block-start: 5.5rem; min-inline-size: 0; }
+.catalogResults { min-inline-size: 0; }
+.mobileFilterButton { display: none; min-block-size: 44px; }
+@media (max-width: 767px) {
+  .catalogLayout { display: block; }
+  .filterSidebar { display: none; }
+  .mobileFilterButton { display: inline-flex; }
+  .catalogPage { padding-inline: 1rem; overflow-x: clip; }
+}
+@media (prefers-reduced-motion: reduce) { .filterDrawer { transition: none; } }
+```
+
+- [ ] **Step 6: Verify desktop, mobile, RTL, and URL behavior**
+
+Run: `node --test tests/commerce/marketplace-filter-sidebar.test.mjs tests/seo-accessibility.test.mjs tests/performance-boundary.test.mjs`  
+Run: `npm run lint && npm run typecheck && npm run build`  
+Run against Preview: `npx playwright test e2e/marketplace-chat.spec.ts --project=chromium-desktop --project=chromium-mobile`  
+Expected: PASS; the filter query survives open/close/navigation, the drawer restores focus, no horizontal overflow occurs at 320px, and desktop controls remain in the sidebar.
+
+- [ ] **Step 7: Commit the catalog UI alignment**
+
+```bash
+git add components/marketplace/catalog-controls.tsx components/marketplace/catalog-view.tsx components/marketplace/marketplace.module.css components/marketplace/marketplace-shell.tsx tests/commerce/marketplace-filter-sidebar.test.mjs e2e/marketplace-chat.spec.ts
+git commit -m "feat: align marketplace filters with dairtak ui"
+```
 
 ## Plan Completion Gate
 
