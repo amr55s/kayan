@@ -14,6 +14,7 @@ const money = z.coerce.number().min(0).max(9_999_999).optional().nullable();
 
 const LISTING_CATEGORY_IDS = [
   'restaurants',
+  'stores',
   'home_made',
   'market',
   'veggies',
@@ -24,7 +25,10 @@ const LISTING_CATEGORY_IDS = [
 
 const CATEGORY_ALIASES: Record<string, (typeof LISTING_CATEGORY_IDS)[number]> = {
   'مطاعم وكافيهات': 'restaurants',
+  'متجر': 'stores',
+  'متاجر': 'stores',
   'صنع يدي وأكل بيتي': 'home_made',
+  'أكل منزلي': 'home_made',
   'سوبر ماركت': 'market',
   'خضار وفاكهة': 'veggies',
   'صيدليات وطب': 'pharmacy',
@@ -102,12 +106,7 @@ export const merchantPlaceSchema = z.object({
   placeId: z.uuid(),
   title: z.string().trim().min(2).max(150),
   category: listingCategorySchema,
-  phone: egyptianPhone,
-  whatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
-  instapayVfcash: z.string().trim().max(30).optional().nullable(),
   description: z.string().trim().max(2000).optional().nullable(),
-  whatsappGroupUrl: whatsappGroupUrlSchema,
-  telegramUrl: telegramUrlSchema,
   address: z.string().trim().max(500).optional().nullable(),
   mapUrl: mapUrlSchema,
   existingImages: z.array(z.url()).max(12).default([]),
@@ -125,10 +124,9 @@ export const accountRequestSchema = z
     kind: z.enum(['driver', 'merchant']),
     displayName: z.string().trim().min(2, 'اكتب الاسم كاملاً.').max(100),
     phone: egyptianPhone,
-    password: z
-      .string()
-      .min(12, 'كلمة المرور يجب أن تتكون من 12 حرفاً على الأقل.')
-      .max(128),
+    // Google-authenticated applicants do not create a second password. The
+    // server still requires a strong password for the legacy fallback flow.
+    password: z.string().max(128).optional().default(''),
     whatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
     vehicleType: z.string().trim().max(60).optional().nullable(),
     placeMode: z.enum(['existing', 'new']).optional().nullable(),

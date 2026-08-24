@@ -6,6 +6,7 @@
 export type CategoryType =
   | 'all'
   | 'restaurants'
+  | 'stores'
   | 'home_made'
   | 'market'
   | 'veggies'
@@ -27,6 +28,7 @@ export interface Driver {
   phone: string;
   whatsapp?: string | null;
   vehicle_type?: string | null;
+  avatar_url?: string | null;
   is_active: boolean;
   is_available: boolean;
   active_until?: string | null;
@@ -92,7 +94,32 @@ export interface Place {
   images: string[];
   is_featured: boolean;
   recommend_count?: number;
+  view_count?: number;
+  coupons?: StoreCoupon[];
   created_at: string;
+}
+
+export type CouponDiscountType = 'percentage' | 'fixed';
+
+export interface StoreCoupon {
+  id: string;
+  place_id: string;
+  title: string;
+  code: string;
+  description: string;
+  discount_type: CouponDiscountType;
+  discount_value: number;
+  minimum_order_amount: number | null;
+  applies_to: string;
+  usage_limit_text: string;
+  is_active: boolean;
+  is_featured: boolean;
+  display_order: number;
+  starts_at: string | null;
+  expires_at: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type PendingStatus = 'pending' | 'approved' | 'rejected';

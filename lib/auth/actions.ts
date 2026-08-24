@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { authEmailForPhone, normalizeEgyptianPhone } from '@/lib/auth/phone';
 import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
@@ -133,7 +134,7 @@ export async function loginWithPhone(input: unknown): Promise<LoginResult> {
     }
     return resolveAuthenticatedDestination(data.user.id);
   } catch (error) {
-    console.error('Server-side phone login failed:', error);
+    logSafeServerFailure('error', 'phone_login_failed', { failure: error });
     return {
       success: false,
       message: 'تعذر الاتصال بخدمة الدخول. بياناتك محفوظة؛ حاول مرة أخرى.',
@@ -171,7 +172,7 @@ export async function completeInitialPassword(password: string): Promise<LoginRe
 
     return resolveAuthenticatedDestination(user.id);
   } catch (error) {
-    console.error('Initial password completion failed:', error);
+    logSafeServerFailure('error', 'initial_password_completion_failed', { failure: error });
     return {
       success: false,
       message: 'تعذر حفظ كلمة المرور مؤقتًا. حاول مرة أخرى دون مغادرة الصفحة.',

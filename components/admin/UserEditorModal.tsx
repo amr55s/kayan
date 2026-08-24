@@ -1,18 +1,15 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import {
-  Button,
-  Input,
-  Modal,
-  ModalBody,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  Select,
-  SelectItem,
-  Switch,
-} from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { ListBox } from '@heroui/react/list-box';
+import { Modal } from '@heroui/react/modal';
+import { Select } from '@heroui/react/select';
+import { Switch } from '@heroui/react/switch';
+import { TextField } from '@heroui/react/textfield';
+import { useOverlayState } from '@heroui/react';
 import { Save, Trash2, UserCog } from 'lucide-react';
 import { deleteManagedUser, updateManagedUser } from '@/lib/operations/actions';
 
@@ -53,6 +50,7 @@ export function UserEditorModal({
   });
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
+  const modalState = useOverlayState({ isOpen, onOpenChange });
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -101,22 +99,15 @@ export function UserEditorModal({
   }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onOpenChange={onOpenChange}
-      size="xl"
-      placement="center"
-      scrollBehavior="inside"
-      classNames={{ base: 'dir-rtl' }}
-    >
-      <ModalContent>
-        {(onClose) => (
-          <>
-            <ModalHeader className="flex items-center gap-2">
+    <Modal state={modalState}>
+      <Modal.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+        <Modal.Container placement="center" size="lg" scroll="inside" className="p-3">
+          <Modal.Dialog aria-label={`إدارة حساب ${profile.display_name}`} dir="rtl" className="border border-zinc-200 bg-white">
+            <Modal.Header className="flex items-center gap-2">
               <UserCog className="size-5" />
-              إدارة حساب {profile.display_name}
-            </ModalHeader>
-            <ModalBody>
+              <Modal.Heading>إدارة حساب {profile.display_name}</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body>
               <form id="managed-user-form" onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
                 {error && (
                   <p
@@ -126,61 +117,38 @@ export function UserEditorModal({
                     {error}
                   </p>
                 )}
-                <Input
-                  isRequired
-                  label="الاسم"
-                  value={form.displayName}
-                  onValueChange={(displayName) => setForm({ ...form, displayName })}
-                />
-                <Input
-                  isRequired
-                  type="tel"
-                  label="رقم الهاتف"
-                  value={form.phone}
-                  onValueChange={(phone) => setForm({ ...form, phone })}
-                />
+                <TextField fullWidth isRequired className="space-y-1.5"><Label className="text-sm font-bold">الاسم</Label><Input required value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" /></TextField>
+                <TextField fullWidth isRequired className="space-y-1.5"><Label className="text-sm font-bold">رقم الهاتف</Label><Input required type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" /></TextField>
                 <Select
-                  label="الصلاحية"
-                  selectedKeys={[form.role]}
-                  onSelectionChange={(keys) =>
+                  selectedKey={form.role}
+                  onSelectionChange={(key) =>
                     setForm({
                       ...form,
-                      role: String(Array.from(keys)[0] ?? form.role) as ManagedProfile['role'],
+                      role: String(key ?? form.role) as ManagedProfile['role'],
                     })
                   }
                 >
-                  <SelectItem key="admin" value="admin">أدمن</SelectItem>
-                  <SelectItem key="merchant" value="merchant">محل / مطعم</SelectItem>
-                  <SelectItem key="driver" value="driver">كابتن</SelectItem>
+                  <Label className="text-sm font-bold">الصلاحية</Label>
+                  <Select.Trigger className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5"><Select.Value /><Select.Indicator /></Select.Trigger>
+                  <Select.Popover className="z-[110] rounded-xl border border-zinc-200 bg-white p-1 shadow-xl"><ListBox><ListBox.Item id="admin" textValue="أدمن" className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100">أدمن</ListBox.Item><ListBox.Item id="merchant" textValue="محل / مطعم" className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100">محل / مطعم</ListBox.Item><ListBox.Item id="driver" textValue="كابتن" className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100">كابتن</ListBox.Item></ListBox></Select.Popover>
                 </Select>
                 {form.role === 'merchant' && (
                   <Select
                     isRequired
-                    label="المحل المرتبط"
-                    selectedKeys={form.merchantId ? [form.merchantId] : []}
-                    onSelectionChange={(keys) =>
+                    selectedKey={form.merchantId || null}
+                    onSelectionChange={(key) =>
                       setForm({
                         ...form,
-                        merchantId: String(Array.from(keys)[0] ?? ''),
+                        merchantId: String(key ?? ''),
                       })
                     }
                   >
-                    {merchants.map((merchant) => (
-                      <SelectItem key={merchant.id} value={merchant.id}>
-                        {merchant.display_name}
-                      </SelectItem>
-                    ))}
+                    <Label className="text-sm font-bold">المحل المرتبط</Label>
+                    <Select.Trigger className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5"><Select.Value /><Select.Indicator /></Select.Trigger>
+                    <Select.Popover className="z-[110] rounded-xl border border-zinc-200 bg-white p-1 shadow-xl"><ListBox>{merchants.map((merchant) => <ListBox.Item key={merchant.id} id={merchant.id} textValue={merchant.display_name} className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100">{merchant.display_name}</ListBox.Item>)}</ListBox></Select.Popover>
                   </Select>
                 )}
-                <Input
-                  type="password"
-                  label="كلمة مرور مؤقتة جديدة (اختياري)"
-                  name="managed-user-new-password"
-                  autoComplete="new-password"
-                  value={form.newPassword}
-                  onValueChange={(newPassword) => setForm({ ...form, newPassword })}
-                  className="sm:col-span-2"
-                />
+                <TextField fullWidth className="space-y-1.5 sm:col-span-2"><Label className="text-sm font-bold">كلمة مرور مؤقتة جديدة (اختياري)</Label><Input type="password" name="managed-user-new-password" autoComplete="new-password" value={form.newPassword} onChange={(event) => setForm({ ...form, newPassword: event.target.value })} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" /></TextField>
                 <p className="-mt-2 text-xs text-zinc-500 sm:col-span-2">
                   12 حرفاً على الأقل، وسيُطلب من المستخدم تغييرها بعد الدخول.
                 </p>
@@ -189,39 +157,35 @@ export function UserEditorModal({
                     <p className="font-bold">الحساب مفعّل</p>
                     <p className="text-xs text-zinc-500">الحساب المعطّل لا يستطيع استخدام لوحة التشغيل.</p>
                   </div>
-                  <Switch
-                    isSelected={form.isActive}
-                    onValueChange={(isActive) => setForm({ ...form, isActive })}
-                  />
+                  <Switch isSelected={form.isActive} onChange={(isActive) => setForm({ ...form, isActive })} aria-label="الحساب مفعّل"><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
                 </div>
               </form>
-            </ModalBody>
-            <ModalFooter className="flex justify-between">
+            </Modal.Body>
+            <Modal.Footer className="flex justify-between">
               <Button
-                color="danger"
-                variant="flat"
-                isLoading={pending}
+                variant="danger-soft"
+                isPending={pending}
                 onPress={remove}
-                startContent={!pending && <Trash2 className="size-4" />}
               >
+                {!pending && <Trash2 className="size-4" aria-hidden="true" />}
                 حذف الحساب
               </Button>
               <div className="flex gap-2">
-                <Button variant="flat" onPress={onClose}>إلغاء</Button>
+                <Button variant="secondary" onPress={modalState.close}>إلغاء</Button>
                 <Button
                   type="submit"
                   form="managed-user-form"
-                  isLoading={pending}
-                  startContent={!pending && <Save className="size-4" />}
+                  isPending={pending}
                   className="bg-zinc-900 font-bold text-white"
                 >
+                  {!pending && <Save className="size-4" aria-hidden="true" />}
                   حفظ
                 </Button>
               </div>
-            </ModalFooter>
-          </>
-        )}
-      </ModalContent>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 }

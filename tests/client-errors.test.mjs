@@ -68,6 +68,13 @@ test('client diagnostics classify safe error categories without leaking messages
     })),
     'ChunkLoadError',
   );
+  assert.equal(
+    classifyClientError(new DOMException(
+      "Failed to execute 'insertBefore' on 'Node': The node before which the new node is to be inserted is not a child of this node.",
+      'NotFoundError',
+    )),
+    'ReactError',
+  );
 });
 
 test('generic cross-origin window errors are ignored', () => {

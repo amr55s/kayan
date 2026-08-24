@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import QRCode from 'qrcode';
 import sharp, { type OverlayOptions } from 'sharp';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createPublicClient } from '@/lib/supabase/public';
 import { fetchPublicDrivers } from '@/lib/supabase/queries';
 import {
   marketingIdeas,
@@ -124,14 +126,14 @@ async function loadEntity(
   id?: string,
 ): Promise<{ place?: Place; driver?: Driver; image?: string | null }> {
   if (type === 'place' && id) {
-    const admin = createAdminClient();
-    const { data } = await (admin as any)
+    const publicClient = createPublicClient();
+    const { data } = await (publicClient as any)
       .from('places')
-      .select('*')
+      .select('id,title,images')
       .eq('id', id)
       .maybeSingle();
-    const place = data as Place | null;
-    return place ? { place, image: place.images?.[0] } : {};
+    const place = data as Pick<Place, 'id' | 'title' | 'images'> | null;
+    return place ? { place: place as Place, image: place.images?.[0] } : {};
   }
   if (type === 'driver' && id) {
     const drivers = await fetchPublicDrivers();
@@ -171,9 +173,9 @@ export async function GET(request: Request) {
     driver: entity.driver,
   });
   const subtitle = entity.place
-    ? 'مكان جديد داخل دليل كيان'
+    ? 'مكان جديد داخل دليل ديرتك'
     : entity.driver
-      ? `${entity.driver.vehicle_type || 'كابتن توصيل'} — تواصل مباشر`
+      ? `${entity.driver.vehicle_type || 'كابتن توصيل'} — متابعة عبر ديرتك`
       : marketingTemplateLabels[templateKey];
   const ideaPath = marketingIdeas.find((idea) => idea.key === templateKey)?.path || '/';
   const targetUrl = type === 'feature'
@@ -187,7 +189,7 @@ export async function GET(request: Request) {
   const isPreview = preview === '1';
   const renderScale = isPreview ? 0.5 : 1;
   const renderSize = isPreview ? 540 : 1080;
-  const [qr, photo] = await Promise.all([
+  const [qr, photo, brandLogo] = await Promise.all([
     QRCode.toBuffer(targetUrl, {
       type: 'png',
       width: isPreview ? 130 : 260,
@@ -196,6 +198,14 @@ export async function GET(request: Request) {
       errorCorrectionLevel: 'M',
     }),
     safeImageBuffer(entity.image, isPreview),
+    readFile(join(process.cwd(), 'public', 'brand', 'dairtak-logo-full.png'))
+      .then((input) => sharp(input)
+        .resize(Math.round(288 * renderScale), Math.round(70 * renderScale), {
+          fit: 'contain',
+          background: '#ffffff',
+        })
+        .png()
+        .toBuffer()),
   ]);
 
   const svg = Buffer.from(`
@@ -211,15 +221,14 @@ export async function GET(request: Request) {
       <rect x="44" y="44" width="992" height="992" rx="64" fill="white"/>
       ${photo ? '' : '<rect x="80" y="92" width="920" height="470" rx="42" fill="url(#bg)"/>'}
       <rect x="80" y="92" width="920" height="470" rx="42" fill="none" stroke="#e4e4e7" stroke-width="3"/>
-      <rect x="112" y="116" width="250" height="56" rx="28" fill="#09090b"/>
-      <text x="237" y="153" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="700">KAYAN CITY SPOT</text>
+      <rect x="112" y="116" width="320" height="98" rx="28" fill="#ffffff"/>
       ${photo ? '<rect x="80" y="92" width="920" height="470" rx="42" fill="url(#shade)" opacity="0"/>' : ''}
       <g text-anchor="end" font-family="Arial, sans-serif">
         <text x="650" y="655" fill="#71717a" font-size="28" font-weight="700">${escapeXml(subtitle)}</text>
         <text x="650" y="718" fill="#09090b" font-size="47" font-weight="800">${escapeXml(titleLineOne)}</text>
         ${titleLineTwo ? `<text x="650" y="775" fill="#09090b" font-size="42" font-weight="800">${escapeXml(titleLineTwo)}</text>` : ''}
-        <text x="650" y="850" fill="#3f3f46" font-size="29" font-weight="700">تواصل مباشر • بدون عمولات</text>
-        <text x="650" y="906" fill="#71717a" font-size="24">امسح الكود لفتح التفاصيل والصور</text>
+        <text x="650" y="850" fill="#3f3f46" font-size="29" font-weight="700">طلب ومتابعة من داخل الموقع</text>
+        <text x="650" y="906" fill="#71717a" font-size="24">امسح الكود لفتح ديرتك ومتابعة التفاصيل</text>
       </g>
       <rect x="710" y="660" width="290" height="290" rx="36" fill="#ffffff" stroke="#e4e4e7" stroke-width="3"/>
       <text x="540" y="994" text-anchor="middle" fill="#71717a" font-family="Arial, sans-serif" font-size="22">كل ما تحتاجه في مكان واحد</text>
@@ -238,8 +247,7 @@ export async function GET(request: Request) {
           clip-rule="evenodd"
         />
         <rect x="80" y="92" width="920" height="470" rx="42" fill="none" stroke="#e4e4e7" stroke-width="3"/>
-        <rect x="112" y="116" width="250" height="56" rx="28" fill="#09090b"/>
-        <text x="237" y="153" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="700">KAYAN CITY SPOT</text>
+        <rect x="112" y="116" width="320" height="98" rx="28" fill="#ffffff"/>
       </svg>
     `);
     composites.push(
@@ -251,6 +259,11 @@ export async function GET(request: Request) {
       { input: frameOverlay, left: 0, top: 0 },
     );
   }
+  composites.push({
+    input: brandLogo,
+    left: Math.round(128 * renderScale),
+    top: Math.round(126 * renderScale),
+  });
   composites.push(
     {
       input: qr,
@@ -267,7 +280,7 @@ export async function GET(request: Request) {
   return new Response(new Uint8Array(png), {
     headers: {
       'content-type': 'image/png',
-      'content-disposition': `inline; filename="kayan-${safeName}.png"`,
+      'content-disposition': `inline; filename="dairtak-${safeName}.png"`,
       'cache-control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
       'x-content-type-options': 'nosniff',
     },

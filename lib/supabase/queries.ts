@@ -1,6 +1,7 @@
 import { createPublicClient } from './public';
 import { createAdminClient } from './admin';
-import type { Driver, Place } from '@/types';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
+import type { Driver, Place, StoreCoupon } from '@/types';
 
 type QueryOutcome<T> =
   | { status: 'fulfilled'; value: T }
@@ -23,6 +24,7 @@ type RegisteredDriverRow = {
   phone: string;
   whatsapp: string | null;
   vehicle_type: string | null;
+  avatar_url: string | null;
   is_available: boolean;
   active_until: string | null;
   created_at: string;
@@ -42,7 +44,7 @@ async function withTimeout<T>(
 ): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('انتهت مهلة تحميل كيان سيتي سبوت.')), timeoutMs);
+    timeoutId = setTimeout(() => reject(new Error('انتهت مهلة تحميل ديرتك.')), timeoutMs);
   });
 
   try {
@@ -93,6 +95,7 @@ export function mergePublicDrivers(
       phone: row.phone,
       whatsapp: row.whatsapp || legacy?.whatsapp || row.phone,
       vehicle_type: row.vehicle_type || legacy?.vehicle_type || null,
+      avatar_url: row.avatar_url,
       is_active: true,
       is_available: row.is_available,
       active_until: row.active_until,
@@ -112,16 +115,37 @@ export function mergePublicDrivers(
 
 async function fetchPlaces(): Promise<Place[]> {
   const supabase = createPublicClient();
-  const result: any = await withTimeout(
+  let result: any = await withTimeout(
     supabase
       .from('places')
-      .select('*')
+      .select('*, store_coupons(*)')
       .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false }),
   );
 
+  // Keep the directory available during a staged deployment where the app
+  // reaches production a few seconds before the additive coupon migration.
+  if (result.error) {
+    result = await withTimeout(
+      supabase
+        .from('places')
+        .select('*')
+        .order('is_featured', { ascending: false })
+        .order('created_at', { ascending: false }),
+    );
+  }
+
   if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []) as Place[];
+  return (result.data ?? []).map((row: Place & { store_coupons?: StoreCoupon[] }) => {
+    const { store_coupons: coupons, ...place } = row;
+    return {
+      ...place,
+      coupons: (coupons ?? []).sort((left, right) =>
+        Number(right.is_featured) - Number(left.is_featured)
+        || left.display_order - right.display_order,
+      ),
+    } as Place;
+  });
 }
 
 async function fetchLegacyDrivers(): Promise<LegacyDriverRow[]> {
@@ -166,15 +190,21 @@ export async function fetchHomePageData(): Promise<{
 
   const errors: string[] = [];
   if (placesResult.status === 'rejected') {
-    console.error('Public places query failed:', placesResult.reason);
+    logSafeServerFailure('error', 'public_places_query_failed', {
+      failure: placesResult.reason,
+    });
     errors.push('الأماكن');
   }
   if (legacyResult.status === 'rejected') {
-    console.error('Public drivers query failed:', legacyResult.reason);
+    logSafeServerFailure('error', 'public_legacy_drivers_query_failed', {
+      failure: legacyResult.reason,
+    });
     errors.push('الكباتن المسجلون سريعاً');
   }
   if (registeredResult.status === 'rejected') {
-    console.error('Registered drivers query failed:', registeredResult.reason);
+    logSafeServerFailure('error', 'public_registered_drivers_query_failed', {
+      failure: registeredResult.reason,
+    });
     errors.push('كباتن نظام التشغيل');
   }
 
@@ -186,7 +216,7 @@ export async function fetchHomePageData(): Promise<{
       registeredResult.status === 'fulfilled' ? registeredResult.value : [],
     ),
     directoryError: errors.length
-      ? `تعذر تحميل بعض بيانات كيان سيتي سبوت (${errors.join('، ')}). يمكنك إعادة المحاولة.`
+      ? `تعذر تحميل بعض بيانات ديرتك (${errors.join('، ')}). يمكنك إعادة المحاولة.`
       : undefined,
   };
 }

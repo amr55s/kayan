@@ -1,13 +1,17 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import Image from 'next/image';
-import { Button, Card, CardBody, CardHeader, Input } from '@heroui/react';
-import { ArrowRight, KeyRound, Phone, UserPlus } from 'lucide-react';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { ArrowRight, KeyRound, Phone, ShieldCheck, UserPlus } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { completeInitialPassword, loginWithPhone } from '@/lib/auth/actions';
 import { isEgyptianPhone } from '@/lib/auth/phone';
 import Link from 'next/link';
+import { SITE_NAME } from '@/lib/brand';
+import { BrandLogo } from '@/components/layout/BrandLogo';
 
 export function LoginForm() {
   const router = useRouter();
@@ -51,75 +55,93 @@ export function LoginForm() {
   }
 
   return (
-    <main className="dir-rtl flex min-h-screen items-center justify-center bg-zinc-950 px-4 py-8 text-white">
-      <Card className="w-full max-w-md border border-zinc-800 bg-zinc-900 text-white shadow-2xl">
-        <CardHeader className="flex flex-col items-center gap-3 pb-2 text-center">
-          <div className="flex size-20 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-lg">
-            <Image
-              src="/kayan-services-logo.png"
-              alt="شعار KAYAN CITY SPOT"
-              width={80}
-              height={80}
-              className="size-20 object-contain"
-              priority
-            />
+    <main id="main-content" className="dir-rtl flex min-h-screen w-full items-center justify-center bg-zinc-100 px-4 py-10 text-zinc-900">
+      <Card className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-2 text-zinc-900 shadow-lg sm:p-4">
+        <Card.Header className="flex flex-col items-center gap-3 pb-2 pt-6 text-center sm:pt-8">
+          <div className="flex h-24 w-full max-w-[19rem] items-center justify-center overflow-hidden rounded-2xl bg-white px-4 shadow-md ring-1 ring-zinc-200/80">
+            <BrandLogo variant="full" className="h-auto w-full" priority />
           </div>
-          <div>
-            <h1 className="text-xl font-black">دخول KAYAN CITY SPOT</h1>
-            <p className="mt-1 text-sm text-zinc-400">للكباتن وأصحاب الأنشطة والإدارة</p>
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-0.5 text-[11px] font-bold text-zinc-800">
+              <ShieldCheck className="size-3.5 text-[var(--dairtak-orange-deep)]" aria-hidden="true" />
+              <span>منصة ديرتك</span>
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-zinc-950">
+              {changePassword ? 'تغيير كلمة المرور' : `دخول ${SITE_NAME}`}
+            </h1>
+            <p className="text-xs font-semibold text-zinc-500">
+              {changePassword
+                ? 'يرجى تعيين كلمة مرور جديدة لحسابك'
+                : 'بوابة الكباتن وأصحاب المحلات والإدارة'}
+            </p>
           </div>
-        </CardHeader>
-        <CardBody>
+        </Card.Header>
+        <Card.Content className="px-4 py-6 sm:px-6">
           <form className="space-y-4" onSubmit={submit}>
-            {error && <p role="alert" className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-200">{error}</p>}
-            {!changePassword && (
-              <Input
-                isRequired
-                name="phone"
-                autoComplete="tel"
-                type="tel"
-                label="رقم الهاتف"
-                placeholder="01012345678"
-                value={phone}
-                onValueChange={setPhone}
-                startContent={<Phone className="size-4 text-zinc-400" />}
-              />
+            {error && (
+              <p
+                role="alert"
+                className="rounded-2xl border border-rose-200 bg-rose-50/90 p-3.5 text-xs font-bold text-rose-700 shadow-xs"
+              >
+                {error}
+              </p>
             )}
-            <Input
-              isRequired
-              name={changePassword ? 'new-password' : 'password'}
-              autoComplete={changePassword ? 'new-password' : 'current-password'}
-              type="password"
-              label={changePassword ? 'كلمة المرور الجديدة' : 'كلمة المرور'}
-              value={password}
-              onValueChange={setPassword}
-              startContent={<KeyRound className="size-4 text-zinc-400" />}
-            />
-            {changePassword && (
-              <Input isRequired name="confirm-password" autoComplete="new-password" type="password" label="تأكيد كلمة المرور" value={confirmPassword} onValueChange={setConfirmPassword} />
-            )}
-            <Button type="submit" isLoading={loading} className="w-full bg-white font-extrabold text-zinc-950">
-              {changePassword ? 'حفظ كلمة المرور' : 'تسجيل الدخول'}
-            </Button>
             {!changePassword && (
-              <div className="border-t border-zinc-800 pt-4 text-center">
-                <p className="mb-2 text-xs text-zinc-400">لسه معندكش تسجيل؟</p>
-                <Button
-                  as={Link}
-                  href="/?register=join"
-                  startContent={<UserPlus className="size-4" />}
-                  className="w-full border border-zinc-700 bg-zinc-800 text-sm font-bold text-white hover:bg-zinc-700"
-                >
-                  إنشاء تسجيل جديد
-                </Button>
+              <div className="space-y-1.5">
+                <Label htmlFor="login-phone" className="text-xs font-bold text-zinc-700">رقم الهاتف</Label>
+                <div className="relative">
+                  <Phone className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                  <Input id="login-phone" required name="phone" autoComplete="tel" type="tel" inputMode="tel" placeholder="01012345678" value={phone} onChange={(event) => setPhone(event.target.value)} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 ps-10 text-base outline-none focus:border-zinc-500 focus:bg-white focus:ring-2 focus:ring-zinc-950/10" />
+                </div>
               </div>
             )}
-            <Link href="/" className="flex min-h-[44px] items-center justify-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-white">
-              <ArrowRight className="size-4" />
-              العودة إلى كيان سيتي سبوت
-            </Link>
+            <div className="space-y-1.5">
+              <Label htmlFor="login-password" className="text-xs font-bold text-zinc-700">{changePassword ? 'كلمة المرور الجديدة' : 'كلمة المرور'}</Label>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                <Input id="login-password" required name={changePassword ? 'new-password' : 'password'} autoComplete={changePassword ? 'new-password' : 'current-password'} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 ps-10 text-base outline-none focus:border-zinc-500 focus:bg-white focus:ring-2 focus:ring-zinc-950/10" />
+              </div>
+            </div>
+            {changePassword && (
+              <div className="space-y-1.5">
+                <Label htmlFor="login-confirm-password" className="text-xs font-bold text-zinc-700">تأكيد كلمة المرور</Label>
+                <div className="relative">
+                  <KeyRound className="pointer-events-none absolute start-3.5 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+                  <Input id="login-confirm-password" required name="confirm-password" autoComplete="new-password" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 ps-10 text-base outline-none focus:border-zinc-500 focus:bg-white focus:ring-2 focus:ring-zinc-950/10" />
+                </div>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              isPending={loading}
+              isDisabled={loading}
+              className="mt-2 min-h-12 w-full rounded-2xl bg-zinc-950 font-black text-white shadow-lg shadow-zinc-950/10 transition-[background-color,transform,box-shadow] hover:bg-zinc-800 active:scale-[0.99] motion-reduce:transform-none"
+            >
+              {changePassword ? 'حفظ كلمة المرور' : 'تسجيل الدخول'}
+            </Button>
+
+            {!changePassword && (
+              <div className="space-y-3 border-t border-zinc-100 pt-5 text-center">
+                <p className="text-xs font-semibold text-zinc-500">ليس لديك حساب بعد؟</p>
+                <Link href="/?register=join" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-bold text-zinc-900 transition-colors hover:bg-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
+                  <UserPlus className="size-4 text-zinc-700" aria-hidden="true" />
+                  تقديم طلب انضمام جديد
+                </Link>
+              </div>
+            )}
+
+            <div className="pt-2 text-center">
+              <Link
+                href="/"
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 text-xs font-bold text-zinc-500 transition-colors hover:text-zinc-950"
+              >
+                <ArrowRight className="size-4" aria-hidden="true" />
+                العودة إلى الصفحة الرئيسية
+              </Link>
+            </div>
           </form>
-        </CardBody>
+        </Card.Content>
       </Card>
     </main>
   );

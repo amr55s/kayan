@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Button, Tooltip } from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Tooltip } from '@heroui/react/tooltip';
 import { BellOff, BellRing } from 'lucide-react';
 
 function urlBase64ToUint8Array(value: string) {
@@ -33,8 +34,19 @@ export function PushSubscriptionButton() {
     let active = true;
     navigator.serviceWorker.ready
       .then((registration) => registration.pushManager.getSubscription())
-      .then((subscription) => {
-        if (active && subscription) setState('enabled');
+      .then(async (subscription) => {
+        if (!subscription) return;
+        const response = await fetch('/api/push/subscribe', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(subscription.toJSON()),
+        });
+        if (!response.ok) {
+          await subscription.unsubscribe().catch(() => false);
+          throw new Error('push_subscription_sync_failed');
+        }
+        if (active) setState('enabled');
       })
       .catch(() => {
         // Registration can be unavailable in privacy-restricted browsers.
@@ -76,10 +88,14 @@ export function PushSubscriptionButton() {
       });
       const response = await fetch('/api/push/subscribe', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscription),
+        body: JSON.stringify(subscription.toJSON()),
       });
-      if (!response.ok) throw new Error('push_subscription_failed');
+      if (!response.ok) {
+        await subscription.unsubscribe().catch(() => false);
+        throw new Error('push_subscription_failed');
+      }
       setState('enabled');
     } catch {
       setState('error');
@@ -105,24 +121,25 @@ export function PushSubscriptionButton() {
   const button = (
     <Button
       size="sm"
-      variant="flat"
-      isLoading={state === 'loading'}
+      variant="secondary"
+      isPending={state === 'loading'}
       onPress={subscribe}
       isDisabled={state === 'enabled' || state === 'unsupported' || state === 'denied'}
-      startContent={
-        state !== 'loading'
-          ? state === 'denied'
-            ? <BellOff className="size-4" aria-hidden="true" />
-            : <BellRing className="size-4" aria-hidden="true" />
-          : undefined
-      }
       className="min-h-10 font-bold"
     >
+      {state !== 'loading'
+        ? state === 'denied'
+          ? <BellOff className="size-4" aria-hidden="true" />
+          : <BellRing className="size-4" aria-hidden="true" />
+        : null}
       {label}
     </Button>
   );
 
-  return help
-    ? <Tooltip content={help}>{button}</Tooltip>
-    : button;
+  return help ? (
+    <Tooltip>
+      <Tooltip.Trigger>{button}</Tooltip.Trigger>
+      <Tooltip.Content>{help}</Tooltip.Content>
+    </Tooltip>
+  ) : button;
 }

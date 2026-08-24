@@ -9,7 +9,7 @@ export const CATEGORIES_CONFIG = CATEGORIES.map((cat) => ({
   subtitle: cat.subtitle,
   emoji: cat.emoji || '📌',
   icon: cat.id,
-  color: cat.id === 'restaurants' ? 'primary' : cat.id === 'home_made' ? 'secondary' : cat.id === 'market' ? 'success' : cat.id === 'veggies' ? 'warning' : cat.id === 'pharmacy' ? 'danger' : 'default',
+  color: cat.id === 'restaurants' ? 'primary' : cat.id === 'stores' ? 'warning' : cat.id === 'home_made' ? 'secondary' : cat.id === 'market' ? 'success' : cat.id === 'veggies' ? 'warning' : cat.id === 'pharmacy' ? 'danger' : 'default',
 }));
 
 export const CATEGORY_OPTIONS = CATEGORIES
@@ -27,6 +27,7 @@ export function getCategoryLabel(category: string): string {
 export function getCategoryColor(category: string): string {
   switch (category) {
     case 'restaurants': return 'primary';
+    case 'stores': return 'warning';
     case 'home_made': return 'secondary';
     case 'market': return 'success';
     case 'veggies': return 'warning';
@@ -35,4 +36,14 @@ export function getCategoryColor(category: string): string {
     case 'services': return 'secondary';
     default: return 'default';
   }
+}
+
+export function getListingDescriptionLabel(category: string): string {
+  return category === 'stores'
+    ? 'أهم المنتجات والماركات ونطاق الأسعار'
+    : 'الوصف أو مواعيد العمل';
+}
+
+export function getListingImageLabel(category: string): string {
+  return category === 'stores' ? 'صور المنتجات والمتجر' : 'صور المنيو والمكان';
 }

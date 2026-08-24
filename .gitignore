@@ -10,7 +10,16 @@ node_modules/
 *.log
 tsconfig.tsbuildinfo
 supabase/.temp/
+.artifacts/
+output/
 
 .vscode/
 .agents/
 skills-lock.json
+
+# Sentry Config File
+.env.sentry-build-plugin
+
+.playwright-cli/
+.lighthouseci/
+.worktrees/

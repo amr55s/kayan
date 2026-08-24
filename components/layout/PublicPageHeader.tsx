@@ -1,7 +1,6 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, BookOpen, Share2 } from 'lucide-react';
-import { SITE_NAME } from '@/lib/brand';
+import { BrandLogo } from './BrandLogo';
 
 export function PublicPageHeader({
   current,
@@ -14,17 +13,10 @@ export function PublicPageHeader({
         <Link
           href="/"
           className="inline-flex min-h-11 items-center gap-2 rounded-xl text-sm font-black text-zinc-950"
-          aria-label="العودة إلى دليل كيان"
+          aria-label="العودة إلى دليل ديرتك"
         >
           <ArrowRight className="size-4" />
-          <Image
-            src="/kayan-services-logo.png"
-            alt=""
-            width={38}
-            height={38}
-            className="size-9 rounded-xl object-contain ring-1 ring-zinc-200"
-          />
-          <span className="hidden sm:inline">{SITE_NAME}</span>
+          <BrandLogo variant="full" className="h-9 w-auto max-w-[7.75rem] sm:h-10 sm:max-w-[8.75rem]" decorative />
         </Link>
         <nav className="flex items-center gap-1" aria-label="صفحات المساعدة">
           <Link
@@ -45,7 +37,7 @@ export function PublicPageHeader({
             }`}
           >
             <Share2 className="size-4" />
-            شارك كيان
+            شارك ديرتك
           </Link>
         </nav>
       </div>

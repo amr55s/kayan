@@ -13,6 +13,11 @@ test('behavior analytics is anonymous, allow-listed, aggregated, and server-only
   assert.match(route, /origin !== requestUrl\.origin/);
   assert.match(route, /visitorId: z\.string\(\)\.uuid\(\)/);
   assert.match(route, /record_site_analytics/);
+  assert.match(route, /sharedEntityEvents/);
+  assert.match(
+    route,
+    /payload\.targetType === 'place' \|\| payload\.targetType === 'driver'/,
+  );
   assert.doesNotMatch(route, /x-forwarded-for|x-real-ip|user-agent/i);
   assert.doesNotMatch(
     client,
@@ -30,6 +35,20 @@ test('behavior analytics is anonymous, allow-listed, aggregated, and server-only
     migration,
     /grant execute on function public\.record_site_analytics[\s\S]*to service_role/,
   );
+});
+
+test('place cards show durable real view counts backed by analytics', () => {
+  const card = read('components/directory/PlaceCard.tsx');
+  const migration = read(
+    'supabase/migrations/20260731100054_add_real_place_view_counts.sql',
+  );
+
+  assert.match(card, /place\.view_count/);
+  assert.match(card, /مشاهدة/);
+  assert.match(migration, /add column if not exists view_count/);
+  assert.match(migration, /event_name = 'place_open'/);
+  assert.match(migration, /view_count = view_count \+ v_delta/);
+  assert.doesNotMatch(migration, /random\(\)|fake|boost/i);
 });
 
 test('admin receives a simple analytics dashboard without exposing visitor hashes', () => {

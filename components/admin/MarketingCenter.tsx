@@ -1,30 +1,19 @@
 'use client';
 
-import { FormEvent, useMemo, useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Input,
-  Select,
-  SelectItem,
-  Textarea,
-} from '@heroui/react';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Chip } from '@heroui/react/chip';
+import { Label } from '@heroui/react/label';
+import { ListBox } from '@heroui/react/list-box';
+import { Select } from '@heroui/react/select';
 import {
   BarChart3,
   Check,
   Copy,
   Download,
-  ExternalLink,
-  MessageCircle,
-  Pencil,
-  Plus,
-  Send,
-  Users,
 } from 'lucide-react';
 import type {
   Driver,
@@ -43,8 +32,6 @@ import { formatCairoDate } from '@/lib/format-date';
 import {
   prepareMarketingCampaign,
   recordMarketingPublication,
-  saveMarketingChannel,
-  setMarketingChannelActive,
 } from '@/lib/marketing/admin-actions';
 
 type QueueItem = {
@@ -101,7 +88,7 @@ function CampaignPreview({
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      onMessage('تعذر النسخ تلقائيًا؛ استخدم زر مشاركة WhatsApp.');
+      onMessage('تعذر النسخ تلقائيًا. حدّد النص من المعاينة وانسخه يدويًا.');
     }
   };
 
@@ -118,10 +105,10 @@ function CampaignPreview({
 
   return (
     <Card className="overflow-hidden border-2 border-zinc-950">
-      <CardHeader className="flex flex-col items-stretch gap-2 border-b border-zinc-200 bg-zinc-950 text-white sm:flex-row sm:items-center sm:justify-between">
+      <Card.Header className="flex flex-col items-stretch gap-2 border-b border-zinc-200 bg-zinc-950 text-white sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-black">الحملة جاهزة لـ {channel.name}</p>
-          <p className="mt-1 text-xs text-zinc-300">انسخ النص والصورة ثم افتح الجروب للنشر اليدوي.</p>
+          <p className="mt-1 text-xs text-zinc-300">انسخ النص أو نزّل البطاقة، ثم سجّل حالة المحتوى من داخل الموقع.</p>
         </div>
         <Chip className={published
           ? 'bg-emerald-500/20 text-emerald-200'
@@ -129,8 +116,8 @@ function CampaignPreview({
         >
           {published ? 'تم النشر' : 'لم تُنشر'}
         </Chip>
-      </CardHeader>
-      <CardBody className="grid gap-5 p-4 lg:grid-cols-[320px_1fr]">
+      </Card.Header>
+      <Card.Content className="grid gap-5 p-4 lg:grid-cols-[320px_1fr]">
         <Image
           src={cardUrl(campaign, true)}
           alt="معاينة بطاقة الحملة"
@@ -144,12 +131,13 @@ function CampaignPreview({
             {text}
           </pre>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            <Button onPress={copy} startContent={copied ? <Check className="size-4" /> : <Copy className="size-4" />} className="font-bold">
+            <Button onPress={copy} className="font-bold">
+              {copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
               {copied ? 'تم النسخ' : 'نسخ النص'}
             </Button>
             <a
               href={imageUrl}
-              download={`kayan-${campaign.campaign_code}.png`}
+              download={`dairtak-${campaign.campaign_code}.png`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-zinc-100 px-4 text-sm font-bold text-zinc-900"
@@ -158,36 +146,16 @@ function CampaignPreview({
               تنزيل البطاقة
             </a>
             <Button
-              as="a"
-              href={`https://wa.me/?text=${encodeURIComponent(text)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              startContent={<Send className="size-4" />}
-              className="bg-emerald-600 font-bold text-white"
-            >
-              مشاركة WhatsApp
-            </Button>
-            <Button
-              as="a"
-              href={channel.whatsapp_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              startContent={<ExternalLink className="size-4" />}
-              className="border border-zinc-200 bg-white font-bold"
-            >
-              فتح الجروب
-            </Button>
-            <Button
               onPress={markPublished}
-              isLoading={pending}
-              startContent={!pending && <Check className="size-4" />}
-              className="bg-zinc-950 font-bold text-white sm:col-span-2"
+              isPending={pending}
+              className="bg-zinc-950 font-bold text-white"
             >
+              {!pending && <Check className="size-4" aria-hidden="true" />}
               سجّل أن المحتوى تم نشره
             </Button>
           </div>
         </div>
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }
@@ -211,13 +179,6 @@ export function MarketingCenter({
   );
   const [queueFilter, setQueueFilter] = useState<'unpublished' | 'published' | 'all'>('unpublished');
   const [prepared, setPrepared] = useState<MarketingCampaign | null>(null);
-  const [channelForm, setChannelForm] = useState({
-    id: '',
-    name: '',
-    whatsappUrl: '',
-    notes: '',
-    isActive: true,
-  });
 
   const selectedChannel = channels.find((channel) => channel.id === selectedChannelId);
   const queue = useMemo<QueueItem[]>(() => [
@@ -267,7 +228,7 @@ export function MarketingCenter({
     templateKey: MarketingTemplateKey,
   ) => {
     if (!selectedChannelId) {
-      setMessage('أضف جروبًا أو اختر جروبًا نشطًا أولًا.');
+      setMessage('اختر مسار محتوى نشطًا أولًا.');
       return;
     }
     const existing = campaignFor(entityType, entityId, templateKey);
@@ -285,22 +246,6 @@ export function MarketingCenter({
       setMessage(result.message);
       if (result.success) {
         setPrepared(result.data);
-        router.refresh();
-      }
-    });
-  };
-
-  const submitChannel = (event: FormEvent) => {
-    event.preventDefault();
-    startTransition(async () => {
-      const result = await saveMarketingChannel({
-        ...channelForm,
-        id: channelForm.id || undefined,
-      });
-      setMessage(result.message);
-      if (result.success) {
-        setChannelForm({ id: '', name: '', whatsappUrl: '', notes: '', isActive: true });
-        setSelectedChannelId(result.data.id);
         router.refresh();
       }
     });
@@ -331,28 +276,38 @@ export function MarketingCenter({
       {message && <p role="status" className="rounded-xl border border-zinc-200 bg-zinc-100 p-3 text-sm font-bold">{message}</p>}
 
       <Card className="border border-zinc-200">
-        <CardHeader className="flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <Card.Header className="flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-black">
-              <MessageCircle className="size-5" />
-              الجروب المستهدف
+              <BarChart3 className="size-5" />
+              مسار المحتوى
             </h2>
-            <p className="mt-1 text-xs text-zinc-500">اسم ورابط الجروب لا يظهران للعامة.</p>
+            <p className="mt-1 text-xs text-zinc-500">اختر مسارًا داخليًا لتجهيز المحتوى وتتبع حالته.</p>
           </div>
           <Select
-            label="اختر الجروب"
-            selectedKeys={selectedChannelId ? [selectedChannelId] : []}
-            onSelectionChange={(keys) => {
-              setSelectedChannelId(String(Array.from(keys)[0] || ''));
+            selectedKey={selectedChannelId || null}
+            onSelectionChange={(key) => {
+              setSelectedChannelId(String(key || ''));
               setPrepared(null);
             }}
             className="sm:max-w-sm"
           >
-            {channels.filter((channel) => channel.is_active).map((channel) => (
-              <SelectItem key={channel.id} value={channel.id}>{channel.name}</SelectItem>
-            ))}
+            <Label className="text-sm font-bold text-zinc-800">اختر مسار المحتوى</Label>
+            <Select.Trigger className="min-h-11 w-full rounded-xl border border-zinc-200 bg-white px-3.5 text-start outline-none focus-visible:ring-2 focus-visible:ring-zinc-950/10">
+              <Select.Value />
+              <Select.Indicator />
+            </Select.Trigger>
+            <Select.Popover className="z-[110] rounded-xl border border-zinc-200 bg-white p-1 shadow-xl">
+              <ListBox>
+                {channels.filter((channel) => channel.is_active).map((channel) => (
+                  <ListBox.Item key={channel.id} id={channel.id} textValue={channel.name} className="cursor-default rounded-lg px-3 py-2 text-sm outline-none data-[focused]:bg-zinc-100 data-[selected]:font-bold">
+                    {channel.name}
+                  </ListBox.Item>
+                ))}
+              </ListBox>
+            </Select.Popover>
           </Select>
-        </CardHeader>
+        </Card.Header>
       </Card>
 
       {prepared && selectedChannel && (
@@ -366,7 +321,7 @@ export function MarketingCenter({
       )}
 
       <Card className="border border-zinc-200">
-        <CardHeader className="flex flex-col items-stretch gap-3 border-b border-zinc-100 sm:flex-row sm:items-center sm:justify-between">
+        <Card.Header className="flex flex-col items-stretch gap-3 border-b border-zinc-100 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-black">طابور الأماكن والكباتن</h2>
             <p className="mt-1 text-xs text-zinc-500">كل عنصر معتمد يظهر هنا تلقائيًا.</p>
@@ -389,8 +344,8 @@ export function MarketingCenter({
               </button>
             ))}
           </div>
-        </CardHeader>
-        <CardBody className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        </Card.Header>
+        <Card.Content className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredQueue.slice(0, 60).map((item) => {
             const itemCampaign = campaignFor(item.entityType, item.entityId, item.templateKey);
             return (
@@ -412,7 +367,7 @@ export function MarketingCenter({
                 </div>
                 <Button
                   onPress={() => prepare(item.entityType, item.entityId, item.templateKey)}
-                  isLoading={pending}
+                  isPending={pending}
                   className="mt-4 bg-zinc-950 font-bold text-white"
                 >
                   {itemCampaign ? 'فتح الحملة' : 'جهّز للنشر'}
@@ -422,20 +377,20 @@ export function MarketingCenter({
           })}
           {!filteredQueue.length && (
             <p className="rounded-2xl bg-zinc-50 p-5 text-sm font-semibold text-zinc-500 sm:col-span-2 lg:col-span-3">
-              لا توجد عناصر في هذا القسم للجروب المختار.
+              لا توجد عناصر في هذا القسم لمسار المحتوى المختار.
             </p>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
 
       <Card className="border border-zinc-200">
-        <CardHeader className="border-b border-zinc-100">
+        <Card.Header className="border-b border-zinc-100">
           <div>
             <h2 className="font-black">مكتبة أفكار النشر المحلي</h2>
-            <p className="mt-1 text-xs text-zinc-500">محتوى جاهز للجروبات، المداخل، المحلات، والأكياس والفواتير.</p>
+            <p className="mt-1 text-xs text-zinc-500">محتوى جاهز للنشر من داخل الموقع وللمطبوعات والمداخل والأكياس والفواتير.</p>
           </div>
-        </CardHeader>
-        <CardBody className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        </Card.Header>
+        <Card.Content className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {marketingIdeas.map((idea) => {
             const existing = campaignFor('feature', null, idea.key);
             return (
@@ -451,15 +406,15 @@ export function MarketingCenter({
               </article>
             );
           })}
-        </CardBody>
+        </Card.Content>
       </Card>
 
       <Card className="border border-zinc-200">
-        <CardHeader className="gap-2 border-b border-zinc-100 font-black">
+        <Card.Header className="gap-2 border-b border-zinc-100 font-black">
           <BarChart3 className="size-5" />
-          نتائج الجروبات
-        </CardHeader>
-        <CardBody className="grid gap-3 lg:grid-cols-2">
+          نتائج مسارات المحتوى
+        </Card.Header>
+        <Card.Content className="grid gap-3 lg:grid-cols-2">
           {channelReports.map((report) => (
             <article key={report.channel.id} className="rounded-2xl border border-zinc-200 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -483,63 +438,9 @@ export function MarketingCenter({
               </div>
             </article>
           ))}
-        </CardBody>
+        </Card.Content>
       </Card>
 
-      <Card className="border border-zinc-200">
-        <CardHeader className="gap-2 border-b border-zinc-100 font-black">
-          <Users className="size-5" />
-          إدارة جروبات النشر
-        </CardHeader>
-        <CardBody className="grid gap-5 lg:grid-cols-[1fr_1.2fr]">
-          <form onSubmit={submitChannel} className="space-y-3 rounded-2xl bg-zinc-50 p-4">
-            <Input isRequired label="اسم الجروب" value={channelForm.name} onValueChange={(name) => setChannelForm({ ...channelForm, name })} />
-            <Input isRequired type="url" label="رابط جروب WhatsApp" value={channelForm.whatsappUrl} onValueChange={(whatsappUrl) => setChannelForm({ ...channelForm, whatsappUrl })} />
-            <Textarea label="ملاحظات خاصة بالإدارة" value={channelForm.notes} onValueChange={(notes) => setChannelForm({ ...channelForm, notes })} />
-            <Button type="submit" isLoading={pending} startContent={!pending && (channelForm.id ? <Pencil className="size-4" /> : <Plus className="size-4" />)} className="w-full bg-zinc-950 font-bold text-white">
-              {channelForm.id ? 'حفظ التعديل' : 'إضافة الجروب'}
-            </Button>
-          </form>
-          <div className="space-y-2">
-            {channels.map((channel) => (
-              <article key={channel.id} className="flex flex-col gap-3 rounded-2xl border border-zinc-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="truncate font-black">{channel.name}</p>
-                  <p className="mt-1 line-clamp-1 text-xs text-zinc-500">{channel.notes || 'بدون ملاحظات'}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    isIconOnly
-                    variant="flat"
-                    aria-label={`تعديل ${channel.name}`}
-                    onPress={() => setChannelForm({
-                      id: channel.id,
-                      name: channel.name,
-                      whatsappUrl: channel.whatsapp_url,
-                      notes: channel.notes,
-                      isActive: channel.is_active,
-                    })}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
-                  <Button
-                    onPress={() => startTransition(async () => {
-                      const result = await setMarketingChannelActive(channel.id, !channel.is_active);
-                      setMessage(result.message);
-                      if (result.success) router.refresh();
-                    })}
-                    className={channel.is_active
-                      ? 'bg-zinc-100 font-bold text-zinc-700'
-                      : 'bg-emerald-600 font-bold text-white'}
-                  >
-                    {channel.is_active ? 'إيقاف' : 'تفعيل'}
-                  </Button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </CardBody>
-      </Card>
     </div>
   );
 }

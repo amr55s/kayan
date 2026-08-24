@@ -4,6 +4,11 @@ KAYAN CITY SPOT separates the public directory from authenticated delivery opera
 
 ## Required setup
 
+For the isolated marketplace Staging setup, follow
+[`docs/staging-external-services.md`](docs/staging-external-services.md). It
+separates public and private object storage and keeps every credential scoped
+away from Production.
+
 1. Create a Supabase project and add the variables in `.env.example` to `.env`.
 2. Apply `supabase/migrations/202607250001_secure_delivery_operations.sql` through the Supabase CLI or SQL editor **after a database backup**.
 3. Enable Realtime publication for `delivery_orders` and `driver_profiles`.

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,7 @@ const payloadSchema = z.object({
     'marketing_share_click',
     'card_download',
     'guide_open',
+    'marketplace_open',
     'favorite_click',
     'upvote_click',
     'search_use',
@@ -41,24 +43,18 @@ const payloadSchema = z.object({
   campaignKey: z.string().regex(/^[a-z0-9_-]{0,64}$/i).default(''),
 });
 
-const placeEvents = new Set([
-  'place_open',
+const sharedEntityEvents = new Set([
   'phone_click',
   'whatsapp_click',
+  'share_click',
+]);
+const placeOnlyEvents = new Set([
+  'place_open',
   'group_click',
   'telegram_click',
   'map_click',
-  'share_click',
   'favorite_click',
   'upvote_click',
-]);
-const driverEvents = new Set([
-  'driver_open',
-  'phone_click',
-  'whatsapp_click',
-  'share_click',
-  'marketing_share_click',
-  'card_download',
 ]);
 const featureEvents = new Set([
   'search_use',
@@ -70,20 +66,27 @@ const featureEvents = new Set([
   'marketing_share_click',
   'card_download',
   'guide_open',
+  'marketplace_open',
 ]);
 
 function targetIsValid(payload: z.infer<typeof payloadSchema>): boolean {
   if (payload.eventName === 'page_view') {
     return payload.targetType === 'site' && payload.targetKey === '';
   }
-  if (placeEvents.has(payload.eventName)) {
+  if (sharedEntityEvents.has(payload.eventName)) {
+    return (
+      (payload.targetType === 'place' || payload.targetType === 'driver')
+      && UUID_PATTERN.test(payload.targetKey)
+    );
+  }
+  if (placeOnlyEvents.has(payload.eventName)) {
     return payload.targetType === 'place' && UUID_PATTERN.test(payload.targetKey);
   }
-  if (
-    driverEvents.has(payload.eventName)
-    && payload.targetType === 'driver'
-  ) {
-    return UUID_PATTERN.test(payload.targetKey);
+  if (payload.eventName === 'driver_open') {
+    return (
+      payload.targetType === 'driver'
+      && UUID_PATTERN.test(payload.targetKey)
+    );
   }
   if (payload.eventName === 'marketing_share_click' || payload.eventName === 'card_download') {
     if (payload.targetType === 'place' || payload.targetType === 'driver') {
@@ -102,6 +105,7 @@ function targetIsValid(payload: z.infer<typeof payloadSchema>): boolean {
 }
 
 export async function POST(request: Request) {
+  const requestId = request.headers.get('x-vercel-id') || crypto.randomUUID();
   try {
     const contentLength = Number(request.headers.get('content-length') ?? 0);
     if (contentLength > MAX_BODY_BYTES) {
@@ -143,11 +147,11 @@ export async function POST(request: Request) {
       p_limit: 120,
     });
     if (error) {
-      console.warn('Anonymous behavior analytics could not be recorded:', error);
+      logSafeServerFailure('warn', 'analytics_record_failed', { failure: error, requestId });
     }
     return new Response(null, { status: 204 });
   } catch (error) {
-    console.warn('Anonymous behavior analytics endpoint failed:', error);
+    logSafeServerFailure('warn', 'analytics_endpoint_failed', { failure: error, requestId });
     return new Response(null, { status: 204 });
   }
 }

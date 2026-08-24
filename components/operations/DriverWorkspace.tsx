@@ -1,30 +1,38 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState, useTransition } from 'react';
-import { Button, Card, CardBody, CardHeader, Chip, Input } from '@heroui/react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { Avatar } from '@heroui/react/avatar';
+import { Button } from '@heroui/react/button';
+import { Card } from '@heroui/react/card';
+import { Chip } from '@heroui/react/chip';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { TextField } from '@heroui/react/textfield';
 import {
+  AlertTriangle,
   BellRing,
   Bike,
   CheckCircle2,
   Clock3,
+  ImagePlus,
   MapPin,
-  MessageCircle,
   PackageCheck,
-  Phone,
   RotateCcw,
   ShieldCheck,
   Smartphone,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   changeDeliveryOrderStatus,
   claimDeliveryOrder,
   renewDriverAvailability,
   updateDriverPublicProfile,
+  updateDriverAvatar,
 } from '@/lib/operations/actions';
 import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
-import { formatPhoneForTel, formatWhatsAppUrl } from '@/lib/utils';
 import { PushSubscriptionButton } from './PushSubscriptionButton';
+import { driverAvatarTone } from '@/lib/driver-avatar';
 
 type Order = {
   id: string;
@@ -44,9 +52,11 @@ type Order = {
 type PublicProfile = {
   displayName: string;
   contactPhone: string;
-  whatsapp: string;
   vehicleType: string;
+  avatarUrl: string | null;
 };
+
+type EditablePublicProfile = Omit<PublicProfile, 'avatarUrl'>;
 
 const statusLabel: Record<string, string> = {
   open: 'مهمة متاحة',
@@ -62,9 +72,9 @@ const cairoTime = new Intl.DateTimeFormat('ar-EG', {
 });
 
 function availabilityCopy(activeUntil: string | null, now: number) {
-  if (!activeUntil) return { active: false, label: 'غير متاح حاليًا', remaining: 'فعّل التواجد لاستقبال المهام' };
+  if (!activeUntil) return { active: false, label: 'خامل (غير متاح حاليًا)', remaining: 'فعّل التواجد لاستقبال المهام' };
   const remainingMs = new Date(activeUntil).getTime() - now;
-  if (remainingMs <= 0) return { active: false, label: 'انتهى وقت التواجد', remaining: 'يمكنك تجديد التواجد الآن' };
+  if (remainingMs <= 0) return { active: false, label: 'انتهى وقت التواجد (خامل)', remaining: 'يمكنك تجديد التواجد الآن' };
   const remainingMinutes = Math.ceil(remainingMs / 60_000);
   const hours = Math.floor(remainingMinutes / 60);
   const minutes = remainingMinutes % 60;
@@ -92,12 +102,20 @@ export function DriverWorkspace({
   const router = useRouter();
   const [actionPending, startActionTransition] = useTransition();
   const [profilePending, startProfileTransition] = useTransition();
+  const [avatarPending, startAvatarTransition] = useTransition();
   const [actionMessage, setActionMessage] = useState('');
   const [profileMessage, setProfileMessage] = useState('');
-  const [profileForm, setProfileForm] = useState(publicProfile);
+  const currentEditableProfile: EditablePublicProfile = {
+    displayName: publicProfile.displayName,
+    contactPhone: publicProfile.contactPhone,
+    vehicleType: publicProfile.vehicleType,
+  };
+  const [profileForm, setProfileForm] = useState<EditablePublicProfile>(currentEditableProfile);
+  const [avatarUrl, setAvatarUrl] = useState(publicProfile.avatarUrl);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [now, setNow] = useState(serverNow);
   const availability = availabilityCopy(availableUntil, now);
-  const isProfileDirty = JSON.stringify(profileForm) !== JSON.stringify(publicProfile);
+  const isProfileDirty = JSON.stringify(profileForm) !== JSON.stringify(currentEditableProfile);
   const openOrders = orders.filter((order) => order.status === 'open').length;
   const activeOrders = orders.filter((order) =>
     ['assigned', 'picked_up', 'issue'].includes(order.status),
@@ -161,13 +179,52 @@ export function DriverWorkspace({
     });
   }
 
+  function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setProfileMessage('');
+    if (file.size > 3_500_000) {
+      setProfileMessage('حجم الصورة كبير. اختر صورة أقل من 3.5 ميجابايت.');
+      return;
+    }
+
+    startAvatarTransition(async () => {
+      try {
+        const data = new FormData();
+        data.set('avatar', file);
+        const result = await updateDriverAvatar(data);
+        if (!result.success || !result.data) {
+          setProfileMessage(result.success ? 'تعذر تحديث الصورة.' : result.message);
+          return;
+        }
+        setAvatarUrl(result.data.avatarUrl);
+        setProfileMessage('تم تحديث صورتك وتظهر الآن في بطاقة الكابتن.');
+        router.refresh();
+      } catch (error) {
+        console.error('Driver avatar transport failed:', error);
+        setProfileMessage('انقطع الاتصال أثناء رفع الصورة. حاول مرة أخرى.');
+      }
+    });
+  }
+
   return (
     <main
       id="main-content"
       className="dir-rtl mx-auto min-h-[calc(100dvh-4rem)] max-w-5xl space-y-5 overflow-x-clip px-3 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6"
     >
+      {!availability.active && (
+        <div role="alert" className="flex items-start gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-200 shadow-sm">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-400" aria-hidden="true" />
+          <div>
+            <p className="font-extrabold text-sm text-amber-100">إشعار: حسابك خامل حاليًا!</p>
+            <p className="mt-1 text-xs text-amber-200/90 leading-5">أنت لا تظهر للعملاء في قائمة الكباتن المتاحين ولن تتلقى الطلبات الجديدة. اضغط «تفعيل التواجد لساعتين» لتظهر متصلاً.</p>
+          </div>
+        </div>
+      )}
+
       <Card className="overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 text-white shadow-lg shadow-zinc-950/10">
-        <CardBody className="gap-5 p-4 sm:p-6">
+        <Card.Content className="gap-5 p-4 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -176,24 +233,25 @@ export function DriverWorkspace({
                   size="sm"
                   className={
                     availability.active
-                      ? 'border border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
-                      : 'border border-zinc-700 bg-zinc-900 text-zinc-300'
+                      ? 'border border-emerald-400/30 bg-emerald-400/10 font-bold text-emerald-200'
+                      : 'border border-amber-500/40 bg-amber-500/15 font-bold text-amber-300'
                   }
                 >
-                  {availability.active ? 'متاح' : 'غير متاح'}
+                  {availability.active ? 'متصل ومتاح' : 'خامل (غير متاح)'}
                 </Chip>
               </div>
               <p className="mt-1 text-sm font-semibold text-zinc-200">{availability.label}</p>
               <p className="mt-1 text-xs text-zinc-400">{availability.remaining}</p>
             </div>
             <Button
-              isLoading={actionPending}
+              isPending={actionPending}
               onPress={() => run(renewDriverAvailability)}
               className="min-h-12 w-full bg-white px-5 font-extrabold text-zinc-950 sm:w-auto"
-              startContent={!actionPending && <Bike className="size-5" aria-hidden="true" />}
             >
+              {!actionPending && <Bike className="size-5" aria-hidden="true" />}
               {availability.active ? 'تجديد التواجد لساعتين' : 'تفعيل التواجد لساعتين'}
             </Button>
+            <Link href="/driver/marketplace" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-5 font-extrabold text-white transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:w-auto"><PackageCheck className="size-5" aria-hidden="true" />توصيل طلبات المتجر</Link>
           </div>
           {actionMessage && (
             <p
@@ -204,32 +262,32 @@ export function DriverWorkspace({
               {actionMessage}
             </p>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
 
       <section aria-label="ملخص الكابتن" className="grid grid-cols-3 gap-2 sm:gap-3">
         <SummaryCard label="مهام متاحة" value={openOrders} icon={<BellRing className="size-4" />} />
         <SummaryCard label="مهام جارية" value={activeOrders} icon={<PackageCheck className="size-4" />} />
         <SummaryCard
-          label="حالة البطاقة"
+          label="اكتمال الملف"
           value={publicProfile.contactPhone ? 'مكتملة' : 'ناقصة'}
           icon={<ShieldCheck className="size-4" />}
         />
       </section>
 
       <Card className="rounded-3xl border border-zinc-200 shadow-sm">
-        <CardHeader className="flex flex-col items-stretch gap-2 border-b border-zinc-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <Card.Header className="flex flex-col items-stretch gap-2 border-b border-zinc-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
-            <h2 className="font-black text-zinc-950">بيانات البطاقة العامة</h2>
+            <h2 className="font-black text-zinc-950">بيانات التشغيل</h2>
             <p className="mt-1 text-xs leading-6 text-zinc-500">
-              رقم الدخول لا يتغير هنا. رقما الاتصال وواتساب هما اللذان يعملان في أزرار بطاقتك.
+              رقم الدخول لا يتغير هنا. رقم التشغيل محفوظ لفريق الإدارة ولا يظهر في الدليل العام.
             </p>
           </div>
-          <Chip size="sm" variant="flat" className="w-fit text-zinc-700">
+          <Chip size="sm" variant="secondary" className="w-fit text-zinc-700">
             تظهر التعديلات فور الحفظ
           </Chip>
-        </CardHeader>
-        <CardBody className="p-4 sm:p-5">
+        </Card.Header>
+        <Card.Content className="p-4 sm:p-5">
           <form onSubmit={saveProfile} className="grid gap-4 sm:grid-cols-2">
             {profileMessage && (
               <p
@@ -240,82 +298,60 @@ export function DriverWorkspace({
                 {profileMessage}
               </p>
             )}
-            <Input
-              isRequired
-              name="displayName"
-              autoComplete="name"
-              label="اسم الكابتن"
-              value={profileForm.displayName}
-              onValueChange={(displayName) => setProfileForm({ ...profileForm, displayName })}
-            />
-            <Input
-              isRequired
-              name="contactPhone"
-              autoComplete="tel"
-              type="tel"
-              inputMode="tel"
-              label="رقم للتواصل"
-              placeholder="مثال: 01012345678"
-              value={profileForm.contactPhone}
-              onValueChange={(contactPhone) => setProfileForm({ ...profileForm, contactPhone })}
-            />
-            <Input
-              name="whatsapp"
-              autoComplete="tel"
-              type="tel"
-              inputMode="tel"
-              label="رقم واتساب"
-              placeholder="مثال: 01012345678"
-              value={profileForm.whatsapp}
-              onValueChange={(whatsapp) => setProfileForm({ ...profileForm, whatsapp })}
-            />
-            <p className="-mt-2 text-xs leading-5 text-zinc-500 sm:col-span-2">
-              رقم التواصل يشغّل زر «اتصال»، ورقم واتساب يشغّل زر «واتساب» ويمكن أن يختلف عنه.
-            </p>
-            <Input
-              name="vehicleType"
-              autoComplete="off"
-              label="نوع المركبة"
-              placeholder="موتوسيكل، دراجة، سيارة"
-              value={profileForm.vehicleType}
-              onValueChange={(vehicleType) => setProfileForm({ ...profileForm, vehicleType })}
-            />
-
-            <div className="grid grid-cols-2 gap-2 sm:col-span-2">
+            <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 sm:col-span-2">
+              <Avatar className={`size-16 shrink-0 border text-base font-black shadow-sm ${driverAvatarTone(profileForm.contactPhone)}`}>
+                {avatarUrl ? <Avatar.Image src={avatarUrl} alt={profileForm.displayName || 'كابتن'} className="object-cover" /> : null}
+                <Avatar.Fallback>{(profileForm.displayName || 'كابتن').slice(0, 1)}</Avatar.Fallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-black text-zinc-950">صورتك على بطاقة التوصيل</p>
+                <p className="mt-1 text-xs leading-5 text-zinc-500">JPG أو PNG أو WebP، بحد أقصى 3.5 ميجابايت.</p>
+              </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={uploadAvatar}
+                aria-label="اختيار صورة الكابتن"
+              />
               <Button
-                as="a"
-                href={`tel:${formatPhoneForTel(profileForm.contactPhone)}`}
-                isDisabled={!profileForm.contactPhone}
-                variant="flat"
-                startContent={<Phone className="size-4" aria-hidden="true" />}
-                className="min-h-11 font-bold"
+                type="button"
+                isIconOnly
+                isPending={avatarPending}
+                onPress={() => avatarInputRef.current?.click()}
+                aria-label={avatarUrl ? 'تغيير صورة الكابتن' : 'إضافة صورة الكابتن'}
+                className="size-11 min-w-11 border border-zinc-800 bg-zinc-950 text-white"
               >
-                تجربة الاتصال
-              </Button>
-              <Button
-                as="a"
-                href={formatWhatsAppUrl(profileForm.whatsapp || profileForm.contactPhone)}
-                target="_blank"
-                rel="noopener noreferrer"
-                isDisabled={!profileForm.whatsapp && !profileForm.contactPhone}
-                variant="flat"
-                startContent={<MessageCircle className="size-4" aria-hidden="true" />}
-                className="min-h-11 font-bold"
-              >
-                تجربة واتساب
+                {!avatarPending && <ImagePlus className="size-5" aria-hidden="true" />}
               </Button>
             </div>
+            <TextField fullWidth isRequired className="space-y-1.5">
+              <Label className="text-sm font-bold text-zinc-800">اسم الكابتن</Label>
+              <Input required name="displayName" autoComplete="name" value={profileForm.displayName} onChange={(event) => setProfileForm({ ...profileForm, displayName: event.target.value })} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
+            </TextField>
+            <TextField fullWidth isRequired className="space-y-1.5">
+              <Label className="text-sm font-bold text-zinc-800">رقم للتواصل</Label>
+              <Input required name="contactPhone" autoComplete="tel" type="tel" inputMode="tel" placeholder="مثال: 01012345678" value={profileForm.contactPhone} onChange={(event) => setProfileForm({ ...profileForm, contactPhone: event.target.value })} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
+            </TextField>
+            <p className="-mt-2 text-xs leading-5 text-zinc-500 sm:col-span-2">
+              رقم التواصل محفوظ لفريق التشغيل ولا يظهر في دليل الكباتن العام.
+            </p>
+            <TextField fullWidth className="space-y-1.5">
+              <Label className="text-sm font-bold text-zinc-800">نوع المركبة</Label>
+              <Input name="vehicleType" autoComplete="off" placeholder="موتوسيكل، دراجة، سيارة" value={profileForm.vehicleType} onChange={(event) => setProfileForm({ ...profileForm, vehicleType: event.target.value })} className="min-h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
+            </TextField>
 
             <Button
               type="submit"
-              isLoading={profilePending}
+              isPending={profilePending}
               isDisabled={!isProfileDirty}
               className="min-h-12 bg-zinc-950 font-bold text-white sm:col-span-2"
             >
               حفظ بيانات البطاقة
             </Button>
           </form>
-        </CardBody>
+        </Card.Content>
       </Card>
 
       <section className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
@@ -369,7 +405,7 @@ function SummaryCard({
 }) {
   return (
     <Card className="min-w-0 rounded-2xl border border-zinc-200 shadow-none">
-      <CardBody className="gap-2 p-3 sm:flex-row sm:items-center sm:p-4">
+      <Card.Content className="gap-2 p-3 sm:flex-row sm:items-center sm:p-4">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-700">
           {icon}
         </span>
@@ -377,7 +413,7 @@ function SummaryCard({
           <p className="truncate text-[10px] font-bold text-zinc-500 sm:text-xs">{label}</p>
           <p className="truncate text-base font-black tabular-nums sm:text-lg">{value}</p>
         </div>
-      </CardBody>
+      </Card.Content>
     </Card>
   );
 }
@@ -405,17 +441,15 @@ function OrderCard({
           <p className="break-words font-black">
             #{order.public_code} — {statusLabel[order.status] ?? order.status}
           </p>
-          <p className="mt-1 text-sm text-zinc-500">
-            {order.recipient_name} · <bdi dir="ltr">{order.recipient_phone}</bdi>
-          </p>
+          <p className="mt-1 text-sm text-zinc-500">{order.recipient_name}</p>
         </div>
         {order.status === 'open' && (
           <Chip
             color="warning"
-            variant="flat"
-            startContent={<Clock3 className="size-3" aria-hidden="true" />}
+            variant="secondary"
             className="shrink-0 tabular-nums"
           >
+            <Clock3 className="size-3" aria-hidden="true" />
             {remaining} د
           </Chip>
         )}
@@ -432,60 +466,60 @@ function OrderCard({
       {order.notes && <p className="mt-3 break-words text-sm text-zinc-600">ملاحظة: {order.notes}</p>}
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-600">
         {order.collection_amount !== null && (
-          <Chip variant="flat">تحصيل: {order.collection_amount} ج.م</Chip>
+          <Chip variant="secondary">تحصيل: {order.collection_amount} ج.م</Chip>
         )}
         {order.delivery_fee !== null && (
-          <Chip variant="flat">التوصيل: {order.delivery_fee} ج.م</Chip>
+          <Chip variant="secondary">التوصيل: {order.delivery_fee} ج.م</Chip>
         )}
       </div>
 
       <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap">
         {order.status === 'open' && (
           <Button
-            isLoading={pending}
+            isPending={pending}
             onPress={() => run(() => claimDeliveryOrder(order.id))}
             className="min-h-11 bg-zinc-950 font-extrabold text-white"
-            startContent={!pending && <CheckCircle2 className="size-4" aria-hidden="true" />}
           >
+            {!pending && <CheckCircle2 className="size-4" aria-hidden="true" />}
             قبول المهمة
           </Button>
         )}
         {order.status === 'assigned' && (
           <>
             <Button
-              isLoading={pending}
+              isPending={pending}
               onPress={() =>
                 run(() =>
                   changeDeliveryOrderStatus({ orderId: order.id, nextStatus: 'picked_up' }),
                 )
               }
               className="min-h-11 bg-zinc-950 font-bold text-white"
-              startContent={!pending && <PackageCheck className="size-4" aria-hidden="true" />}
             >
+              {!pending && <PackageCheck className="size-4" aria-hidden="true" />}
               تأكيد الاستلام
             </Button>
             <Button
-              variant="flat"
+              variant="secondary"
               isDisabled={pending}
               onPress={() =>
                 run(() => changeDeliveryOrderStatus({ orderId: order.id, nextStatus: 'open' }))
               }
               className="min-h-11"
-              startContent={<RotateCcw className="size-4" aria-hidden="true" />}
             >
+              <RotateCcw className="size-4" aria-hidden="true" />
               إعادة العرض
             </Button>
           </>
         )}
         {order.status === 'picked_up' && (
           <Button
-            isLoading={pending}
+            isPending={pending}
             onPress={() =>
               run(() => changeDeliveryOrderStatus({ orderId: order.id, nextStatus: 'delivered' }))
             }
             className="min-h-11 bg-zinc-950 font-bold text-white"
-            startContent={!pending && <PackageCheck className="size-4" aria-hidden="true" />}
           >
+            {!pending && <PackageCheck className="size-4" aria-hidden="true" />}
             تأكيد التسليم
           </Button>
         )}
