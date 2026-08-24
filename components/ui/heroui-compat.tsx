@@ -12,6 +12,7 @@ import React, {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import NextImage from 'next/image';
 import {
   Card as HeroCard,
   CardContent,
@@ -197,7 +198,7 @@ export function Image({
 
     try {
       const parsed = new URL(src);
-      return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' || parsed.protocol === 'blob:'
         ? parsed.toString()
         : undefined;
     } catch {
@@ -205,19 +206,30 @@ export function Image({
     }
   })();
 
+  const imageWidth = typeof width === 'number' || /^\d+$/u.test(width || '')
+    ? width as number | `${number}`
+    : undefined;
+  const imageHeight = typeof height === 'number' || /^\d+$/u.test(height || '')
+    ? height as number | `${number}`
+    : undefined;
+  const hasDimensions = imageWidth !== undefined && imageHeight !== undefined;
+
   return (
-    <span className={classNames?.wrapper}>
-      {/* Directory images are user supplied and may not be known to Next Image. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={safeSrc}
-        alt={alt || ''}
-        draggable={draggable}
-        height={height}
-        loading={loading}
-        width={width}
-        className={cx(classNames?.img, className)}
-      />
+    <span className={cx('relative block', classNames?.wrapper)}>
+      {safeSrc ? (
+        <NextImage
+          src={safeSrc}
+          alt={alt || ''}
+          draggable={draggable}
+          loading={loading}
+          width={hasDimensions ? imageWidth : undefined}
+          height={hasDimensions ? imageHeight : undefined}
+          fill={!hasDimensions}
+          sizes={!hasDimensions ? '100vw' : undefined}
+          unoptimized
+          className={cx(classNames?.img, className)}
+        />
+      ) : null}
     </span>
   );
 }
