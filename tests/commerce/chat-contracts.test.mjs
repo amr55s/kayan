@@ -33,3 +33,40 @@ test('search and message bodies are bounded', () => {
   form.set('body', 'x'.repeat(5001));
   assert.equal(parseSendMessageForm(form).success, false);
 });
+
+test('message and search limits count Unicode code points', () => {
+  const message = (body) => {
+    const form = new FormData();
+    form.set('conversationId', crypto.randomUUID());
+    form.set('clientMessageId', crypto.randomUUID());
+    form.set('body', body);
+    return parseSendMessageForm(form).success;
+  };
+  assert.equal(message('😀'.repeat(5000)), true);
+  assert.equal(message('😀'.repeat(5001)), false);
+  assert.equal(parseChatSearchInput({ conversationId: crypto.randomUUID(), query: '😀'.repeat(200), limit: 30 }).success, true);
+  assert.equal(parseChatSearchInput({ conversationId: crypto.randomUUID(), query: '😀'.repeat(201), limit: 30 }).success, false);
+});
+
+test('message cards are parsed and must match the message kind', () => {
+  const form = (kind, body, card) => {
+    const value = new FormData();
+    value.set('conversationId', crypto.randomUUID());
+    value.set('clientMessageId', crypto.randomUUID());
+    value.set('kind', kind);
+    if (body !== undefined) value.set('body', body);
+    if (card !== undefined) value.set('card', JSON.stringify(card));
+    return parseSendMessageForm(value).success;
+  };
+  assert.equal(form('text', 'hello'), true);
+  assert.equal(form('text', '   '), false);
+  assert.equal(form('text', 'hello', { type: 'product', id: crypto.randomUUID() }), false);
+  assert.equal(form('product', null, { type: 'product', id: crypto.randomUUID() }), true);
+  assert.equal(form('store', null, { type: 'product', id: crypto.randomUUID() }), false);
+  assert.equal(form('location', null, { type: 'location', latitude: 30, longitude: 31 }), true);
+  assert.equal(form('location', null, { type: 'location', latitude: 91, longitude: 31 }), false);
+  assert.equal(form('location', null, { type: 'product', id: crypto.randomUUID() }), false);
+  assert.equal(form('product', null), false);
+  assert.equal(form('image', null), true);
+  assert.equal(form('product', null, '{bad json'), false);
+});
