@@ -4,6 +4,10 @@ import test from 'node:test';
 
 const migrationsUrl = new URL('../../supabase/migrations/', import.meta.url);
 const pgTapSql = readFileSync(new URL('../../supabase/tests/rls_contract.sql', import.meta.url), 'utf8');
+const granularAdminSql = readFileSync(
+  new URL('../../supabase/migrations/20260818180000_granular_admin_memberships.sql', import.meta.url),
+  'utf8',
+);
 const matchingMigrations = readdirSync(migrationsUrl)
   .filter((name) => name.endsWith('_unified_marketplace_chat_core.sql'));
 
@@ -116,8 +120,46 @@ test('active customer-driver blocks create one constrained assigned-admin suppor
   assert.match(block, /participant\.user_id is distinct from p_counterparty_id/u);
   assert.match(block, /'supportEscalationConversationId'/u);
   assert.match(block, /'orderSupportAvailable'/u);
-  assert.match(routineSql('can_access_marketplace_chat_thread'), /thread\.assigned_admin_id = v_actor_id[\s\S]*membership\.role::text in \('support', 'super_admin', 'chat_monitor'\)/u);
+  assert.match(routineSql('can_send_marketplace_chat_thread'), /thread\.assigned_admin_id = v_actor_id[\s\S]*membership\.role::text in \('support', 'super_admin'\)/u);
   assert.match(routineSql('send_my_marketplace_chat_message'), /participant\.participant_role = 'admin'[\s\S]*v_thread\.assigned_admin_id = v_actor_id/u);
+});
+
+test('chat monitors remain read-only across chat, Realtime, and legacy support senders', () => {
+  const access = routineSql('can_access_marketplace_chat_thread');
+  const canSend = routineSql('can_send_marketplace_chat_thread');
+  const send = routineSql('send_my_marketplace_chat_message');
+  const block = routineSql('block_my_marketplace_chat_counterparty');
+  const realtimeSendPolicy = sql.match(
+    /create policy marketplace_chat_send_private[\s\S]*?\n\);/u,
+  )?.[0] ?? '';
+  assert.match(access, /membership\.role::text = 'chat_monitor'/u);
+  assert.match(canSend, /membership\.role::text in \('support', 'super_admin'\)/u);
+  assert.doesNotMatch(canSend, /chat_monitor/u);
+  assert.match(send, /can_send_marketplace_chat_thread/u);
+  assert.doesNotMatch(send, /'support', 'super_admin', 'chat_monitor'/u);
+  assert.match(realtimeSendPolicy, /can_send_marketplace_chat_thread/u);
+  assert.doesNotMatch(block, /membership\.role::text in \('support', 'super_admin', 'chat_monitor'\)/u);
+  assert.doesNotMatch(
+    granularAdminSql.match(/-- Support functions[\s\S]*?alter table public\.admin_memberships/u)?.[0] ?? '',
+    /chat_monitor/u,
+  );
+});
+
+test('blocked escalation counterparties cannot be reactivated by store membership sync', () => {
+  const sync = routineSql('sync_marketplace_chat_store_participant');
+  assert.match(sync, /marketplace_chat_block_escalations/u);
+  assert.match(sync, /escalation\.blocked_user_id = v_user_id/u);
+  assert.match(sync, /set removed_at = coalesce\(removed_at, now\(\)\)/u);
+});
+
+test('escalation reuse repairs stale support assignment and reports actual eligibility', () => {
+  const block = routineSql('block_my_marketplace_chat_counterparty');
+  assert.match(block, /membership\.role::text in \('support', 'super_admin'\)/u);
+  assert.match(block, /where thread\.id = v_escalation_thread_id\s+for update/u);
+  assert.match(block, /set assigned_admin_id = v_assigned_admin_id/u);
+  assert.match(block, /participant_role = 'admin'[\s\S]*removed_at = coalesce\(participant\.removed_at, now\(\)\)/u);
+  assert.match(block, /v_administration_assigned/u);
+  assert.doesNotMatch(block, /'administrationAssigned', v_assigned_admin_id is not null/u);
 });
 
 test('SQL accepts only exact bounded card shapes from Task 1', () => {
@@ -128,7 +170,7 @@ test('SQL accepts only exact bounded card shapes from Task 1', () => {
 });
 
 test('driver authorization requires an active driver profile and deactivation sync', () => {
-  assert.match(routineSql('can_access_marketplace_chat_thread'), /profile\.role = 'driver'.*profile\.is_active/su);
+  assert.match(routineSql('can_send_marketplace_chat_thread'), /profile\.role = 'driver'.*profile\.is_active/su);
   assert.match(routineSql('sync_marketplace_chat_driver_participant'), /profile\.role = 'driver'.*profile\.is_active/su);
   assert.match(sql, /create or replace function public\.sync_marketplace_chat_driver_profile/u);
   assert.doesNotMatch(routineSql('sync_marketplace_chat_driver_participant'), /joined_at = now\(\)/u);
@@ -169,6 +211,15 @@ test('pgTAP runtime coverage has a correct plan for the review threat matrix', (
     'blocked driver cannot access the substitute support thread',
     'actual realtime.messages INSERT policy accepts the participant topic',
     'catalog-only membership synchronization removes chat participation',
+    'monitor-only assigned participant cannot author a chat message',
+    'monitor keeps read visibility but has no authoring predicate',
+    'actual Realtime policy rejects monitor-only channel writes',
+    'monitor-only admin cannot author through the legacy support reply RPC',
+    'reuse replaces a monitor-only assignment with an eligible support author',
+    'reuse replaces an inactive support administrator deterministically',
+    'reuse reports no administration when no eligible author exists',
+    'membership synchronization removes the mapped blocked merchant',
+    'blocked member cannot rejoin the escalation Realtime topic',
   ]) assert.match(pgTapSql, new RegExp(evidence, 'u'));
   assert.match(pgTapSql, /created_at = timestamp with time zone/u);
   assert.match(pgTapSql, /insert into realtime\.messages/u);

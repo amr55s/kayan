@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(63);
+select extensions.plan(74);
 
 select extensions.is(
   (select count(*)::integer from pg_catalog.pg_class as relation
@@ -64,7 +64,8 @@ from (values
   ('10000000-0000-0000-0000-000000000007'::uuid, 'chat-admin-monitor@example.test'),
   ('10000000-0000-0000-0000-000000000008'::uuid, 'chat-unrelated-merchant@example.test'),
   ('10000000-0000-0000-0000-000000000009'::uuid, 'chat-catalog-member@example.test'),
-  ('10000000-0000-0000-0000-000000000010'::uuid, 'chat-driver-inactive@example.test')
+  ('10000000-0000-0000-0000-000000000010'::uuid, 'chat-driver-inactive@example.test'),
+  ('10000000-0000-0000-0000-000000000011'::uuid, 'chat-admin-replacement@example.test')
 ) as fixture(id, email)
 on conflict (id) do nothing;
 
@@ -75,13 +76,15 @@ insert into public.profiles (
   ('10000000-0000-0000-0000-000000000005', 'driver', '01010000005', 'Former driver', true, false),
   ('10000000-0000-0000-0000-000000000010', 'driver', '01010000010', 'Inactive driver', false, false),
   ('10000000-0000-0000-0000-000000000006', 'admin', '01010000006', 'Generic admin', true, false),
-  ('10000000-0000-0000-0000-000000000007', 'admin', '01010000007', 'Chat monitor', true, false)
+  ('10000000-0000-0000-0000-000000000007', 'admin', '01010000007', 'Chat monitor', true, false),
+  ('10000000-0000-0000-0000-000000000011', 'admin', '01010000011', 'Replacement support', true, false)
 on conflict (id) do nothing;
 
 insert into public.admin_memberships (user_id, role, is_active)
 values
   ('10000000-0000-0000-0000-000000000006', 'support', true),
-  ('10000000-0000-0000-0000-000000000007', 'chat_monitor', true)
+  ('10000000-0000-0000-0000-000000000007', 'chat_monitor', true),
+  ('10000000-0000-0000-0000-000000000011', 'support', true)
 on conflict (user_id, role) do update set is_active = true;
 
 insert into public.marketplace_customers (id, auth_user_id, display_name)
@@ -694,6 +697,95 @@ select extensions.ok(
   'substitute support excludes the blocked driver and routes merchants plus assigned administration'
 );
 
+update public.support_threads as thread
+set assigned_admin_id = '10000000-0000-0000-0000-000000000007'
+from chat_escalation_state as state
+where thread.id = state.escalation_thread_id;
+update public.marketplace_chat_participants as participant
+set removed_at = coalesce(participant.removed_at, now())
+from chat_escalation_state as state
+where participant.thread_id = state.escalation_thread_id
+  and participant.participant_role = 'admin';
+insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
+select state.escalation_thread_id, '10000000-0000-0000-0000-000000000007', 'admin'
+from chat_escalation_state as state
+on conflict (thread_id, user_id, participant_role)
+do update set removed_at = null;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000007","role":"authenticated","aal":"aal2"}', true);
+select extensions.ok(
+  public.can_access_marketplace_chat_thread(
+    (select escalation_thread_id from chat_escalation_state)
+  ) and not public.can_send_marketplace_chat_thread(
+    (select escalation_thread_id from chat_escalation_state)
+  ),
+  'monitor keeps read visibility but has no authoring predicate'
+);
+select pg_temp.assert_marketplace_realtime_insert_policy(
+  'marketplace-chat:' || (select escalation_thread_id::text from chat_escalation_state),
+  false,
+  'actual Realtime policy rejects monitor-only channel writes'
+);
+select extensions.throws_ok(
+  $$select public.send_my_marketplace_chat_message(
+    (select escalation_thread_id from chat_escalation_state),
+    'c0000000-0000-0000-0000-000000000016', 'text', 'monitor must not author', null, null
+  )$$,
+  'P0002', 'not_found', 'monitor-only assigned participant cannot author a chat message'
+);
+select extensions.throws_ok(
+  $$select public.reply_my_marketplace_support_thread(
+    (select escalation_thread_id from chat_escalation_state), 'monitor legacy reply'
+  )$$,
+  '42501', 'admin_role_required',
+  'monitor-only admin cannot author through the legacy support reply RPC'
+);
+
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select extensions.ok(
+  (public.block_my_marketplace_chat_counterparty(
+    '90000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000004', true
+  ) ->> 'administrationAssigned')::boolean
+  and (select thread.assigned_admin_id = '10000000-0000-0000-0000-000000000006'
+       from public.support_threads as thread
+       join chat_escalation_state as state on state.escalation_thread_id = thread.id)
+  and (select count(*) = 0
+       from public.marketplace_chat_participants as participant
+       join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+       where participant.user_id = '10000000-0000-0000-0000-000000000007'
+         and participant.participant_role = 'admin' and participant.removed_at is null)
+  and (select count(*) = 1
+       from public.marketplace_chat_participants as participant
+       join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+       where participant.user_id = '10000000-0000-0000-0000-000000000006'
+         and participant.participant_role = 'admin' and participant.removed_at is null),
+  'reuse replaces a monitor-only assignment with an eligible support author'
+);
+
+reset role;
+insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
+select state.escalation_thread_id, '10000000-0000-0000-0000-000000000004', 'merchant'
+from chat_escalation_state as state
+on conflict (thread_id, user_id, participant_role)
+do update set removed_at = null;
+insert into public.store_memberships (store_id, user_id, role, is_active)
+values (
+  '40000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000004', 'fulfillment', true
+)
+on conflict (store_id, user_id) do update
+set role = excluded.role, is_active = true, updated_at = now();
+select extensions.ok(
+  (select participant.removed_at is not null
+   from public.marketplace_chat_participants as participant
+   join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+   where participant.user_id = '10000000-0000-0000-0000-000000000004'
+     and participant.participant_role = 'merchant'),
+  'membership synchronization removes the mapped blocked merchant'
+);
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
 select extensions.throws_ok(
@@ -717,6 +809,24 @@ select extensions.throws_ok(
     (select escalation_thread_id from chat_escalation_state), 20, null, null
   )$$,
   'P0002', 'not_found', 'blocked driver cannot access the substitute support thread'
+);
+select extensions.throws_ok(
+  $$select public.send_my_marketplace_chat_message(
+    (select escalation_thread_id from chat_escalation_state),
+    'c0000000-0000-0000-0000-000000000017', 'text', 'blocked membership retry', null, null
+  )$$,
+  'P0002', 'not_found', 'blocked member cannot send after a store membership update'
+);
+select extensions.ok(
+  not public.can_access_marketplace_chat_thread(
+    (select escalation_thread_id from chat_escalation_state)
+  ),
+  'blocked member cannot rejoin the escalation Realtime topic'
+);
+select pg_temp.assert_marketplace_realtime_insert_policy(
+  'marketplace-chat:' || (select escalation_thread_id::text from chat_escalation_state),
+  false,
+  'actual Realtime policy rejects blocked membership re-entry'
 );
 
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
@@ -749,6 +859,77 @@ select extensions.is(
   'order-operating merchant can access the substitute support path'
 );
 
+reset role;
+update public.profiles
+set is_active = false
+where id = '10000000-0000-0000-0000-000000000006';
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select extensions.ok(
+  (public.block_my_marketplace_chat_counterparty(
+    '90000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000004', true
+  ) ->> 'administrationAssigned')::boolean
+  and (select thread.assigned_admin_id = '10000000-0000-0000-0000-000000000011'
+       from public.support_threads as thread
+       join chat_escalation_state as state on state.escalation_thread_id = thread.id)
+  and (select count(*) = 0
+       from public.marketplace_chat_participants as participant
+       join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+       where participant.user_id = '10000000-0000-0000-0000-000000000006'
+         and participant.participant_role = 'admin' and participant.removed_at is null)
+  and (select count(*) = 1
+       from public.marketplace_chat_participants as participant
+       join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+       where participant.user_id = '10000000-0000-0000-0000-000000000011'
+         and participant.participant_role = 'admin' and participant.removed_at is null),
+  'reuse replaces an inactive support administrator deterministically'
+);
+
+reset role;
+create temporary table chat_author_admin_state (
+  user_id uuid primary key,
+  had_password_reset_required boolean not null
+) on commit drop;
+insert into chat_author_admin_state (user_id, had_password_reset_required)
+select profile.id, profile.must_change_password
+from public.profiles as profile
+where exists (
+  select 1 from public.admin_memberships as membership
+  where membership.user_id = profile.id and membership.is_active
+    and membership.role::text in ('support', 'super_admin')
+);
+update public.profiles as profile
+set must_change_password = true
+where exists (
+  select 1 from chat_author_admin_state as state where state.user_id = profile.id
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select extensions.ok(
+  not (public.block_my_marketplace_chat_counterparty(
+    '90000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000004', true
+  ) ->> 'administrationAssigned')::boolean
+  and (select thread.assigned_admin_id is null
+       from public.support_threads as thread
+       join chat_escalation_state as state on state.escalation_thread_id = thread.id)
+  and (select count(*) = 0
+       from public.marketplace_chat_participants as participant
+       join chat_escalation_state as state on state.escalation_thread_id = participant.thread_id
+       where participant.participant_role = 'admin' and participant.removed_at is null),
+  'reuse reports no administration when no eligible author exists'
+);
+
+reset role;
+update public.profiles as profile
+set must_change_password = state.had_password_reset_required
+from chat_author_admin_state as state
+where state.user_id = profile.id;
+
+set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
 select extensions.ok(
   not (public.block_my_marketplace_chat_counterparty(
