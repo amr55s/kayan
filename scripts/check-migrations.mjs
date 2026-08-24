@@ -22,7 +22,7 @@ for (const file of files) {
   if (timestamps.has(timestamp)) throw new Error(`duplicate_migration_timestamp:${timestamp}`);
   timestamps.add(timestamp);
   latestTimestamp = timestamp;
-  if (file.endsWith('_marketplace_release_marker.sql')) {
+  if (/_release_marker\.sql$/u.test(file)) {
     releaseMarkerTimestamp = timestamp;
   }
 
