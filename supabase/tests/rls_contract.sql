@@ -851,6 +851,13 @@ select extensions.ok(
 );
 
 reset role;
+select set_config(
+  'pgtap.marketplace_chat_delete_message_id',
+  (select message.id::text
+   from public.support_messages as message
+   where message.client_message_id = 'c0000000-0000-0000-0000-000000000015'),
+  true
+);
 update public.admin_memberships
 set is_active = false
 where user_id = '10000000-0000-0000-0000-000000000006'
@@ -863,8 +870,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000006","role":"authenticated","aal":"aal2"}', true);
 select extensions.throws_ok(
   $$select public.delete_my_marketplace_chat_message(
-    (select message.id from public.support_messages as message
-     where message.client_message_id = 'c0000000-0000-0000-0000-000000000015')
+    current_setting('pgtap.marketplace_chat_delete_message_id')::uuid
   )$$,
   'P0002', 'not_found',
   'monitor-only former support author cannot delete their message'

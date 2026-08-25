@@ -237,6 +237,15 @@ test('pgTAP runtime coverage has a correct plan for the review threat matrix', (
     'membership synchronization removes the mapped blocked merchant',
     'blocked member cannot rejoin the escalation Realtime topic',
   ]) assert.match(pgTapSql, new RegExp(evidence, 'u'));
+  assert.match(
+    pgTapSql,
+    /set_config\(\s*'pgtap\.marketplace_chat_delete_message_id',[\s\S]*?from public\.support_messages/u,
+  );
+  const monitorDeleteProbe = pgTapSql.match(
+    /\$\$select public\.delete_my_marketplace_chat_message\([\s\S]*?\)\$\$/u,
+  )?.[0] ?? '';
+  assert.match(monitorDeleteProbe, /current_setting\('pgtap\.marketplace_chat_delete_message_id'\)::uuid/u);
+  assert.doesNotMatch(monitorDeleteProbe, /from public\.support_messages/u);
   assert.match(pgTapSql, /created_at = timestamp with time zone/u);
   assert.match(pgTapSql, /insert into realtime\.messages/u);
 });
