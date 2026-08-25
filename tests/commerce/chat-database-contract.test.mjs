@@ -128,6 +128,8 @@ test('chat monitors remain read-only across chat, Realtime, and legacy support s
   const access = routineSql('can_access_marketplace_chat_thread');
   const canSend = routineSql('can_send_marketplace_chat_thread');
   const send = routineSql('send_my_marketplace_chat_message');
+  const react = routineSql('react_to_my_marketplace_chat_message');
+  const deleteMessage = routineSql('delete_my_marketplace_chat_message');
   const block = routineSql('block_my_marketplace_chat_counterparty');
   const realtimeSendPolicy = sql.match(
     /create policy marketplace_chat_send_private[\s\S]*?\n\);/u,
@@ -135,7 +137,15 @@ test('chat monitors remain read-only across chat, Realtime, and legacy support s
   assert.match(access, /membership\.role::text = 'chat_monitor'/u);
   assert.match(canSend, /membership\.role::text in \('support', 'super_admin'\)/u);
   assert.doesNotMatch(canSend, /chat_monitor/u);
-  assert.match(send, /can_send_marketplace_chat_thread/u);
+  for (const [name, routine] of [
+    ['send', send],
+    ['react', react],
+    ['delete', deleteMessage],
+    ['block', block],
+  ]) {
+    assert.match(routine, /can_send_marketplace_chat_thread/u, `${name} must require current write authority`);
+    assert.doesNotMatch(routine, /can_access_marketplace_chat_thread/u, `${name} must not authorize through monitor read access`);
+  }
   assert.doesNotMatch(send, /'support', 'super_admin', 'chat_monitor'/u);
   assert.match(realtimeSendPolicy, /can_send_marketplace_chat_thread/u);
   assert.doesNotMatch(block, /membership\.role::text in \('support', 'super_admin', 'chat_monitor'\)/u);
@@ -159,6 +169,8 @@ test('escalation reuse repairs stale support assignment and reports actual eligi
   assert.match(block, /set assigned_admin_id = v_assigned_admin_id/u);
   assert.match(block, /participant_role = 'admin'[\s\S]*removed_at = coalesce\(participant\.removed_at, now\(\)\)/u);
   assert.match(block, /v_administration_assigned/u);
+  const counterpartyExclusions = block.match(/profile\.id is distinct from p_counterparty_id/gu) ?? [];
+  assert.ok(counterpartyExclusions.length >= 3, `expected counterparty exclusion in keep, repair, and result checks, got ${counterpartyExclusions.length}`);
   assert.doesNotMatch(block, /'administrationAssigned', v_assigned_admin_id is not null/u);
 });
 
@@ -218,6 +230,10 @@ test('pgTAP runtime coverage has a correct plan for the review threat matrix', (
     'reuse replaces a monitor-only assignment with an eligible support author',
     'reuse replaces an inactive support administrator deterministically',
     'reuse reports no administration when no eligible author exists',
+    'monitor-only former support author cannot delete their message',
+    'denied monitor deletion leaves the original message untombstoned',
+    'reverse driver-customer block assigns support other than the blocked counterparty',
+    'reverse escalation excludes its blocked support-capable customer',
     'membership synchronization removes the mapped blocked merchant',
     'blocked member cannot rejoin the escalation Realtime topic',
   ]) assert.match(pgTapSql, new RegExp(evidence, 'u'));

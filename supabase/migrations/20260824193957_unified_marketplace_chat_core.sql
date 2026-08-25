@@ -998,7 +998,7 @@ begin
   select * into v_message from public.support_messages where id = p_message_id for update;
   if v_message is null or v_message.sender_user_id is distinct from v_actor_id
      or v_message.sender_kind = 'system'
-     or not public.can_access_marketplace_chat_thread(v_message.thread_id) then
+     or not public.can_send_marketplace_chat_thread(v_message.thread_id) then
     raise exception 'not_found' using errcode = 'P0002';
   end if;
   if v_message.deleted_at is null then
@@ -1214,6 +1214,7 @@ begin
       from public.profiles as profile
       join public.admin_memberships as membership on membership.user_id = profile.id
       where profile.id = v_previous_admin_id
+        and profile.id is distinct from p_counterparty_id
         and profile.role = 'admin' and profile.is_active
         and not profile.must_change_password and membership.is_active
         and membership.role::text in ('support', 'super_admin')
@@ -1226,6 +1227,7 @@ begin
       from public.profiles as profile
       join public.admin_memberships as membership on membership.user_id = profile.id
       where profile.role = 'admin' and profile.is_active
+        and profile.id is distinct from p_counterparty_id
         and not profile.must_change_password and membership.is_active
         and membership.role::text in ('support', 'super_admin')
       order by case membership.role::text when 'support' then 0 else 1 end,
@@ -1287,6 +1289,7 @@ begin
       join public.profiles as profile on profile.id = thread.assigned_admin_id
       join public.admin_memberships as membership on membership.user_id = profile.id
       where thread.id = v_escalation_thread_id
+        and profile.id is distinct from p_counterparty_id
         and profile.role = 'admin' and profile.is_active
         and not profile.must_change_password and membership.is_active
         and membership.role::text in ('support', 'super_admin')

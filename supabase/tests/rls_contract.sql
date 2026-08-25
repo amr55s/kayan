@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(74);
+select extensions.plan(78);
 
 select extensions.is(
   (select count(*)::integer from pg_catalog.pg_class as relation
@@ -850,6 +850,44 @@ select extensions.ok(
   'the narrowly assigned AAL2 support admin can read and respond'
 );
 
+reset role;
+update public.admin_memberships
+set is_active = false
+where user_id = '10000000-0000-0000-0000-000000000006'
+  and role::text = 'support';
+insert into public.admin_memberships (user_id, role, is_active)
+values ('10000000-0000-0000-0000-000000000006', 'chat_monitor', true)
+on conflict (user_id, role) do update set is_active = true;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000006","role":"authenticated","aal":"aal2"}', true);
+select extensions.throws_ok(
+  $$select public.delete_my_marketplace_chat_message(
+    (select message.id from public.support_messages as message
+     where message.client_message_id = 'c0000000-0000-0000-0000-000000000015')
+  )$$,
+  'P0002', 'not_found',
+  'monitor-only former support author cannot delete their message'
+);
+
+reset role;
+select extensions.ok(
+  (select message.deleted_at is null
+      and message.deleted_body is null
+      and message.body = 'Assigned support response'
+   from public.support_messages as message
+   where message.client_message_id = 'c0000000-0000-0000-0000-000000000015'),
+  'denied monitor deletion leaves the original message untombstoned'
+);
+update public.admin_memberships
+set is_active = true
+where user_id = '10000000-0000-0000-0000-000000000006'
+  and role::text = 'support';
+update public.admin_memberships
+set is_active = false
+where user_id = '10000000-0000-0000-0000-000000000006'
+  and role::text = 'chat_monitor';
+
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000003","role":"authenticated","aal":"aal1"}', true);
 select extensions.is(
   public.get_my_marketplace_conversation_page(
@@ -1016,6 +1054,61 @@ select extensions.throws_ok(
     'c0000000-0000-0000-0000-000000000011', 'system', 'forged system event', null, null
   )$$,
   '22023', 'invalid_input', 'participants cannot forge system messages'
+);
+
+reset role;
+insert into public.profiles (
+  id, role, phone, display_name, is_active, must_change_password
+) values (
+  '10000000-0000-0000-0000-000000000001', 'admin', '01010000001',
+  'Support-capable customer', true, false
+)
+on conflict (id) do update set
+  role = excluded.role,
+  is_active = true,
+  must_change_password = false;
+insert into public.admin_memberships (user_id, role, is_active)
+values ('10000000-0000-0000-0000-000000000001', 'support', true)
+on conflict (user_id, role) do update set is_active = true;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000004","role":"authenticated","aal":"aal1"}', true);
+select extensions.ok(
+  (public.block_my_marketplace_chat_counterparty(
+    '90000000-0000-0000-0000-000000000001',
+    '10000000-0000-0000-0000-000000000001', true
+  ) ->> 'administrationAssigned')::boolean,
+  'reverse driver-customer block assigns support other than the blocked counterparty'
+);
+
+reset role;
+select extensions.ok(
+  (select thread.assigned_admin_id = '10000000-0000-0000-0000-000000000011'
+   from public.marketplace_chat_block_escalations as escalation
+   join public.support_threads as thread on thread.id = escalation.escalation_thread_id
+   where escalation.source_thread_id = '90000000-0000-0000-0000-000000000001'
+     and escalation.blocker_user_id = '10000000-0000-0000-0000-000000000004'
+     and escalation.blocked_user_id = '10000000-0000-0000-0000-000000000001')
+  and (select count(*) = 0
+       from public.marketplace_chat_block_escalations as escalation
+       join public.marketplace_chat_participants as participant
+         on participant.thread_id = escalation.escalation_thread_id
+       where escalation.source_thread_id = '90000000-0000-0000-0000-000000000001'
+         and escalation.blocker_user_id = '10000000-0000-0000-0000-000000000004'
+         and escalation.blocked_user_id = '10000000-0000-0000-0000-000000000001'
+         and participant.user_id = escalation.blocked_user_id
+         and participant.removed_at is null)
+  and (select count(*) = 1
+       from public.marketplace_chat_block_escalations as escalation
+       join public.marketplace_chat_participants as participant
+         on participant.thread_id = escalation.escalation_thread_id
+       where escalation.source_thread_id = '90000000-0000-0000-0000-000000000001'
+         and escalation.blocker_user_id = '10000000-0000-0000-0000-000000000004'
+         and escalation.blocked_user_id = '10000000-0000-0000-0000-000000000001'
+         and participant.user_id = '10000000-0000-0000-0000-000000000011'
+         and participant.participant_role = 'admin'
+         and participant.removed_at is null),
+  'reverse escalation excludes its blocked support-capable customer'
 );
 
 select * from extensions.finish();
