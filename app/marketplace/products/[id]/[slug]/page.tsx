@@ -7,6 +7,8 @@ import { fetchMarketplaceProduct } from '@/lib/commerce/catalog';
 import { addMarketplaceCartItemAction } from '@/app/marketplace/actions';
 import { absoluteSiteUrl } from '@/lib/seo/site';
 import { serializeJsonLd } from '@/lib/seo/json-ld';
+import { createChatLoginHref } from '@/lib/auth/safe-next';
+import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +88,10 @@ export default async function MarketplaceProductPage({ params }: ProductPageProp
   const product = await loadProduct(id);
   if (!product) notFound();
   if (slug !== product.slug) redirect(marketplaceProductHref(product));
+  const returnTo = marketplaceProductHref(product);
+  const intent = { kind: 'presale', storeId: product.store.id, productId: product.id } as const;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const structuredData = productJsonLd(product);
   return (
     <>
@@ -96,6 +102,8 @@ export default async function MarketplaceProductPage({ params }: ProductPageProp
       <MarketplaceProductDetails
         product={product}
         addToCartAction={addMarketplaceCartItemAction}
+        isAuthenticated={Boolean(user)}
+        chatLoginHref={createChatLoginHref({ returnTo, intent })}
       />
     </>
   );

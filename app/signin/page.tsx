@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
-import { safeNextPath } from '@/lib/auth/safe-next';
+import { chatIntentFromSearchParams, safeNextPath } from '@/lib/auth/safe-next';
 import { createClient } from '@/lib/supabase/server';
 import { BrandLogo } from '@/components/layout/BrandLogo';
+import { openMarketplaceConversationAction } from '@/lib/commerce/chat/actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,10 +20,28 @@ export default async function SignInPage({
 }) {
   const params = await searchParams;
   const next = safeNextPath(typeof params.next === 'string' ? params.next : null);
+  const intent = chatIntentFromSearchParams(params);
   const errorCode = typeof params.error === 'string' ? params.error : '';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (user) redirect(next);
+  if (!intent) {
+    if (user) redirect(next);
+  }
+  if (user) {
+    if (intent) {
+      const form = new FormData();
+      form.set('kind', intent.kind);
+      form.set('chatRoute', '/account/chat');
+      if (intent.kind === 'presale') {
+        form.set('storeId', intent.storeId);
+        if (intent.productId) form.set('productId', intent.productId);
+      } else {
+        form.set('orderId', intent.orderId);
+      }
+      await openMarketplaceConversationAction({ status: 'idle' }, form);
+    }
+    redirect(next);
+  }
 
   return (
     <main id="main-content" className="flex min-h-screen items-center justify-center bg-zinc-100 px-4 py-10">
@@ -35,7 +54,13 @@ export default async function SignInPage({
           ادخل بجوجل للشراء أو لتقديم طلب تاجر أو كابتن. سنستخدم الاسم والبريد لتقليل الخطوات، ولن نمنح أي صلاحية تشغيلية قبل المراجعة.
         </p>
         {errors[errorCode] ? <p role="alert" className="mt-4 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{errors[errorCode]}</p> : null}
-        <div className="mt-6"><GoogleSignInButton next={next} /></div>
+        <div className="mt-6">
+          <GoogleSignInButton
+            next={next}
+            intent={intent}
+            helper={intent ? 'سنرجعك إلى الصفحة نفسها ونفتح المحادثة المطلوبة بعد اكتمال الدخول.' : undefined}
+          />
+        </div>
         <div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-zinc-200 pt-5 text-sm font-bold">
           <Link href="/marketplace" className="text-zinc-700 underline-offset-4 hover:underline">العودة إلى المتجر</Link>
           <Link href="/login" className="text-zinc-700 underline-offset-4 hover:underline">دخول فريق التشغيل</Link>

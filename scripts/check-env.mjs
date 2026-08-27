@@ -24,6 +24,7 @@ const groups = {
   ],
   operations: [
     'CRON_SECRET',
+    'MARKETPLACE_CHAT_INTENT_SECRET',
     'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
     'TURNSTILE_SECRET_KEY',
   ],
@@ -189,6 +190,7 @@ function checkRuntime() {
   for (const [name, minimum] of [
     ['CLIENT_ERROR_HASH_SALT', 32],
     ['CRON_SECRET', 32],
+    ['MARKETPLACE_CHAT_INTENT_SECRET', 32],
     [['OBJECT_STORAGE_ACCESS_KEY_ID', 'DO_SPACES_ACCESS_KEY_ID'], 16],
     [['OBJECT_STORAGE_SECRET_ACCESS_KEY', 'DO_SPACES_SECRET_ACCESS_KEY'], 32],
     ['NEXT_PUBLIC_TURNSTILE_SITE_KEY', 20],

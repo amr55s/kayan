@@ -8,6 +8,7 @@ import { TextArea } from '@heroui/react/textarea';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { formatMarketplaceMoney } from './format';
 import type {
   MarketplaceCheckoutViewModel,
@@ -106,7 +107,7 @@ export function MarketplaceCodCheckout({
   }
 
   if (model.requiresAuthentication) {
-    return <MarketplaceCheckoutLogin loginHref={model.loginHref} />;
+    return <MarketplaceCheckoutLogin />;
   }
 
   return (
@@ -339,7 +340,7 @@ export function MarketplaceCodCheckout({
   );
 }
 
-function MarketplaceCheckoutLogin({ loginHref }: { loginHref: string }) {
+function MarketplaceCheckoutLogin() {
   return (
     <Card.Root className={styles.stateCard}>
       <Card.Content className={styles.stateContent}>
@@ -347,7 +348,14 @@ function MarketplaceCheckoutLogin({ loginHref }: { loginHref: string }) {
         <p className={styles.stateDescription}>
           تسجيل الدخول يحفظ السلة ويربط الطلب بحسابك حتى لو تغيّر الجهاز أو انتهت الجلسة.
         </p>
-        <Link href={loginHref} className={styles.primaryButton}>المتابعة بتسجيل الدخول</Link>
+        <div className="w-full max-w-sm">
+          <GoogleSignInButton
+            next="/marketplace/checkout"
+            label="المتابعة باستخدام Google"
+            helper="سنستعيد سلتك ثم نرجعك إلى صفحة إتمام الطلب نفسها. يمكنك إعادة المحاولة بأمان إذا أغلقت نافذة Google."
+          />
+        </div>
+        <Link href="/marketplace/cart" className={styles.secondaryButton}>العودة إلى السلة</Link>
       </Card.Content>
     </Card.Root>
   );

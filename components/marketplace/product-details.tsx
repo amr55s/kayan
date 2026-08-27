@@ -1,8 +1,13 @@
 import { Card } from '@heroui/react/card';
 import { Chip } from '@heroui/react/chip';
-import { formatMarketplaceMoney, marketplaceDiscountPercentage } from './format';
+import {
+  formatMarketplaceMoney,
+  marketplaceDiscountPercentage,
+  marketplaceProductHref,
+} from './format';
 import { MarketplaceProductGallery } from './product-gallery';
 import { MarketplacePurchaseForm } from './purchase-form';
+import { ChatEntryButton } from './chat/chat-entry-button';
 import type {
   MarketplaceFormAction,
   MarketplaceProductDetailsViewModel,
@@ -12,9 +17,13 @@ import styles from './marketplace.module.css';
 export function MarketplaceProductDetails({
   product,
   addToCartAction,
+  isAuthenticated,
+  chatLoginHref,
 }: {
   product: MarketplaceProductDetailsViewModel;
   addToCartAction?: MarketplaceFormAction;
+  isAuthenticated: boolean;
+  chatLoginHref: string;
 }) {
   const discount = marketplaceDiscountPercentage(product.price, product.compareAtPrice);
   const showRating = Boolean(product.rating && product.rating.count > 0);
@@ -76,6 +85,14 @@ export function MarketplaceProductDetails({
             maxQuantityPerOrder={product.maxQuantityPerOrder}
             isInStock={product.isInStock}
             addToCartAction={addToCartAction}
+          />
+
+          <ChatEntryButton
+            intent={{ kind: 'presale', storeId: product.store.id, productId: product.id }}
+            returnTo={marketplaceProductHref(product)}
+            loginHref={chatLoginHref}
+            isAuthenticated={isAuthenticated}
+            label="اسأل المتجر عن هذا المنتج"
           />
 
           {product.deliveryNote ? <p className={styles.notice}>{product.deliveryNote}</p> : null}

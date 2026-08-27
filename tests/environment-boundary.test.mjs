@@ -74,6 +74,7 @@ const baseRuntimeEnv = {
   CRON_SECRET: 'b'.repeat(32),
   NEXT_PUBLIC_TURNSTILE_SITE_KEY: 'turnstile_public_key_1234',
   TURNSTILE_SECRET_KEY: 'turnstile_secret_key_5678',
+  MARKETPLACE_CHAT_INTENT_SECRET: 'e'.repeat(32),
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: 'c'.repeat(64),
   VAPID_PRIVATE_KEY: 'd'.repeat(32),
   VAPID_SUBJECT: 'mailto:ops@example.com',
@@ -91,6 +92,25 @@ function runPreflight(storage) {
     },
   });
 }
+
+test('runtime preflight refuses a missing or weak chat-intent signing secret', () => {
+  const storage = {
+    OBJECT_STORAGE_PROVIDER: 'cloudflare-r2',
+    OBJECT_STORAGE_REGION: 'auto',
+    OBJECT_STORAGE_ENDPOINT: `https://${'a'.repeat(32)}.r2.cloudflarestorage.com`,
+    OBJECT_STORAGE_PRIVATE_BUCKET: 'dairtak-staging-private',
+    OBJECT_STORAGE_PUBLIC_BUCKET: 'dairtak-staging-public',
+    OBJECT_STORAGE_ACCESS_KEY_ID: 'r'.repeat(32),
+    OBJECT_STORAGE_SECRET_ACCESS_KEY: 's'.repeat(64),
+    OBJECT_STORAGE_PUBLIC_BASE_URL: 'https://media.example.com',
+  };
+  const missing = runPreflight({ ...storage, MARKETPLACE_CHAT_INTENT_SECRET: undefined });
+  const weak = runPreflight({ ...storage, MARKETPLACE_CHAT_INTENT_SECRET: 'too-short' });
+  assert.notEqual(missing.status, 0);
+  assert.match(missing.stderr, /MARKETPLACE_CHAT_INTENT_SECRET/);
+  assert.notEqual(weak.status, 0);
+  assert.match(weak.stderr, /at least 32/);
+});
 
 test('runtime preflight accepts Cloudflare R2 without requiring Sentry', () => {
   const result = runPreflight({

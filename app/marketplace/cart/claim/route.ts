@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { safeNextPath } from '@/lib/auth/safe-next';
+import { sanitizeNextPath } from '@/lib/auth/safe-next';
 import { claimMarketplaceGuestCart } from '@/lib/commerce/cart';
 
 export const runtime = 'nodejs';
@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const next = safeNextPath(requestUrl.searchParams.get('next'));
+  const next = sanitizeNextPath(requestUrl.searchParams.get('next'), '/marketplace/cart');
   try {
     await claimMarketplaceGuestCart();
     return NextResponse.redirect(new URL(next, requestUrl.origin));
