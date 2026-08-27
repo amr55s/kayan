@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import { marketplaceOrderStatuses } from './operations';
+import { openConversation, sendMessage } from './chat/service';
 
 const uuid = z.uuid();
 const transitionSchema = z.object({
@@ -340,18 +341,34 @@ export async function respondToMarketplaceDeliveryOfferAction(formData: FormData
   redirect(resultUrl(parsed.data.returnTo, 'notice', parsed.data.accept === 'true' ? 'offer_accepted' : 'offer_declined'));
 }
 
+/** Compatibility adapter replacing the legacy create_my_marketplace_support_thread RPC. */
 export async function createMarketplaceSupportThreadAction(formData: FormData): Promise<void> {
   const parsed = supportCreateSchema.safeParse({
     orderId: field(formData, 'orderId'), storeId: field(formData, 'storeId'), subject: field(formData, 'subject'),
     message: field(formData, 'message'), returnTo: field(formData, 'returnTo'),
   });
   if (!parsed.success) redirect('/account/orders?error=invalid_support_message');
-  const supabase = await requireSupabase();
-  const { error } = await (supabase as any).rpc('create_my_marketplace_support_thread', {
-    p_order_id: parsed.data.orderId ?? null, p_store_id: parsed.data.storeId ?? null,
-    p_subject: parsed.data.subject, p_message: parsed.data.message,
-  });
-  if (error) redirect(resultUrl(parsed.data.returnTo, 'error', 'support_failed'));
+  const intent = parsed.data.orderId
+    ? { kind: 'order' as const, orderId: parsed.data.orderId }
+    : parsed.data.storeId
+      ? { kind: 'presale' as const, storeId: parsed.data.storeId, productId: null }
+      : null;
+  if (!intent) redirect('/account/orders?error=invalid_support_message');
+  let failed = false;
+  try {
+    const conversation = await openConversation(intent);
+    await sendMessage({
+      conversationId: conversation.id,
+      clientMessageId: crypto.randomUUID(),
+      kind: 'text',
+      body: parsed.data.message,
+      replyToId: null,
+      card: null,
+    });
+  } catch {
+    failed = true;
+  }
+  if (failed) redirect(resultUrl(parsed.data.returnTo, 'error', 'support_failed'));
   revalidatePath(parsed.data.returnTo);
   redirect(resultUrl(parsed.data.returnTo, 'notice', 'support_created'));
 }
@@ -359,9 +376,20 @@ export async function createMarketplaceSupportThreadAction(formData: FormData): 
 export async function replyMarketplaceSupportThreadAction(formData: FormData): Promise<void> {
   const parsed = supportReplySchema.safeParse({ threadId: field(formData, 'threadId'), body: field(formData, 'body'), returnTo: field(formData, 'returnTo') });
   if (!parsed.success) redirect('/account/orders?error=invalid_support_message');
-  const supabase = await requireSupabase();
-  const { error } = await (supabase as any).rpc('reply_my_marketplace_support_thread', { p_thread_id: parsed.data.threadId, p_body: parsed.data.body });
-  if (error) redirect(resultUrl(parsed.data.returnTo, 'error', 'support_failed'));
+  let failed = false;
+  try {
+    await sendMessage({
+      conversationId: parsed.data.threadId,
+      clientMessageId: crypto.randomUUID(),
+      kind: 'text',
+      body: parsed.data.body,
+      replyToId: null,
+      card: null,
+    });
+  } catch {
+    failed = true;
+  }
+  if (failed) redirect(resultUrl(parsed.data.returnTo, 'error', 'support_failed'));
   revalidatePath(parsed.data.returnTo);
   redirect(resultUrl(parsed.data.returnTo, 'notice', 'support_replied'));
 }

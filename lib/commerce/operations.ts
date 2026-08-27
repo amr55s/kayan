@@ -3,6 +3,11 @@ import 'server-only';
 import { z } from 'zod';
 import { databaseMinorToNumber } from '@/lib/commerce/money';
 import { createClient } from '@/lib/supabase/server';
+import {
+  ChatServiceError,
+  getConversationPage,
+  listConversations,
+} from '@/lib/commerce/chat/service';
 
 export const marketplaceOrderStatuses = [
   'pending_confirmation',
@@ -565,10 +570,30 @@ export async function listAllCommissionStatementsAsAdmin(input: { status?: strin
   }));
 }
 
+/** Compatibility adapter replacing the legacy list_my_marketplace_support_threads RPC. */
 export async function listMyMarketplaceSupportThreads(input: { status?: string | null; limit?: number; before?: string | null } = {}) {
-  return parseCursorPage(supportPageSchema, await authenticatedRpc('list_my_marketplace_support_threads', {
-    p_status: input.status ?? null, p_limit: Math.min(100, Math.max(1, input.limit ?? 30)), p_before: input.before ?? null,
-  }));
+  const limit = Math.min(100, Math.max(1, input.limit ?? 30));
+  const before = input.before && timestamp.safeParse(input.before).success ? input.before : null;
+  try {
+    const page = await listConversations({
+      limit,
+      cursor: before ? { createdAt: before, id: 'ffffffff-ffff-4fff-bfff-ffffffffffff' } : null,
+    });
+    const items = page.items
+      .filter((thread) => !input.status || thread.status === input.status)
+      .map((thread): MarketplaceSupportThreadSummary => ({
+        id: thread.id,
+        public_code: thread.publicCode,
+        subject: thread.subject,
+        status: thread.status,
+        order_id: thread.order?.id ?? null,
+        last_message_at: thread.lastMessageAt,
+        unread_count: thread.unreadCount,
+      }));
+    return { items, nextBefore: page.nextCursor?.createdAt ?? null };
+  } catch (error) {
+    throw mapLegacyChatError(error);
+  }
 }
 
 export async function getMyMarketplaceSupportThread(
@@ -583,16 +608,43 @@ export async function getMyMarketplaceSupportThread(
     ? input.cursor
     : null;
   try {
-    const parsed = supportThreadSchema.safeParse(await authenticatedRpc('get_my_marketplace_support_thread_page', {
-      p_thread_id: threadId,
-      p_limit: limit,
-      p_before_created_at: cursor?.createdAt ?? null,
-      p_before_id: cursor?.id ?? null,
-    }));
+    const page = await getConversationPage({ conversationId: threadId, limit, cursor });
+    const parsed = supportThreadSchema.safeParse({
+      id: page.conversation.id,
+      public_code: page.conversation.publicCode,
+      subject: page.conversation.subject,
+      status: page.conversation.status,
+      order_id: page.conversation.order?.id ?? null,
+      store_id: page.conversation.store?.id ?? null,
+      last_message_at: page.conversation.lastMessageAt,
+      messages: page.messages.map((message) => ({
+        id: message.id,
+        author_role: message.senderRole === 'driver' ? 'system' : message.senderRole,
+        body: message.body
+          ?? message.card?.label
+          ?? (message.deleted ? 'تم حذف الرسالة' : message.kind === 'image' ? 'صورة' : 'رسالة نظام'),
+        created_at: message.createdAt,
+      })),
+      next_cursor: page.nextCursor
+        ? { created_at: page.nextCursor.createdAt, id: page.nextCursor.id }
+        : null,
+      has_more: page.nextCursor !== null,
+    });
     if (!parsed.success) throw new MarketplaceOperationsError('invalid_contract');
     return parsed.data;
   } catch (error) {
-    if (error instanceof MarketplaceOperationsError && error.code === 'service_unavailable') return null;
-    throw error;
+    if (error instanceof ChatServiceError && (error.code === 'not_found' || error.code === 'service_unavailable')) {
+      return null;
+    }
+    throw mapLegacyChatError(error);
   }
+}
+
+function mapLegacyChatError(error: unknown): MarketplaceOperationsError {
+  if (error instanceof MarketplaceOperationsError) return error;
+  if (error instanceof ChatServiceError) {
+    if (error.code === 'authentication_required') return new MarketplaceOperationsError('authentication_required');
+    if (error.code === 'invalid_input') return new MarketplaceOperationsError('invalid_contract');
+  }
+  return new MarketplaceOperationsError('service_unavailable');
 }
