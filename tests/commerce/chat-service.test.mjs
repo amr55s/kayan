@@ -197,12 +197,14 @@ test('every participant RPC rejects a malformed DTO through its bound parser', a
   }
 });
 
-test('missing and expired Supabase Auth sessions map to authentication_required without an RPC', async () => {
+test('missing and all stable expired Supabase Auth sessions map to authentication_required without an RPC', async () => {
   const missingSessions = [
     { data: { user: null }, error: null },
     { data: { user: null }, error: { name: 'AuthSessionMissingError' } },
+    { data: { user: null }, error: { code: 'session_expired', message: 'secret expiry detail' } },
     { data: { user: null }, error: { code: 'session_not_found' } },
     { data: { user: null }, error: { code: 'refresh_token_not_found' } },
+    { data: { user: null }, error: { code: 'refresh_token_already_used' } },
     { data: { user: null }, error: { code: 'bad_jwt' } },
   ];
   for (const auth of missingSessions) {

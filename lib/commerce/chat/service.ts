@@ -206,6 +206,7 @@ const stableAuthErrorCodes = new Set([
   'bad_jwt',
   'refresh_token_already_used',
   'refresh_token_not_found',
+  'session_expired',
   'session_not_found',
 ]);
 const providerErrorSchema = z.object({

@@ -23,6 +23,19 @@ const routineSql = (name) => sql.match(new RegExp(
   `create or replace function public\\.${name}\\([\\s\\S]*?\\n\\$\\$;`, 'u',
 ))?.[0] ?? '';
 
+const revokedChatTables = [
+  'support_threads',
+  'support_messages',
+  'marketplace_chat_participants',
+  'marketplace_chat_reactions',
+  'marketplace_chat_blocks',
+  'marketplace_chat_block_escalations',
+];
+
+const authenticatedRoleBlocks = [...pgTapSql.matchAll(
+  /set local role authenticated;([\s\S]*?)reset role;/gu,
+)];
+
 test('chat persistence adds participant, message, reaction, and idempotency contracts', () => {
   assert.match(sql, /create table public\.marketplace_chat_participants/u);
   assert.match(sql, /primary key \(thread_id, user_id, participant_role\)/u);
@@ -76,10 +89,28 @@ test('legacy support RPCs are database-guarded to genuine support threads only',
   for (const evidence of [
     'legacy support list excludes unified order conversations',
     'legacy support get rejects a unified order conversation',
+    'legacy support paged get rejects a unified order conversation',
     'legacy support reply rejects a unified order conversation',
     'legacy support close rejects a unified order conversation',
+    'authenticated callers cannot read chat tables directly',
     'legacy support creation remains a genuine support conversation',
   ]) assert.match(pgTapSql, new RegExp(evidence, 'u'));
+});
+
+test('authenticated pgTAP blocks use RPCs and reserve revoked-table reads for explicit 42501 probes', () => {
+  const intentionalDenial = /select extensions\.throws_ok\(\s*\$\$[\s\S]*?\$\$,\s*'42501',[\s\S]*?\);/gu;
+  const restrictedRelation = new RegExp(
+    `\\b(?:from|join|update|into|delete\\s+from)\\s+public\\.(?:${revokedChatTables.join('|')})\\b`,
+    'iu',
+  );
+  assert.ok(authenticatedRoleBlocks.length > 0);
+  for (const [index, match] of authenticatedRoleBlocks.entries()) {
+    assert.doesNotMatch(
+      match[1].replaceAll(intentionalDenial, ''),
+      restrictedRelation,
+      `authenticated role block ${index + 1} bypasses the RPC boundary`,
+    );
+  }
 });
 
 test('private Realtime authorization and delivery reassignment reuse durable access', () => {

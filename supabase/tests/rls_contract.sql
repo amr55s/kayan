@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(83);
+select extensions.plan(85);
 
 select extensions.is(
   (select count(*)::integer from pg_catalog.pg_class as relation
@@ -286,6 +286,13 @@ select extensions.throws_ok(
   'legacy support get rejects a unified order conversation'
 );
 select extensions.throws_ok(
+  $$select public.get_my_marketplace_support_thread_page(
+    '90000000-0000-0000-0000-000000000001', 20, null, null
+  )$$,
+  'P0002', 'support_thread_not_found',
+  'legacy support paged get rejects a unified order conversation'
+);
+select extensions.throws_ok(
   $$select public.reply_my_marketplace_support_thread(
     '90000000-0000-0000-0000-000000000001', 'legacy bypass attempt'
   )$$,
@@ -299,20 +306,31 @@ select extensions.throws_ok(
   'P0002', 'support_thread_not_found',
   'legacy support close rejects a unified order conversation'
 );
+select extensions.throws_ok(
+  $$select count(*) from public.support_threads$$,
+  '42501', 'permission denied for table support_threads',
+  'authenticated callers cannot read chat tables directly'
+);
+select set_config(
+  'pgtap.legacy_support_thread_id',
+  public.create_my_marketplace_support_thread(
+    '80000000-0000-0000-0000-000000000001',
+    '40000000-0000-0000-0000-000000000001',
+    'Legacy support ticket', 'Preserve the support workflow'
+  ) ->> 'id',
+  true
+);
+
+reset role;
 select extensions.is(
   (select thread.conversation_kind
    from public.support_threads as thread
-   where thread.id = (
-     public.create_my_marketplace_support_thread(
-       '80000000-0000-0000-0000-000000000001',
-       '40000000-0000-0000-0000-000000000001',
-       'Legacy support ticket', 'Preserve the support workflow'
-     ) ->> 'id'
-   )::uuid),
+   where thread.id = current_setting('pgtap.legacy_support_thread_id')::uuid),
   'support',
   'legacy support creation remains a genuine support conversation'
 );
 
+set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000003","role":"authenticated","aal":"aal1"}', true);
 select extensions.is(
   public.get_my_marketplace_conversation_page('90000000-0000-0000-0000-000000000001', 20, null, null)
@@ -712,7 +730,11 @@ from public.marketplace_chat_block_escalations as escalation
 where escalation.source_thread_id = '90000000-0000-0000-0000-000000000001'
   and escalation.blocker_user_id = '10000000-0000-0000-0000-000000000001'
   and escalation.blocked_user_id = '10000000-0000-0000-0000-000000000004';
-grant select on table chat_escalation_state to authenticated;
+select set_config(
+  'pgtap.marketplace_chat_escalation_thread_id',
+  (select escalation_thread_id::text from chat_escalation_state),
+  true
+);
 
 select extensions.is(
   (select count(*)::integer from chat_escalation_state),
@@ -761,38 +783,45 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000007","role":"authenticated","aal":"aal2"}', true);
 select extensions.ok(
   public.can_access_marketplace_chat_thread(
-    (select escalation_thread_id from chat_escalation_state)
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid
   ) and not public.can_send_marketplace_chat_thread(
-    (select escalation_thread_id from chat_escalation_state)
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid
   ),
   'monitor keeps read visibility but has no authoring predicate'
 );
 select pg_temp.assert_marketplace_realtime_insert_policy(
-  'marketplace-chat:' || (select escalation_thread_id::text from chat_escalation_state),
+  'marketplace-chat:' || current_setting('pgtap.marketplace_chat_escalation_thread_id'),
   false,
   'actual Realtime policy rejects monitor-only channel writes'
 );
 select extensions.throws_ok(
   $$select public.send_my_marketplace_chat_message(
-    (select escalation_thread_id from chat_escalation_state),
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid,
     'c0000000-0000-0000-0000-000000000016', 'text', 'monitor must not author', null, null
   )$$,
   'P0002', 'not_found', 'monitor-only assigned participant cannot author a chat message'
 );
 select extensions.throws_ok(
   $$select public.reply_my_marketplace_support_thread(
-    (select escalation_thread_id from chat_escalation_state), 'monitor legacy reply'
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid, 'monitor legacy reply'
   )$$,
   '42501', 'admin_role_required',
   'monitor-only admin cannot author through the legacy support reply RPC'
 );
 
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
-select extensions.ok(
-  (public.block_my_marketplace_chat_counterparty(
+select set_config(
+  'pgtap.marketplace_chat_reassignment_result',
+  public.block_my_marketplace_chat_counterparty(
     '90000000-0000-0000-0000-000000000001',
     '10000000-0000-0000-0000-000000000004', true
-  ) ->> 'administrationAssigned')::boolean
+  ) ->> 'administrationAssigned',
+  true
+);
+
+reset role;
+select extensions.ok(
+  current_setting('pgtap.marketplace_chat_reassignment_result')::boolean
   and (select thread.assigned_admin_id = '10000000-0000-0000-0000-000000000006'
        from public.support_threads as thread
        join chat_escalation_state as state on state.escalation_thread_id = thread.id)
@@ -808,8 +837,6 @@ select extensions.ok(
          and participant.participant_role = 'admin' and participant.removed_at is null),
   'reuse replaces a monitor-only assignment with an eligible support author'
 );
-
-reset role;
 insert into public.marketplace_chat_participants (thread_id, user_id, participant_role)
 select state.escalation_thread_id, '10000000-0000-0000-0000-000000000004', 'merchant'
 from chat_escalation_state as state
@@ -851,25 +878,25 @@ select extensions.throws_ok(
 );
 select extensions.throws_ok(
   $$select public.get_my_marketplace_conversation_page(
-    (select escalation_thread_id from chat_escalation_state), 20, null, null
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid, 20, null, null
   )$$,
   'P0002', 'not_found', 'blocked driver cannot access the substitute support thread'
 );
 select extensions.throws_ok(
   $$select public.send_my_marketplace_chat_message(
-    (select escalation_thread_id from chat_escalation_state),
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid,
     'c0000000-0000-0000-0000-000000000017', 'text', 'blocked membership retry', null, null
   )$$,
   'P0002', 'not_found', 'blocked member cannot send after a store membership update'
 );
 select extensions.ok(
   not public.can_access_marketplace_chat_thread(
-    (select escalation_thread_id from chat_escalation_state)
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid
   ),
   'blocked member cannot rejoin the escalation Realtime topic'
 );
 select pg_temp.assert_marketplace_realtime_insert_policy(
-  'marketplace-chat:' || (select escalation_thread_id::text from chat_escalation_state),
+  'marketplace-chat:' || current_setting('pgtap.marketplace_chat_escalation_thread_id'),
   false,
   'actual Realtime policy rejects blocked membership re-entry'
 );
@@ -877,7 +904,7 @@ select pg_temp.assert_marketplace_realtime_insert_policy(
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
 select extensions.ok(
   (public.send_my_marketplace_chat_message(
-    (select escalation_thread_id from chat_escalation_state),
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid,
     'c0000000-0000-0000-0000-000000000014', 'text', 'Customer order-support request', null, null
   ) ->> 'id') is not null,
   'the customer can continue through constrained order support'
@@ -886,10 +913,10 @@ select extensions.ok(
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000006","role":"authenticated","aal":"aal2"}', true);
 select extensions.ok(
   public.get_my_marketplace_conversation_page(
-    (select escalation_thread_id from chat_escalation_state), 20, null, null
-  ) #>> '{conversation,id}' = (select escalation_thread_id::text from chat_escalation_state)
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid, 20, null, null
+  ) #>> '{conversation,id}' = current_setting('pgtap.marketplace_chat_escalation_thread_id')
   and (public.send_my_marketplace_chat_message(
-    (select escalation_thread_id from chat_escalation_state),
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid,
     'c0000000-0000-0000-0000-000000000015', 'text', 'Assigned support response', null, null
   ) ->> 'id') is not null,
   'the narrowly assigned AAL2 support admin can read and respond'
@@ -939,12 +966,13 @@ set is_active = false
 where user_id = '10000000-0000-0000-0000-000000000006'
   and role::text = 'chat_monitor';
 
+set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000003","role":"authenticated","aal":"aal1"}', true);
 select extensions.is(
   public.get_my_marketplace_conversation_page(
-    (select escalation_thread_id from chat_escalation_state), 20, null, null
+    current_setting('pgtap.marketplace_chat_escalation_thread_id')::uuid, 20, null, null
   ) #>> '{conversation,id}',
-  (select escalation_thread_id::text from chat_escalation_state),
+  current_setting('pgtap.marketplace_chat_escalation_thread_id'),
   'order-operating merchant can access the substitute support path'
 );
 
@@ -955,11 +983,18 @@ where id = '10000000-0000-0000-0000-000000000006';
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
-select extensions.ok(
-  (public.block_my_marketplace_chat_counterparty(
+select set_config(
+  'pgtap.marketplace_chat_reassignment_result',
+  public.block_my_marketplace_chat_counterparty(
     '90000000-0000-0000-0000-000000000001',
     '10000000-0000-0000-0000-000000000004', true
-  ) ->> 'administrationAssigned')::boolean
+  ) ->> 'administrationAssigned',
+  true
+);
+
+reset role;
+select extensions.ok(
+  current_setting('pgtap.marketplace_chat_reassignment_result')::boolean
   and (select thread.assigned_admin_id = '10000000-0000-0000-0000-000000000011'
        from public.support_threads as thread
        join chat_escalation_state as state on state.escalation_thread_id = thread.id)
@@ -997,11 +1032,18 @@ where exists (
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
-select extensions.ok(
-  not (public.block_my_marketplace_chat_counterparty(
+select set_config(
+  'pgtap.marketplace_chat_reassignment_result',
+  public.block_my_marketplace_chat_counterparty(
     '90000000-0000-0000-0000-000000000001',
     '10000000-0000-0000-0000-000000000004', true
-  ) ->> 'administrationAssigned')::boolean
+  ) ->> 'administrationAssigned',
+  true
+);
+
+reset role;
+select extensions.ok(
+  not current_setting('pgtap.marketplace_chat_reassignment_result')::boolean
   and (select thread.assigned_admin_id is null
        from public.support_threads as thread
        join chat_escalation_state as state on state.escalation_thread_id = thread.id)
