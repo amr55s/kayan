@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { CatalogControls } from './catalog-controls';
 import { MarketplaceProductCard } from './product-card';
 import { MarketplaceStatePanel } from './state-panel';
+import { ChatEntryButton } from './chat/chat-entry-button';
+import type { ChatErrorCode } from '@/lib/commerce/chat/contracts';
+import type { ChatLoginIntent } from '@/lib/auth/safe-next';
 import type {
   MarketplaceCatalogViewModel,
   MarketplaceFormAction,
@@ -11,6 +14,14 @@ import styles from './marketplace.module.css';
 type MarketplaceCatalogProps = {
   model: MarketplaceCatalogViewModel;
   addToCartAction?: MarketplaceFormAction;
+  storeChat?: {
+    intent: ChatLoginIntent;
+    returnTo: string;
+    loginHref: string;
+    isAuthenticated: boolean;
+    storeName: string;
+    recovery?: ChatErrorCode | null;
+  } | null;
 };
 
 function catalogHref(
@@ -36,7 +47,7 @@ function catalogHref(
   return query ? `/marketplace?${query}` : '/marketplace';
 }
 
-export function MarketplaceCatalog({ model, addToCartAction }: MarketplaceCatalogProps) {
+export function MarketplaceCatalog({ model, addToCartAction, storeChat }: MarketplaceCatalogProps) {
   return (
     <section aria-labelledby="marketplace-catalog-title">
       <header className={styles.sectionHeader}>
@@ -47,6 +58,18 @@ export function MarketplaceCatalog({ model, addToCartAction }: MarketplaceCatalo
             ابحث وقارن ثم أكمل الطلب والدفع عند الاستلام من داخل الموقع.
           </p>
         </div>
+        {storeChat ? (
+          <div className="w-full max-w-sm shrink-0" dir="rtl">
+            <ChatEntryButton
+              intent={storeChat.intent}
+              returnTo={storeChat.returnTo}
+              loginHref={storeChat.loginHref}
+              isAuthenticated={storeChat.isAuthenticated}
+              recovery={storeChat.recovery}
+              label={`اسأل متجر ${storeChat.storeName}`}
+            />
+          </div>
+        ) : null}
       </header>
 
       <CatalogControls

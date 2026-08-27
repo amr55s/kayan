@@ -3,12 +3,9 @@
 import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import {
-  parseChatLoginIntent,
-  safeNextPath,
-  type ChatLoginIntent,
-} from '@/lib/auth/safe-next';
-import { chatIntentCookie, signChatIntentCookie } from '@/lib/auth/chat-intent-cookie';
+import type { ChatLoginIntent } from '@/lib/auth/safe-next';
+import { chatIntentCookie } from '@/lib/auth/chat-intent-cookie';
+import { startGoogleOAuthFlow, type GoogleOAuthStartResult } from '@/lib/auth/oauth-flow';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 
 type GoogleSignInInput = string | {
@@ -23,42 +20,47 @@ function intentSecret(): string {
 }
 
 export async function beginGoogleSignIn(input?: GoogleSignInInput): Promise<
-  { success: true; url: string } | { success: false; message: string }
+  GoogleOAuthStartResult
 > {
   try {
-    const next = safeNextPath(typeof input === 'string' ? input : input?.next);
-    const requestedIntent = typeof input === 'string' ? null : input?.intent ?? null;
-    const intent = requestedIntent ? parseChatLoginIntent(requestedIntent) : null;
-    if (requestedIntent && !intent) throw new Error('invalid_chat_intent');
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
     if (!siteUrl) throw new Error('site_url_missing');
-    const callback = new URL('/auth/callback', siteUrl);
-    callback.searchParams.set('next', next);
-    const flowId = intent ? randomUUID() : null;
-    if (flowId) callback.searchParams.set('flow', flowId);
+    const cookieStore = await cookies();
     const supabase = await createClient();
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: callback.toString(),
-        skipBrowserRedirect: true,
-        queryParams: { prompt: 'select_account' },
+    const result = await startGoogleOAuthFlow({
+      next: typeof input === 'string' ? input : input?.next,
+      intent: typeof input === 'string' ? null : input?.intent ?? null,
+    }, {
+      secret: intentSecret(),
+      siteUrl,
+      now: Date.now,
+      randomFlowId: randomUUID,
+      readCookie: () => cookieStore.get(chatIntentCookie.name)?.value,
+      writeCookie: (value) => { cookieStore.set(chatIntentCookie.name, value, chatIntentCookie.options); },
+      deleteCookie: () => { cookieStore.delete(chatIntentCookie.name); },
+      isAuthenticated: async () => {
+        const { data } = await supabase.auth.getUser();
+        return Boolean(data.user);
+      },
+      startOAuth: async (redirectTo) => {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo,
+            skipBrowserRedirect: true,
+            queryParams: { prompt: 'select_account' },
+          },
+        });
+        if (error || !data.url) throw error || new Error('oauth_url_missing');
+        return data.url;
       },
     });
-    if (error || !data.url) throw error || new Error('oauth_url_missing');
-    if (intent && flowId) {
-      const signed = signChatIntentCookie({
-        secret: intentSecret(),
-        flowId,
-        returnTo: next,
-        intent,
-      });
-      const cookieStore = await cookies();
-      cookieStore.set(chatIntentCookie.name, signed.value, chatIntentCookie.options);
+    if (!result.success && result.code === 'start_failed') {
+      logSafeServerFailure('error', 'google_sign_in_start_failed');
     }
-    return { success: true, url: data.url };
+    return result;
   } catch (error) {
     logSafeServerFailure('error', 'google_sign_in_start_failed', { failure: error });
-    return { success: false, message: 'تعذر بدء تسجيل الدخول بجوجل. حاول مرة أخرى.' };
+    return { success: false, code: 'start_failed', message: 'تعذر بدء تسجيل الدخول بجوجل. حاول مرة أخرى.' };
   }
 }

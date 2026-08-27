@@ -16,15 +16,15 @@ export function GoogleSignInButton({
   label?: string;
   helper?: string;
 }) {
-  const [message, setMessage] = useState('');
+  const [feedback, setFeedback] = useState<{ code: string; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function signIn() {
-    setMessage('');
+    setFeedback(null);
     startTransition(async () => {
       const result = await beginGoogleSignIn({ next, intent });
       if (!result.success) {
-        setMessage(result.message);
+        setFeedback({ code: result.code, message: result.message });
         return;
       }
       window.location.assign(result.url);
@@ -45,7 +45,16 @@ export function GoogleSignInButton({
         {isPending ? 'جارٍ فتح Google…' : label}
       </Button>
       {helper ? <p className="text-sm leading-6 text-zinc-600">{helper}</p> : null}
-      {message ? <p role="alert" className="border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{message}</p> : null}
+      {feedback ? (
+        <p
+          role="alert"
+          className={feedback.code === 'oauth_in_progress'
+            ? 'border border-amber-300 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-950'
+            : 'border border-red-200 bg-red-50 p-3 text-sm font-bold leading-6 text-red-800'}
+        >
+          {feedback.message}
+        </p>
+      ) : null}
     </div>
   );
 }

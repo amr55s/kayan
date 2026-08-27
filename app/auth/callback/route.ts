@@ -2,47 +2,19 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { claimMarketplaceGuestCart } from '@/lib/commerce/cart';
 import { openMarketplaceConversationAction } from '@/lib/commerce/chat/actions';
-import {
-  createChatLoginHref,
-  safeNextPath,
-  type ChatLoginIntent,
-} from '@/lib/auth/safe-next';
-import { chatIntentCookie, verifyChatIntentCookie } from '@/lib/auth/chat-intent-cookie';
+import type { ChatLoginIntent } from '@/lib/auth/safe-next';
+import { chatIntentCookie } from '@/lib/auth/chat-intent-cookie';
+import { handleGoogleOAuthCallback } from '@/lib/auth/callback-flow';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function destination(path: string): URL {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (!siteUrl) throw new Error('site_url_missing');
-  return new URL(path, siteUrl);
-}
-
 function intentSecret(): string {
   const secret = process.env.MARKETPLACE_CHAT_INTENT_SECRET;
   if (!secret) throw new Error('chat_intent_configuration_invalid');
   return secret;
-}
-
-async function callbackIntent(
-  flowId: string | null,
-  returnTo: string,
-): Promise<{ intent: ChatLoginIntent; cookieStore: Awaited<ReturnType<typeof cookies>> } | null> {
-  if (!flowId) return null;
-  const cookieStore = await cookies();
-  try {
-    const verified = verifyChatIntentCookie(cookieStore.get(chatIntentCookie.name)?.value, {
-      secret: intentSecret(),
-      flowId,
-      returnTo,
-    });
-    return verified.status === 'valid' ? { intent: verified.intent, cookieStore } : null;
-  } catch {
-    logSafeServerFailure('error', 'chat_intent_verification_failed');
-    return null;
-  }
 }
 
 function intentForm(intent: ChatLoginIntent): FormData {
@@ -58,56 +30,44 @@ function intentForm(intent: ChatLoginIntent): FormData {
   return form;
 }
 
-function retryDestination(
-  returnTo: string,
-  pendingIntent: Awaited<ReturnType<typeof callbackIntent>>,
-  error: 'oauth_callback' | 'profile_setup',
-): URL {
-  const retryPath = pendingIntent
-    ? createChatLoginHref({ returnTo, intent: pendingIntent.intent })
-    : `/signin?next=${encodeURIComponent(returnTo)}`;
-  const retry = destination(retryPath);
-  retry.searchParams.set('error', error);
-  return retry;
-}
-
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const code = url.searchParams.get('code');
-  const next = safeNextPath(url.searchParams.get('next'));
-  const flowId = url.searchParams.get('flow');
-  const pendingIntent = await callbackIntent(flowId, next);
-  if (!code) {
-    return NextResponse.redirect(retryDestination(next, pendingIntent, 'oauth_callback'));
-  }
-
   try {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (!siteUrl) throw new Error('site_url_missing');
+    const cookieStore = await cookies();
     const supabase = await createClient();
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    if (exchangeError) throw exchangeError;
-
-    const { data: customer, error: profileError } = await (supabase as any).rpc(
-      'ensure_marketplace_customer',
-    );
-    if (profileError || !customer) throw profileError || new Error('customer_profile_missing');
-
-    // Claiming is best-effort here and remains lazy/idempotent in the cart
-    // resolver. A temporary failure must not turn a valid OAuth login into an
-    // authentication error or leak the guest credential into logs.
-    await claimMarketplaceGuestCart().catch(() => undefined);
-    if (pendingIntent) {
-      const result = await openMarketplaceConversationAction(
+    const result = await handleGoogleOAuthCallback({ requestUrl: request.url }, {
+      siteUrl,
+      secret: intentSecret(),
+      now: Date.now,
+      readCookie: () => cookieStore.get(chatIntentCookie.name)?.value,
+      writeCookie: (value) => { cookieStore.set(chatIntentCookie.name, value, chatIntentCookie.options); },
+      deleteCookie: () => { cookieStore.delete(chatIntentCookie.name); },
+      exchangeCode: async (code) => {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+      },
+      ensureCustomer: async () => {
+        const { data, error } = await (supabase as any).rpc('ensure_marketplace_customer');
+        if (error || !data) throw error || new Error('customer_profile_missing');
+      },
+      claimGuestCart: claimMarketplaceGuestCart,
+      openConversation: (intent) => openMarketplaceConversationAction(
         { status: 'idle' },
-        intentForm(pendingIntent.intent),
-      );
-      pendingIntent.cookieStore.delete(chatIntentCookie.name);
-      if (result.status === 'error') {
-        logSafeServerFailure('warn', 'chat_intent_open_failed');
-      }
+        intentForm(intent),
+      ),
+    });
+    if (result.event === 'chat_open_failed') {
+      logSafeServerFailure('warn', 'chat_intent_open_failed');
+    } else if (result.event === 'callback_failed') {
+      logSafeServerFailure('error', 'google_sign_in_callback_failed');
     }
-    return NextResponse.redirect(destination(next));
-  } catch {
-    logSafeServerFailure('error', 'google_sign_in_callback_failed');
-    return NextResponse.redirect(retryDestination(next, pendingIntent, 'profile_setup'));
+    return NextResponse.redirect(result.redirectTo);
+  } catch (error) {
+    logSafeServerFailure('error', 'google_sign_in_callback_failed', { failure: error });
+    return NextResponse.json(
+      { error: 'authentication_unavailable' },
+      { status: 503 },
+    );
   }
 }

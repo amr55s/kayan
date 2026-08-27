@@ -8,13 +8,16 @@ import {
 const INTENT_TTL_MS = 10 * 60 * 1_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
+export type OAuthFlowPhase = 'oauth' | 'cancelled' | 'recovery';
+
 type SignedChatIntent = {
   version: 1;
   flowId: string;
   issuedAt: number;
   expiresAt: number;
   returnTo: string;
-  intent: ChatLoginIntent;
+  intent: ChatLoginIntent | null;
+  phase: OAuthFlowPhase;
 };
 
 export const chatIntentCookie = {
@@ -58,10 +61,10 @@ function equalSignature(actual: string, expected: string): boolean {
 function parseSignedPayload(value: unknown): SignedChatIntent | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const input = value as Record<string, unknown>;
-  if (!exactKeys(input, ['version', 'flowId', 'issuedAt', 'expiresAt', 'returnTo', 'intent'])) {
+  if (!exactKeys(input, ['version', 'flowId', 'issuedAt', 'expiresAt', 'returnTo', 'intent', 'phase'])) {
     return null;
   }
-  const intent = parseChatLoginIntent(input.intent);
+  const intent = input.intent === null ? null : parseChatLoginIntent(input.intent);
   const returnTo = exactReturnTo(input.returnTo);
   if (
     input.version !== 1
@@ -72,7 +75,8 @@ function parseSignedPayload(value: unknown): SignedChatIntent | null {
     || typeof input.expiresAt !== 'number'
     || !Number.isSafeInteger(input.expiresAt)
     || !returnTo
-    || !intent
+    || (input.intent !== null && !intent)
+    || (input.phase !== 'oauth' && input.phase !== 'cancelled' && input.phase !== 'recovery')
   ) return null;
   return {
     version: 1,
@@ -81,39 +85,14 @@ function parseSignedPayload(value: unknown): SignedChatIntent | null {
     expiresAt: input.expiresAt,
     returnTo,
     intent,
+    phase: input.phase,
   };
 }
 
-export function signChatIntentCookie(input: {
-  secret: string;
-  flowId: string;
-  returnTo: string;
-  intent: ChatLoginIntent;
-  now?: number;
-}): { value: string; flowId: string } {
-  const intent = parseChatLoginIntent(input.intent);
-  const returnTo = exactReturnTo(input.returnTo);
-  if (!intent || !returnTo || !UUID.test(input.flowId)) throw new Error('invalid_chat_intent');
-  const issuedAt = input.now ?? Date.now();
-  if (!Number.isSafeInteger(issuedAt) || issuedAt < 0) throw new Error('invalid_chat_intent');
-  const payload: SignedChatIntent = {
-    version: 1,
-    flowId: input.flowId,
-    issuedAt,
-    expiresAt: issuedAt + INTENT_TTL_MS,
-    returnTo,
-    intent,
-  };
-  const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
-  return { value: `${encoded}.${signature(encoded, input.secret)}`, flowId: input.flowId };
-}
-
-export function verifyChatIntentCookie(
+function parseAndVerify(
   value: string | null | undefined,
-  input: { secret: string; flowId: string; returnTo: string; now?: number },
-):
-  | { status: 'valid'; intent: ChatLoginIntent }
-  | { status: 'invalid' | 'expired' | 'mismatch' } {
+  input: { secret: string; now?: number },
+): { status: 'valid'; payload: SignedChatIntent } | { status: 'invalid' | 'expired' } {
   validatedSecret(input.secret);
   if (!value || typeof value !== 'string') return { status: 'invalid' };
   const separator = value.indexOf('.');
@@ -129,10 +108,6 @@ export function verifyChatIntentCookie(
   }
   const payload = parseSignedPayload(raw);
   if (!payload) return { status: 'invalid' };
-  const returnTo = exactReturnTo(input.returnTo);
-  if (payload.flowId !== input.flowId || !returnTo || payload.returnTo !== returnTo) {
-    return { status: 'mismatch' };
-  }
   const now = input.now ?? Date.now();
   if (
     !Number.isSafeInteger(now)
@@ -140,5 +115,85 @@ export function verifyChatIntentCookie(
     || payload.issuedAt > now + 30_000
     || now >= payload.expiresAt
   ) return { status: 'expired' };
-  return { status: 'valid', intent: payload.intent };
+  return { status: 'valid', payload };
+}
+
+function encodePayload(payload: SignedChatIntent, secret: string): string {
+  const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  return `${encoded}.${signature(encoded, secret)}`;
+}
+
+export function signChatIntentCookie(input: {
+  secret: string;
+  flowId: string;
+  returnTo: string;
+  intent: ChatLoginIntent | null;
+  phase?: OAuthFlowPhase;
+  now?: number;
+}): { value: string; flowId: string } {
+  const intent = input.intent === null ? null : parseChatLoginIntent(input.intent);
+  const returnTo = exactReturnTo(input.returnTo);
+  if ((input.intent !== null && !intent) || !returnTo || !UUID.test(input.flowId)) throw new Error('invalid_chat_intent');
+  const issuedAt = input.now ?? Date.now();
+  if (!Number.isSafeInteger(issuedAt) || issuedAt < 0) throw new Error('invalid_chat_intent');
+  const payload: SignedChatIntent = {
+    version: 1,
+    flowId: input.flowId,
+    issuedAt,
+    expiresAt: issuedAt + INTENT_TTL_MS,
+    returnTo,
+    intent,
+    phase: input.phase ?? 'oauth',
+  };
+  return { value: encodePayload(payload, input.secret), flowId: input.flowId };
+}
+
+export function inspectChatIntentCookie(
+  value: string | null | undefined,
+  input: { secret: string; now?: number },
+):
+  | { status: 'valid'; flow: Pick<SignedChatIntent, 'flowId' | 'returnTo' | 'intent' | 'phase'> }
+  | { status: 'invalid' | 'expired' } {
+  const result = parseAndVerify(value, input);
+  if (result.status !== 'valid') return result;
+  const { flowId, returnTo, intent, phase } = result.payload;
+  return { status: 'valid', flow: { flowId, returnTo, intent, phase } };
+}
+
+export function transitionChatIntentCookie(
+  value: string | null | undefined,
+  input: {
+    secret: string;
+    now?: number;
+    flowId: string;
+    returnTo: string;
+    phase: OAuthFlowPhase;
+  },
+): { status: 'valid'; value: string } | { status: 'invalid' | 'expired' | 'mismatch' } {
+  const result = parseAndVerify(value, input);
+  if (result.status !== 'valid') return result;
+  const returnTo = exactReturnTo(input.returnTo);
+  if (!returnTo || result.payload.flowId !== input.flowId || result.payload.returnTo !== returnTo) {
+    return { status: 'mismatch' };
+  }
+  return {
+    status: 'valid',
+    value: encodePayload({ ...result.payload, phase: input.phase }, input.secret),
+  };
+}
+
+export function verifyChatIntentCookie(
+  value: string | null | undefined,
+  input: { secret: string; flowId: string; returnTo: string; now?: number },
+):
+  | { status: 'valid'; intent: ChatLoginIntent | null; phase: OAuthFlowPhase }
+  | { status: 'invalid' | 'expired' | 'mismatch' } {
+  const result = parseAndVerify(value, input);
+  if (result.status !== 'valid') return result;
+  const payload = result.payload;
+  const returnTo = exactReturnTo(input.returnTo);
+  if (payload.flowId !== input.flowId || !returnTo || payload.returnTo !== returnTo) {
+    return { status: 'mismatch' };
+  }
+  return { status: 'valid', intent: payload.intent, phase: payload.phase };
 }

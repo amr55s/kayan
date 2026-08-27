@@ -19,11 +19,13 @@ export function MarketplaceProductDetails({
   addToCartAction,
   isAuthenticated,
   chatLoginHref,
+  chatRecovery,
 }: {
   product: MarketplaceProductDetailsViewModel;
   addToCartAction?: MarketplaceFormAction;
   isAuthenticated: boolean;
   chatLoginHref: string;
+  chatRecovery?: import('@/lib/commerce/chat/contracts').ChatErrorCode | null;
 }) {
   const discount = marketplaceDiscountPercentage(product.price, product.compareAtPrice);
   const showRating = Boolean(product.rating && product.rating.count > 0);
@@ -92,6 +94,7 @@ export function MarketplaceProductDetails({
             returnTo={marketplaceProductHref(product)}
             loginHref={chatLoginHref}
             isAuthenticated={isAuthenticated}
+            recovery={chatRecovery}
             label="اسأل المتجر عن هذا المنتج"
           />
 

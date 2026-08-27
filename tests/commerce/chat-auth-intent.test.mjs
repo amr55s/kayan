@@ -1,176 +1,469 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import * as navigation from '../../lib/auth/safe-next.ts';
 import * as intentCookie from '../../lib/auth/chat-intent-cookie.ts';
 
-const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), 'utf8');
-const storeId = '4a87a29f-803b-4e0d-af3e-55d7dc54af64';
-const productId = '7182ed18-22e8-4b9d-b528-9c33f81c4a53';
+const oauthFlow = await import('../../lib/auth/oauth-flow.ts').catch(() => null);
+const callbackFlow = await import('../../lib/auth/callback-flow.ts').catch(() => null);
+const entryState = await import('../../components/marketplace/chat/chat-entry-state.ts').catch(() => null);
+const checkoutState = await import('../../components/marketplace/checkout-state.ts').catch(() => null);
+const storeChat = await import('../../lib/commerce/store-chat.ts').catch(() => null);
+
+const storeA = '4a87a29f-803b-4e0d-af3e-55d7dc54af64';
+const storeB = '236957b7-4bb9-405f-956d-338fb3442719';
+const productA = '7182ed18-22e8-4b9d-b528-9c33f81c4a53';
+const productB = '8fa4e845-220d-44d1-8c73-50eaa81496cb';
 const orderId = 'df80bb8c-59f6-409b-8458-b1e5c3c28280';
 const flowA = 'f2616187-4f06-422c-8690-58f442023a2c';
 const flowB = 'f5e4689f-995f-46a7-a25f-15d5a42d41f0';
 const secret = 'test-only-intent-secret-that-is-at-least-32-bytes';
 const issuedAt = Date.parse('2026-08-28T10:00:00.000Z');
+const siteUrl = 'https://shop.example';
 
-test('OAuth return paths reject encoded redirect tricks and retain allowed internal queries', () => {
+function intent(storeId, productId) {
+  return { kind: 'presale', storeId, productId };
+}
+
+function memoryCookie(initial = null) {
+  let value = initial;
+  const mutations = [];
+  return {
+    get value() { return value; },
+    mutations,
+    read: () => value,
+    write(next) { value = next; mutations.push(['write', next]); },
+    delete() { value = null; mutations.push(['delete']); },
+  };
+}
+
+function requireModule(module, name) {
+  assert.ok(module, `${name} behavioral module is missing`);
+  return module;
+}
+
+test('OAuth return paths decode until stable and reject nested authority, scheme, and separator tricks', () => {
+  const nested = (value, passes) => {
+    let result = value;
+    for (let index = 0; index < passes; index += 1) result = encodeURIComponent(result);
+    return result;
+  };
   assert.equal(
-    navigation.sanitizeNextPath?.('/account/chat?store=valid', '/marketplace'),
-    '/account/chat?store=valid',
+    navigation.sanitizeNextPath('/account/chat?store=valid#thread', '/marketplace'),
+    '/account/chat?store=valid#thread',
   );
   for (const malicious of [
     'https://evil.example/chat',
     '//evil.example/chat',
-    '/%2f%2fevil.example/chat',
-    '/%255c%255cevil.example/chat',
-    '/marketplace/%0d%0aLocation:%20https://evil.example',
-    '/marketplace?next=%252F%252Fevil.example/chat',
+    `/marketplace?next=${nested('//evil.example/chat', 12)}`,
+    `/marketplace?next=${nested('\\\\evil.example/chat', 12)}`,
+    `/marketplace?next=${nested('javascript:alert(1)', 9)}`,
+    `/marketplace#next=${nested('data:text/html,bad', 7)}`,
+    `/marketplace?x=${encodeURIComponent('\r\nLocation: https://evil.example')}`,
+    `/marketplace/${encodeURIComponent('\u2028')}evil`,
+    `/marketplace?x=${encodeURIComponent('\u2029')}evil`,
     '/api/private?next=/marketplace',
   ]) {
-    assert.equal(
-      navigation.sanitizeNextPath?.(malicious, '/marketplace'),
-      '/marketplace',
-      malicious,
-    );
+    assert.equal(navigation.sanitizeNextPath(malicious, '/marketplace'), '/marketplace', malicious);
   }
 });
 
-test('store and product chat login hrefs carry only validated intent fields and one final return path', () => {
-  assert.equal(typeof navigation.createChatLoginHref, 'function');
-  const storeHref = navigation.createChatLoginHref({
-    returnTo: '/marketplace?store=groceries',
-    intent: { kind: 'presale', storeId, productId: null },
-  });
-  const productHref = navigation.createChatLoginHref({
-    returnTo: `/marketplace/products/${productId}/olive-oil?variant=large`,
-    intent: { kind: 'presale', storeId, productId },
-  });
-
-  assert.equal(
-    storeHref,
-    `/signin?next=%2Fmarketplace%3Fstore%3Dgroceries&intent=chat&kind=presale&storeId=${storeId}`,
-  );
-  assert.equal(
-    productHref,
-    `/signin?next=%2Fmarketplace%2Fproducts%2F${productId}%2Folive-oil%3Fvariant%3Dlarge&intent=chat&kind=presale&storeId=${storeId}&productId=${productId}`,
-  );
-  assert.throws(
-    () => navigation.createChatLoginHref({
-      returnTo: '/marketplace',
-      intent: { kind: 'presale', storeId: 'not-a-uuid', productId: null },
-    }),
-    /invalid_chat_intent/,
-  );
-});
-
-test('signed chat intent is tamper-evident, expires, and binds to the exact callback flow and return path', () => {
-  assert.equal(typeof intentCookie.signChatIntentCookie, 'function');
-  assert.equal(typeof intentCookie.verifyChatIntentCookie, 'function');
+test('signed flow inspection preserves exact intent shapes, phase, expiry, and tamper evidence', () => {
+  assert.equal(typeof intentCookie.inspectChatIntentCookie, 'function');
   const signed = intentCookie.signChatIntentCookie({
     secret,
     now: issuedAt,
     flowId: flowA,
     returnTo: `/marketplace/orders/${orderId}?tab=details`,
     intent: { kind: 'order', orderId },
+    phase: 'oauth',
   });
-
   assert.deepEqual(
-    intentCookie.verifyChatIntentCookie(signed.value, {
-      secret,
-      now: issuedAt + 30_000,
-      flowId: flowA,
-      returnTo: `/marketplace/orders/${orderId}?tab=details`,
-    }),
-    { status: 'valid', intent: { kind: 'order', orderId } },
+    intentCookie.inspectChatIntentCookie(signed.value, { secret, now: issuedAt + 30_000 }),
+    {
+      status: 'valid',
+      flow: {
+        flowId: flowA,
+        returnTo: `/marketplace/orders/${orderId}?tab=details`,
+        intent: { kind: 'order', orderId },
+        phase: 'oauth',
+      },
+    },
   );
   assert.deepEqual(
-    intentCookie.verifyChatIntentCookie(`${signed.value.slice(0, -1)}x`, {
+    intentCookie.inspectChatIntentCookie(`${signed.value.slice(0, -1)}x`, {
       secret,
       now: issuedAt + 30_000,
-      flowId: flowA,
-      returnTo: `/marketplace/orders/${orderId}?tab=details`,
     }),
     { status: 'invalid' },
   );
   assert.deepEqual(
-    intentCookie.verifyChatIntentCookie(signed.value, {
-      secret,
-      now: issuedAt + 601_000,
-      flowId: flowA,
-      returnTo: `/marketplace/orders/${orderId}?tab=details`,
-    }),
+    intentCookie.inspectChatIntentCookie(signed.value, { secret, now: issuedAt + 601_000 }),
     { status: 'expired' },
-  );
-  assert.deepEqual(
-    intentCookie.verifyChatIntentCookie(signed.value, {
-      secret,
-      now: issuedAt + 30_000,
-      flowId: flowA,
-      returnTo: '/marketplace',
-    }),
-    { status: 'mismatch' },
   );
 });
 
-test('a callback from another tab cannot consume or replay the current chat flow', () => {
+test('two tabs serialize fixed-key PKCE without overwriting the first signed intent', async () => {
+  const { startGoogleOAuthFlow } = requireModule(oauthFlow, 'oauth-flow');
+  const cookie = memoryCookie();
+  let oauthStarts = 0;
+  let authenticated = false;
+  const common = {
+    secret,
+    siteUrl,
+    now: () => issuedAt,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    isAuthenticated: async () => authenticated,
+    startOAuth: async (callbackUrl) => {
+      oauthStarts += 1;
+      return `https://auth.example/authorize?redirect=${encodeURIComponent(callbackUrl)}`;
+    },
+  };
+  const first = await startGoogleOAuthFlow(
+    { next: '/marketplace?store=a', intent: intent(storeA, productA) },
+    { ...common, randomFlowId: () => flowA },
+  );
+  const firstCookie = cookie.value;
+  const second = await startGoogleOAuthFlow(
+    { next: '/marketplace?store=b', intent: intent(storeB, productB) },
+    { ...common, randomFlowId: () => flowB },
+  );
+
+  assert.equal(first.success, true);
+  assert.equal(second.success, false);
+  assert.equal(second.code, 'oauth_in_progress');
+  assert.equal(oauthStarts, 1);
+  assert.equal(cookie.value, firstCookie, 'tab B must not overwrite tab A intent');
+
+  cookie.delete();
+  authenticated = true;
+  const sharedSessionRetry = await startGoogleOAuthFlow(
+    { next: '/marketplace?store=b', intent: intent(storeB, productB) },
+    { ...common, randomFlowId: () => flowB },
+  );
+  assert.deepEqual(sharedSessionRetry, { success: true, url: '/marketplace?store=b' });
+  assert.equal(oauthStarts, 1, 'an existing shared session must not start another PKCE flow');
+});
+
+test('stale and cancelled flows can be replaced but active recovery cannot be overwritten', async () => {
+  const { startGoogleOAuthFlow } = requireModule(oauthFlow, 'oauth-flow');
+  const stale = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt - 700_000,
+    flowId: flowA,
+    returnTo: '/marketplace?store=a',
+    intent: intent(storeA, null),
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(stale);
+  let starts = 0;
+  const dependencies = {
+    secret,
+    siteUrl,
+    now: () => issuedAt,
+    randomFlowId: () => flowB,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    isAuthenticated: async () => false,
+    startOAuth: async () => { starts += 1; return 'https://auth.example/new'; },
+  };
+  assert.equal((await startGoogleOAuthFlow({ next: '/marketplace', intent: null }, dependencies)).success, true);
+  assert.equal(starts, 1);
+
+  const recovery = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo: '/marketplace?store=a',
+    intent: intent(storeA, null),
+    phase: 'recovery',
+  }).value;
+  const recoveryCookie = memoryCookie(recovery);
+  const blocked = await startGoogleOAuthFlow(
+    { next: '/marketplace?store=b', intent: intent(storeB, null) },
+    { ...dependencies, readCookie: recoveryCookie.read, writeCookie: recoveryCookie.write },
+  );
+  assert.equal(blocked.code, 'oauth_in_progress');
+  assert.equal(recoveryCookie.value, recovery);
+});
+
+test('successful callback preserves profile-cart-chat ordering and consumes only its exact flow', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
   const signed = intentCookie.signChatIntentCookie({
     secret,
     now: issuedAt,
-    flowId: flowB,
-    returnTo: `/marketplace/products/${productId}/olive-oil`,
-    intent: { kind: 'presale', storeId, productId },
+    flowId: flowA,
+    returnTo: '/marketplace?store=a&sort=newest',
+    intent: intent(storeA, null),
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signed);
+  const events = [];
+  const result = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=good&flow=${flowA}&next=${encodeURIComponent('/marketplace?store=a&sort=newest')}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 30_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => { events.push('exchange'); },
+    ensureCustomer: async () => { events.push('profile'); },
+    claimGuestCart: async () => { events.push('cart'); },
+    openConversation: async () => { events.push('chat'); return { status: 'sent' }; },
   });
-  assert.deepEqual(
-    intentCookie.verifyChatIntentCookie(signed.value, {
-      secret,
-      now: issuedAt + 10_000,
-      flowId: flowA,
-      returnTo: `/marketplace/products/${productId}/olive-oil`,
-    }),
-    { status: 'mismatch' },
-  );
+
+  assert.deepEqual(events, ['exchange', 'profile', 'cart', 'chat']);
+  assert.equal(result.redirectTo, `${siteUrl}/marketplace?store=a&sort=newest`);
+  assert.equal(cookie.value, null);
+  assert.deepEqual(cookie.mutations.at(-1), ['delete']);
+});
+
+test('cancellation retains intent as replaceable state and never exchanges or opens chat', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
+  const signed = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo: `/marketplace/products/${productA}/item`,
+    intent: intent(storeA, productA),
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signed);
+  let sideEffects = 0;
+  const result = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?error=access_denied&flow=${flowA}&next=${encodeURIComponent(`/marketplace/products/${productA}/item`)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => { sideEffects += 1; },
+    ensureCustomer: async () => { sideEffects += 1; },
+    claimGuestCart: async () => { sideEffects += 1; },
+    openConversation: async () => { sideEffects += 1; return { status: 'sent' }; },
+  });
+
+  assert.equal(sideEffects, 0);
+  assert.equal(new URL(result.redirectTo).searchParams.get('error'), 'oauth_callback');
   assert.equal(
-    intentCookie.verifyChatIntentCookie(signed.value, {
-      secret,
-      now: issuedAt + 10_000,
-      flowId: flowB,
-      returnTo: `/marketplace/products/${productId}/olive-oil`,
-    }).status,
-    'valid',
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt + 20_000 }).flow.phase,
+    'cancelled',
   );
 });
 
-test('checkout and chat expose Google first without an anonymous or service-role submission fallback', () => {
-  const checkout = read('components/marketplace/checkout-form.tsx');
-  const checkoutService = read('lib/commerce/checkout.ts');
-  const entry = read('components/marketplace/chat/chat-entry-button.tsx');
-  const callback = read('app/auth/callback/route.ts');
-
-  assert.match(checkout, /MarketplaceCheckoutLogin[\s\S]*GoogleSignInButton/);
-  assert.match(entry, /openMarketplaceConversationAction/);
-  assert.match(entry, /GoogleSignInButton/);
-  assert.doesNotMatch(entry, /https?:\/\//);
-  assert.doesNotMatch(checkoutService, /createAdminClient|service_role|p_customer_id/);
-  assert.match(checkoutService, /authentication_required/);
-  assert.match(callback, /claimMarketplaceGuestCart[\s\S]*openMarketplaceConversationAction/);
+test('a mismatched callback cannot exchange a code or consume another tab flow', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
+  const signed = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo: '/marketplace?store=a',
+    intent: intent(storeA, null),
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signed);
+  let exchanges = 0;
+  const result = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=wrong-tab&flow=${flowB}&next=${encodeURIComponent('/marketplace?store=b')}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => { exchanges += 1; },
+    ensureCustomer: async () => {},
+    claimGuestCart: async () => {},
+    openConversation: async () => ({ status: 'sent' }),
+  });
+  assert.equal(exchanges, 0);
+  assert.equal(cookie.value, signed);
+  assert.equal(new URL(result.redirectTo).searchParams.get('error'), 'oauth_callback');
 });
 
-test('OAuth cancellation retains a retryable final destination while successful callbacks consume once', () => {
-  const oauth = read('lib/auth/oauth-actions.ts');
-  const callback = read('app/auth/callback/route.ts');
-  const googleButton = read('components/auth/GoogleSignInButton.tsx');
-
-  assert.deepEqual(intentCookie.chatIntentCookie.options, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 600,
+test('a cancelled flow callback replay cannot exchange or automatically open its intent', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
+  const signed = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo: '/marketplace?store=a',
+    intent: intent(storeA, null),
+    phase: 'cancelled',
+  }).value;
+  const cookie = memoryCookie(signed);
+  let sideEffects = 0;
+  const result = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=replayed&flow=${flowA}&next=${encodeURIComponent('/marketplace?store=a')}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => { sideEffects += 1; },
+    ensureCustomer: async () => { sideEffects += 1; },
+    claimGuestCart: async () => { sideEffects += 1; },
+    openConversation: async () => { sideEffects += 1; return { status: 'sent' }; },
   });
-  assert.match(oauth, /chatIntentCookie\.options/);
-  assert.match(callback, /oauth_callback/);
-  assert.match(callback, /cookieStore\.delete/);
-  assert.match(googleButton, /label/);
-  assert.doesNotMatch(googleButton, /next=\{loginHref\}/);
+  assert.equal(sideEffects, 0);
+  assert.equal(cookie.value, signed);
+  assert.equal(new URL(result.redirectTo).searchParams.get('error'), 'oauth_callback');
+});
+
+test('temporary chat-open failure retains recovery, redirects visibly, and explicit retry consumes it', async () => {
+  const { handleGoogleOAuthCallback, retryRecoveredChatIntent } = requireModule(callbackFlow, 'callback-flow');
+  const returnTo = `/marketplace/products/${productA}/item?variant=large`;
+  const chatIntent = intent(storeA, productA);
+  const signed = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo,
+    intent: chatIntent,
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signed);
+  let opens = 0;
+  const dependencies = {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 30_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => {},
+    ensureCustomer: async () => {},
+    claimGuestCart: async () => {},
+    openConversation: async () => {
+      opens += 1;
+      return { status: 'error', code: 'service_unavailable' };
+    },
+  };
+  const callbackResult = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=good&flow=${flowA}&next=${encodeURIComponent(returnTo)}`,
+  }, dependencies);
+  const recoveryUrl = new URL(callbackResult.redirectTo);
+
+  assert.equal(recoveryUrl.pathname + recoveryUrl.search.replace(/&?chat_recovery=[^&]+/u, ''), returnTo);
+  assert.equal(recoveryUrl.searchParams.get('chat_recovery'), 'service_unavailable');
+  assert.equal(opens, 1);
+  assert.equal(
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt + 30_000 }).flow.phase,
+    'recovery',
+  );
+
+  dependencies.openConversation = async () => { opens += 1; return { status: 'sent' }; };
+  const retried = await retryRecoveredChatIntent({ intent: chatIntent, returnTo }, dependencies);
+  assert.deepEqual(retried, { status: 'sent' });
+  assert.equal(opens, 2);
+  assert.equal(cookie.value, null);
+});
+
+test('replayed callback never automatically reopens a recovery intent', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
+  const returnTo = `/marketplace/products/${productA}/item`;
+  const recovery = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo,
+    intent: intent(storeA, productA),
+    phase: 'recovery',
+  }).value;
+  const cookie = memoryCookie(recovery);
+  let opens = 0;
+  const result = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=replayed&flow=${flowA}&next=${encodeURIComponent(returnTo)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 40_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => {},
+    ensureCustomer: async () => {},
+    claimGuestCart: async () => {},
+    openConversation: async () => { opens += 1; return { status: 'sent' }; },
+  });
+  assert.equal(opens, 0);
+  assert.equal(new URL(result.redirectTo).searchParams.get('chat_recovery'), 'service_unavailable');
+  assert.equal(cookie.value, recovery);
+});
+
+test('a no-code callback retry cannot downgrade or consume a recovery intent', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
+  const returnTo = `/marketplace/products/${productA}/item`;
+  const recovery = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo,
+    intent: intent(storeA, productA),
+    phase: 'recovery',
+  }).value;
+  const cookie = memoryCookie(recovery);
+  const result = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?error=access_denied&flow=${flowA}&next=${encodeURIComponent(returnTo)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 40_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => assert.fail('must not exchange'),
+    ensureCustomer: async () => assert.fail('must not provision'),
+    claimGuestCart: async () => assert.fail('must not claim'),
+    openConversation: async () => assert.fail('must not auto-open'),
+  });
+  assert.equal(new URL(result.redirectTo).searchParams.get('chat_recovery'), 'service_unavailable');
+  assert.equal(cookie.value, recovery);
+  assert.equal(
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt + 40_000 }).flow.phase,
+    'recovery',
+  );
+});
+
+test('anonymous checkout/chat gates and oauth-in-progress guidance are behavioral UI states', () => {
+  const chat = requireModule(entryState, 'chat-entry-state');
+  const checkout = requireModule(checkoutState, 'checkout-state');
+  assert.deepEqual(checkout.resolveCheckoutEntryState(true), { mode: 'google' });
+  assert.deepEqual(checkout.resolveCheckoutEntryState(false), { mode: 'checkout' });
+  assert.equal(chat.resolveChatEntryState({ isAuthenticated: false, recovery: null }).mode, 'google');
+  assert.equal(
+    chat.resolveChatEntryState({ isAuthenticated: true, recovery: 'service_unavailable' }).message,
+    'تعذر فتح المحادثة بعد تسجيل الدخول. أعد المحاولة من هنا؛ لن نكرر تسجيل الدخول.',
+  );
+  assert.deepEqual(oauthFlow.oauthInProgressFeedback(), {
+    code: 'oauth_in_progress',
+    message: 'هناك محاولة تسجيل دخول جارية في تبويب آخر. أكملها أو ألغها هناك، ثم أعد المحاولة هنا.',
+  });
+});
+
+test('selected store surface produces a real store-level presale entry without nesting a product intent', () => {
+  const { createSelectedStoreChatEntry } = requireModule(storeChat, 'store-chat');
+  const model = {
+    selectedStore: 'groceries',
+    products: [{ id: productA, store: { id: storeA, slug: 'groceries', name: 'البقالة' } }],
+  };
+  const entry = createSelectedStoreChatEntry({
+    model,
+    returnTo: '/marketplace?store=groceries&sort=newest',
+    isAuthenticated: false,
+  });
+  assert.deepEqual(entry.intent, { kind: 'presale', storeId: storeA, productId: null });
+  assert.equal(entry.returnTo, '/marketplace?store=groceries&sort=newest');
+  assert.equal(entry.isAuthenticated, false);
+  assert.match(entry.loginHref, /^\/signin\?/u);
 });

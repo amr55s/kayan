@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useEffect } from 'react';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { openMarketplaceConversationAction } from '@/lib/commerce/chat/actions';
+import { retryMarketplaceConversationAction } from '@/lib/commerce/chat/recovery-action';
 import type { ChatLoginIntent } from '@/lib/auth/safe-next';
-import type { ChatActionState } from '@/lib/commerce/chat/contracts';
+import type { ChatActionState, ChatErrorCode } from '@/lib/commerce/chat/contracts';
+import { resolveChatEntryState } from './chat-entry-state';
 import styles from '../marketplace.module.css';
 
 const initialState: ChatActionState = { status: 'idle' };
@@ -24,17 +26,22 @@ export function ChatEntryButton({
   returnTo,
   loginHref,
   isAuthenticated,
+  recovery = null,
   label = 'اسأل المتجر',
 }: {
   intent: ChatLoginIntent;
   returnTo: string;
   loginHref: string;
   isAuthenticated: boolean;
+  recovery?: ChatErrorCode | null;
   label?: string;
 }) {
   const router = useRouter();
+  const entry = resolveChatEntryState({ isAuthenticated, recovery });
   const [state, formAction, isPending] = useActionState(
-    openMarketplaceConversationAction,
+    entry.mode === 'recovery'
+      ? retryMarketplaceConversationAction
+      : openMarketplaceConversationAction,
     initialState,
   );
 
@@ -62,6 +69,7 @@ export function ChatEntryButton({
     <form action={formAction} className="grid w-full gap-2" dir="rtl">
       <input type="hidden" name="kind" value={intent.kind} />
       <input type="hidden" name="chatRoute" value="/account/chat" />
+      <input type="hidden" name="returnTo" value={returnTo} />
       {intent.kind === 'presale' ? (
         <>
           <input type="hidden" name="storeId" value={intent.storeId} />
@@ -76,8 +84,13 @@ export function ChatEntryButton({
         aria-disabled={isPending}
         className={styles.secondaryButton}
       >
-        {isPending ? 'جارٍ فتح المحادثة…' : label}
+        {isPending ? 'جارٍ فتح المحادثة…' : entry.mode === 'recovery' ? 'إعادة محاولة فتح المحادثة' : label}
       </button>
+      {entry.message ? (
+        <p role="status" className="m-0 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-950">
+          {entry.message}
+        </p>
+      ) : null}
       {state.status === 'error' ? (
         <p role="alert" className="m-0 text-sm font-bold leading-6 text-red-800">
           {errors[state.code]}

@@ -16,6 +16,7 @@ const loadProduct = cache(fetchMarketplaceProduct);
 
 type ProductPageProps = {
   params: Promise<{ id: string; slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
@@ -83,7 +84,7 @@ function productJsonLd(product: Awaited<ReturnType<typeof loadProduct>>) {
   };
 }
 
-export default async function MarketplaceProductPage({ params }: ProductPageProps) {
+export default async function MarketplaceProductPage({ params, searchParams }: ProductPageProps) {
   const { id, slug } = await params;
   const product = await loadProduct(id);
   if (!product) notFound();
@@ -92,6 +93,12 @@ export default async function MarketplaceProductPage({ params }: ProductPageProp
   const intent = { kind: 'presale', storeId: product.store.id, productId: product.id } as const;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const recoveryValue = (await searchParams)?.chat_recovery;
+  const chatRecovery = recoveryValue === 'authentication_required'
+    || recoveryValue === 'rate_limited'
+    || recoveryValue === 'service_unavailable'
+    ? recoveryValue
+    : null;
   const structuredData = productJsonLd(product);
   return (
     <>
@@ -104,6 +111,7 @@ export default async function MarketplaceProductPage({ params }: ProductPageProp
         addToCartAction={addMarketplaceCartItemAction}
         isAuthenticated={Boolean(user)}
         chatLoginHref={createChatLoginHref({ returnTo, intent })}
+        chatRecovery={chatRecovery}
       />
     </>
   );

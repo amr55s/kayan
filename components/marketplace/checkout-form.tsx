@@ -17,6 +17,7 @@ import type {
   MarketplaceSavedAddress,
 } from './view-models';
 import styles from './marketplace.module.css';
+import { resolveCheckoutEntryState } from './checkout-state';
 
 type AddressDraft = Pick<MarketplaceSavedAddress,
   | 'recipientName'
@@ -106,7 +107,7 @@ export function MarketplaceCodCheckout({
     setAddress((current) => ({ ...current, [key]: value }));
   }
 
-  if (model.requiresAuthentication) {
+  if (resolveCheckoutEntryState(model.requiresAuthentication).mode === 'google') {
     return <MarketplaceCheckoutLogin />;
   }
 

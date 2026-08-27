@@ -1,5 +1,6 @@
 const NAVIGATION_ORIGIN = 'https://navigation.invalid';
 const MAX_NEXT_LENGTH = 500;
+const MAX_DECODE_PASSES = Math.floor(MAX_NEXT_LENGTH / 2) + 2;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const ALLOWED_PATH = /^\/(?:$|marketplace(?:\/|$)|account(?:\/|$)|merchant(?:\/|$)|driver(?:\/|$)|admin(?:\/|$)|services(?:\/|$)|guide(?:\/|$)|share(?:\/|$))/u;
 
@@ -9,22 +10,27 @@ export type ChatLoginIntent =
 
 function unsafeAfterDecoding(value: string): boolean {
   let decoded = value;
-  for (let pass = 0; pass < 3; pass += 1) {
-    if (decoded.includes('\\') || /[\u0000-\u001f\u007f]/u.test(decoded)) return true;
+  for (let pass = 0; pass < MAX_DECODE_PASSES; pass += 1) {
+    if (decoded.includes('\\') || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(decoded)) return true;
     const path = decoded.split(/[?#]/u, 1)[0] ?? '';
     if (!path.startsWith('/') || path.startsWith('//')) return true;
     const queryAndHash = decoded.slice(path.length);
-    if (/:\/\//u.test(queryAndHash) || /(?:^|[?&=])\/\//u.test(queryAndHash)) return true;
+    if (
+      /:\/\//u.test(queryAndHash)
+      || /(?:^|[?&#=])\/\//u.test(queryAndHash)
+      || /(?:^|[?&#=])(javascript|data):/iu.test(queryAndHash)
+    ) return true;
     try {
       const next = decodeURIComponent(decoded);
-      if (next === decoded) break;
+      if (next === decoded) return false;
       decoded = next;
     } catch {
       return true;
     }
   }
-  const decodedPath = decoded.split(/[?#]/u, 1)[0] ?? '';
-  return decodedPath.startsWith('//') || decodedPath.includes('\\');
+  // Every changing decode consumes at least one three-byte percent escape, so a
+  // value capped at MAX_NEXT_LENGTH must stabilize before this bound.
+  return true;
 }
 
 function normalizedNextPath(value: string | null | undefined): string | null {
