@@ -5690,6 +5690,77 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      block_my_marketplace_chat_counterparty: {
+        Args: {
+          p_blocked: boolean
+          p_counterparty_id: string
+          p_thread_id: string
+        }
+        Returns: Json
+      }
+      delete_my_marketplace_chat_message: {
+        Args: { p_message_id: string }
+        Returns: Json
+      }
+      get_my_marketplace_conversation_page: {
+        Args: {
+          p_before_created_at?: string | null
+          p_before_id?: string | null
+          p_limit?: number
+          p_thread_id: string
+        }
+        Returns: Json
+      }
+      list_my_marketplace_conversations: {
+        Args: {
+          p_before_created_at?: string | null
+          p_before_id?: string | null
+          p_kind?: string | null
+          p_limit?: number
+        }
+        Returns: Json
+      }
+      open_my_marketplace_conversation: {
+        Args: {
+          p_kind: string
+          p_order_id: string | null
+          p_store_id: string | null
+        }
+        Returns: Json
+      }
+      react_to_my_marketplace_chat_message: {
+        Args: { p_active: boolean; p_emoji: string; p_message_id: string }
+        Returns: Json
+      }
+      search_my_marketplace_chat_messages: {
+        Args: {
+          p_before_created_at?: string | null
+          p_before_id?: string | null
+          p_limit?: number
+          p_query: string
+          p_thread_id: string
+        }
+        Returns: Json
+      }
+      send_my_marketplace_chat_message: {
+        Args: {
+          p_body: string | null
+          p_card_data: Json | null
+          p_client_message_id: string
+          p_kind: string
+          p_reply_to_id: string | null
+          p_thread_id: string
+        }
+        Returns: Json
+      }
+      set_my_marketplace_chat_preferences: {
+        Args: { p_muted_until: string | null; p_thread_id: string }
+        Returns: Json
+      }
+      set_my_marketplace_chat_read_cursor: {
+        Args: { p_message_id: string; p_thread_id: string }
+        Returns: Json
+      }
       activate_marketplace_admin_capability: {
         Args: {
           p_roles: Database["public"]["Enums"]["marketplace_admin_role"][]
@@ -6321,8 +6392,8 @@ export type Database = {
       create_my_marketplace_support_thread: {
         Args: {
           p_message: string
-          p_order_id: string
-          p_store_id: string
+          p_order_id: string | null
+          p_store_id: string | null
           p_subject: string
         }
         Returns: Json
@@ -6330,8 +6401,8 @@ export type Database = {
       create_my_marketplace_support_thread_base_180000: {
         Args: {
           p_message: string
-          p_order_id: string
-          p_store_id: string
+          p_order_id: string | null
+          p_store_id: string | null
           p_subject: string
         }
         Returns: Json
@@ -6728,8 +6799,8 @@ export type Database = {
       }
       get_my_marketplace_support_thread_page: {
         Args: {
-          p_before_created_at?: string
-          p_before_id?: string
+          p_before_created_at?: string | null
+          p_before_id?: string | null
           p_limit?: number
           p_thread_id: string
         }
@@ -6955,11 +7026,11 @@ export type Database = {
       }
       list_my_marketplace_stores: { Args: never; Returns: Json }
       list_my_marketplace_support_threads: {
-        Args: { p_before?: string; p_limit?: number; p_status?: string }
+        Args: { p_before?: string | null; p_limit?: number; p_status?: string | null }
         Returns: Json
       }
       list_my_marketplace_support_threads_base_180000: {
-        Args: { p_before?: string; p_limit?: number; p_status?: string }
+        Args: { p_before?: string | null; p_limit?: number; p_status?: string | null }
         Returns: Json
       }
       list_my_store_branches: { Args: { p_store_id: string }; Returns: Json }

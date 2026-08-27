@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(78);
+select extensions.plan(83);
 
 select extensions.is(
   (select count(*)::integer from pg_catalog.pg_class as relation
@@ -266,6 +266,51 @@ select extensions.is(
     #>> '{conversation,id}',
   '90000000-0000-0000-0000-000000000001',
   'the customer receives the linked conversation'
+);
+
+select extensions.ok(
+  not exists (
+    select 1
+    from jsonb_array_elements(
+      public.list_my_marketplace_support_threads(null, 30, null) -> 'items'
+    ) as item
+    where item ->> 'id' = '90000000-0000-0000-0000-000000000001'
+  ),
+  'legacy support list excludes unified order conversations'
+);
+select extensions.throws_ok(
+  $$select public.get_my_marketplace_support_thread(
+    '90000000-0000-0000-0000-000000000001'
+  )$$,
+  'P0002', 'support_thread_not_found',
+  'legacy support get rejects a unified order conversation'
+);
+select extensions.throws_ok(
+  $$select public.reply_my_marketplace_support_thread(
+    '90000000-0000-0000-0000-000000000001', 'legacy bypass attempt'
+  )$$,
+  'P0002', 'support_thread_not_found',
+  'legacy support reply rejects a unified order conversation'
+);
+select extensions.throws_ok(
+  $$select public.close_my_marketplace_support_thread(
+    '90000000-0000-0000-0000-000000000001'
+  )$$,
+  'P0002', 'support_thread_not_found',
+  'legacy support close rejects a unified order conversation'
+);
+select extensions.is(
+  (select thread.conversation_kind
+   from public.support_threads as thread
+   where thread.id = (
+     public.create_my_marketplace_support_thread(
+       '80000000-0000-0000-0000-000000000001',
+       '40000000-0000-0000-0000-000000000001',
+       'Legacy support ticket', 'Preserve the support workflow'
+     ) ->> 'id'
+   )::uuid),
+  'support',
+  'legacy support creation remains a genuine support conversation'
 );
 
 select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000003","role":"authenticated","aal":"aal1"}', true);

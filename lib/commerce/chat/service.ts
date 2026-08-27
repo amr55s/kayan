@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import type { Json } from '@/lib/supabase/database.types';
 import {
   chatConversationKinds,
   chatMessageKinds,
@@ -25,26 +26,6 @@ import {
   reactionSchema,
   sendMessageSchema,
 } from './input';
-
-type ChatRpcName =
-  | 'open_my_marketplace_conversation'
-  | 'list_my_marketplace_conversations'
-  | 'get_my_marketplace_conversation_page'
-  | 'search_my_marketplace_chat_messages'
-  | 'send_my_marketplace_chat_message'
-  | 'set_my_marketplace_chat_read_cursor'
-  | 'react_to_my_marketplace_chat_message'
-  | 'delete_my_marketplace_chat_message'
-  | 'set_my_marketplace_chat_preferences'
-  | 'block_my_marketplace_chat_counterparty';
-
-type ChatRpcResponse = { data: unknown; error: unknown };
-type ChatRpcClient = {
-  auth: {
-    getUser(): Promise<{ data: { user: { id: string } | null }; error: unknown }>;
-  };
-  rpc(name: ChatRpcName, args: Record<string, unknown>): Promise<ChatRpcResponse>;
-};
 
 export type ListConversationsInput = {
   kind?: ChatConversationKind | null;
@@ -221,6 +202,17 @@ const stableRpcErrorCodes: Readonly<Record<string, ChatErrorCode>> = {
   '55000': 'closed',
   'P0001': 'rate_limited',
 };
+const stableAuthErrorCodes = new Set([
+  'bad_jwt',
+  'refresh_token_already_used',
+  'refresh_token_not_found',
+  'session_not_found',
+]);
+const providerErrorSchema = z.object({
+  code: z.string().optional(),
+  name: z.string().optional(),
+  status: z.number().int().optional(),
+}).passthrough();
 
 export class ChatServiceError extends Error {
   constructor(public readonly code: ChatErrorCode) {
@@ -229,22 +221,22 @@ export class ChatServiceError extends Error {
   }
 }
 
-async function authenticatedChatClient(): Promise<ChatRpcClient> {
-  let supabase: ChatRpcClient;
+async function authenticatedChatClient(): Promise<Awaited<ReturnType<typeof createClient>>> {
+  let supabase: Awaited<ReturnType<typeof createClient>>;
   try {
-    supabase = await createClient() as unknown as ChatRpcClient;
+    supabase = await createClient();
   } catch {
     throw new ChatServiceError('service_unavailable');
   }
 
-  let authResult: Awaited<ReturnType<ChatRpcClient['auth']['getUser']>>;
+  let authResult: Awaited<ReturnType<typeof supabase.auth.getUser>>;
   try {
     authResult = await supabase.auth.getUser();
   } catch {
     throw new ChatServiceError('service_unavailable');
   }
   const { data: { user }, error } = authResult;
-  if (error) throw mapChatRpcError(error);
+  if (error) throw mapChatAuthError(error);
   if (!user) throw new ChatServiceError('authentication_required');
   return supabase;
 }
@@ -260,10 +252,21 @@ function parseChatMessage(value: unknown): ChatMessage {
 }
 
 function mapChatRpcError(error: unknown): ChatServiceError {
-  const parsed = z.object({ code: z.string() }).passthrough().safeParse(error);
-  if (!parsed.success) return new ChatServiceError('service_unavailable');
+  const parsed = providerErrorSchema.safeParse(error);
+  if (!parsed.success || !parsed.data.code) return new ChatServiceError('service_unavailable');
   const code = stableRpcErrorCodes[parsed.data.code];
   return new ChatServiceError(code ?? 'service_unavailable');
+}
+
+function mapChatAuthError(error: unknown): ChatServiceError {
+  const parsed = providerErrorSchema.safeParse(error);
+  if (!parsed.success) return new ChatServiceError('service_unavailable');
+  if (parsed.data.name === 'AuthSessionMissingError'
+      || parsed.data.status === 401
+      || (parsed.data.code && stableAuthErrorCodes.has(parsed.data.code))) {
+    return new ChatServiceError('authentication_required');
+  }
+  return new ChatServiceError('service_unavailable');
 }
 
 function parseServiceInput<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -272,10 +275,12 @@ function parseServiceInput<T>(schema: z.ZodType<T>, value: unknown): T {
   return parsed.data;
 }
 
-async function executeRpc(call: () => Promise<ChatRpcResponse>): Promise<unknown> {
-  let response: ChatRpcResponse;
+async function resolveChatRpc(
+  request: PromiseLike<{ data: Json | null; error: { code: string } | null }>,
+): Promise<Json | null> {
+  let response: { data: Json | null; error: { code: string } | null };
   try {
-    response = await call();
+    response = await request;
   } catch {
     throw new ChatServiceError('service_unavailable');
   }
@@ -292,7 +297,7 @@ export function toChatActionState(error: unknown): ChatActionState {
 export async function openConversation(intent: ConversationIntent): Promise<ChatConversationSummary> {
   const input = parseServiceInput(conversationIntentSchema, intent);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('open_my_marketplace_conversation', {
+  const data = await resolveChatRpc(supabase.rpc('open_my_marketplace_conversation', {
     p_store_id: input.kind === 'presale' ? input.storeId : null,
     p_order_id: input.kind === 'order' ? input.orderId : null,
     p_kind: input.kind,
@@ -303,7 +308,7 @@ export async function openConversation(intent: ConversationIntent): Promise<Chat
 export async function listConversations(input: ListConversationsInput = {}): Promise<ChatConversationPage> {
   const parsedInput = parseServiceInput(listConversationsInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('list_my_marketplace_conversations', {
+  const data = await resolveChatRpc(supabase.rpc('list_my_marketplace_conversations', {
     p_kind: parsedInput.kind ?? null,
     p_limit: parsedInput.limit ?? 30,
     p_before_created_at: parsedInput.cursor?.createdAt ?? null,
@@ -315,7 +320,7 @@ export async function listConversations(input: ListConversationsInput = {}): Pro
 export async function getConversationPage(input: GetConversationPageInput): Promise<ChatMessagePage> {
   const parsedInput = parseServiceInput(getConversationPageInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('get_my_marketplace_conversation_page', {
+  const data = await resolveChatRpc(supabase.rpc('get_my_marketplace_conversation_page', {
     p_thread_id: parsedInput.conversationId,
     p_limit: parsedInput.limit ?? 50,
     p_before_created_at: parsedInput.cursor?.createdAt ?? null,
@@ -327,7 +332,7 @@ export async function getConversationPage(input: GetConversationPageInput): Prom
 export async function searchConversationMessages(input: ChatSearchInput): Promise<ChatMessageSearchPage> {
   const parsedInput = parseServiceInput(chatSearchSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('search_my_marketplace_chat_messages', {
+  const data = await resolveChatRpc(supabase.rpc('search_my_marketplace_chat_messages', {
     p_thread_id: parsedInput.conversationId,
     p_query: parsedInput.query,
     p_limit: parsedInput.limit,
@@ -340,7 +345,7 @@ export async function searchConversationMessages(input: ChatSearchInput): Promis
 export async function sendMessage(input: SendMessageInput): Promise<ChatMessage> {
   const parsedInput = parseServiceInput(sendMessageSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('send_my_marketplace_chat_message', {
+  const data = await resolveChatRpc(supabase.rpc('send_my_marketplace_chat_message', {
     p_thread_id: parsedInput.conversationId,
     p_client_message_id: parsedInput.clientMessageId,
     p_kind: parsedInput.kind,
@@ -358,7 +363,7 @@ export async function sendMessage(input: SendMessageInput): Promise<ChatMessage>
 export async function markConversationRead(input: MarkConversationReadInput): Promise<ChatReadCursorResult> {
   const parsedInput = parseServiceInput(markConversationReadInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('set_my_marketplace_chat_read_cursor', {
+  const data = await resolveChatRpc(supabase.rpc('set_my_marketplace_chat_read_cursor', {
     p_thread_id: parsedInput.conversationId,
     p_message_id: parsedInput.messageId,
   }));
@@ -368,7 +373,7 @@ export async function markConversationRead(input: MarkConversationReadInput): Pr
 export async function setReaction(input: ChatReactionInput): Promise<ChatMessage> {
   const parsedInput = parseServiceInput(reactionSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('react_to_my_marketplace_chat_message', {
+  const data = await resolveChatRpc(supabase.rpc('react_to_my_marketplace_chat_message', {
     p_message_id: parsedInput.messageId,
     p_emoji: parsedInput.emoji,
     p_active: parsedInput.active,
@@ -383,7 +388,7 @@ export async function setReaction(input: ChatReactionInput): Promise<ChatMessage
 export async function deleteMessage(input: DeleteMessageInput): Promise<ChatMessage> {
   const parsedInput = parseServiceInput(deleteMessageInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('delete_my_marketplace_chat_message', {
+  const data = await resolveChatRpc(supabase.rpc('delete_my_marketplace_chat_message', {
     p_message_id: parsedInput.messageId,
   }));
   try {
@@ -396,7 +401,7 @@ export async function deleteMessage(input: DeleteMessageInput): Promise<ChatMess
 export async function setConversationPreferences(input: SetConversationPreferencesInput): Promise<ChatPreferencesResult> {
   const parsedInput = parseServiceInput(setConversationPreferencesInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('set_my_marketplace_chat_preferences', {
+  const data = await resolveChatRpc(supabase.rpc('set_my_marketplace_chat_preferences', {
     p_thread_id: parsedInput.conversationId,
     p_muted_until: parsedInput.mutedUntil,
   }));
@@ -406,7 +411,7 @@ export async function setConversationPreferences(input: SetConversationPreferenc
 export async function setConversationBlock(input: SetConversationBlockInput): Promise<ChatBlockResult> {
   const parsedInput = parseServiceInput(setConversationBlockInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await executeRpc(() => supabase.rpc('block_my_marketplace_chat_counterparty', {
+  const data = await resolveChatRpc(supabase.rpc('block_my_marketplace_chat_counterparty', {
     p_thread_id: parsedInput.conversationId,
     p_counterparty_id: parsedInput.userId,
     p_blocked: parsedInput.blocked,

@@ -62,6 +62,26 @@ test('chat tables and definer routines are denied by default and granted narrowl
   assert.doesNotMatch(sql, /auth\.jwt\(\).*user_metadata/su);
 });
 
+test('legacy support RPCs are database-guarded to genuine support threads only', () => {
+  for (const routine of [
+    'list_my_marketplace_support_threads',
+    'get_my_marketplace_support_thread',
+    'get_my_marketplace_support_thread_page',
+    'reply_my_marketplace_support_thread',
+    'close_my_marketplace_support_thread',
+  ]) {
+    assert.match(routineSql(routine), /conversation_kind = 'support'/u, routine);
+  }
+  assert.match(routineSql('create_my_marketplace_support_thread'), /conversation_kind = 'support'/u);
+  for (const evidence of [
+    'legacy support list excludes unified order conversations',
+    'legacy support get rejects a unified order conversation',
+    'legacy support reply rejects a unified order conversation',
+    'legacy support close rejects a unified order conversation',
+    'legacy support creation remains a genuine support conversation',
+  ]) assert.match(pgTapSql, new RegExp(evidence, 'u'));
+});
+
 test('private Realtime authorization and delivery reassignment reuse durable access', () => {
   assert.match(sql, /realtime\.topic\(\)/u);
   assert.match(sql, /marketplace-chat:/u);

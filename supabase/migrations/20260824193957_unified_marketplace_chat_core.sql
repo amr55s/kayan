@@ -1593,6 +1593,218 @@ using (exists (
     and public.can_access_marketplace_chat_thread(message.thread_id)
 ));
 
+-- Keep the legacy ticket workflow until its routes move in Task 8, but make
+-- every old entry point support-only at the database boundary. Unified order,
+-- presale, and dispute conversations are reachable only through the new
+-- participant-scoped RPCs above.
+create or replace function public.create_my_marketplace_support_thread(
+  p_order_id uuid,
+  p_store_id uuid,
+  p_subject text,
+  p_message text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_result jsonb;
+begin
+  if public.current_profile_is_marketplace_admin() then
+    perform public.activate_marketplace_admin_capability(
+      array['super_admin','support']::public.marketplace_admin_role[]);
+  end if;
+  v_result := public.create_my_marketplace_support_thread_base_180000(
+    p_order_id, p_store_id, p_subject, p_message);
+  if not exists (
+    select 1 from public.support_threads as thread
+    where thread.id = (v_result ->> 'id')::uuid
+      and thread.conversation_kind = 'support'
+  ) then
+    raise exception 'support_thread_not_found' using errcode = 'P0002';
+  end if;
+  return v_result;
+end;
+$$;
+
+create or replace function public.list_my_marketplace_support_threads(
+  p_status text default null,
+  p_limit integer default 30,
+  p_before timestamptz default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor_id uuid := (select auth.uid());
+  v_result jsonb;
+begin
+  if v_actor_id is null or p_limit is null or p_limit not between 1 and 100
+     or (p_status is not null and p_status not in ('open','waiting_customer','waiting_support','resolved','closed')) then
+    raise exception 'invalid_support_page' using errcode = '22023';
+  end if;
+  if public.current_profile_is_marketplace_admin() then
+    perform public.activate_marketplace_admin_capability(
+      array['super_admin','support']::public.marketplace_admin_role[]);
+  end if;
+  with page as materialized (
+    select thread.*,
+      (
+        select count(*)::integer
+        from public.support_messages as message
+        where message.thread_id = thread.id
+          and message.sender_user_id is distinct from v_actor_id
+          and message.created_at > coalesce((
+            select reads.last_read_at
+            from public.support_thread_reads as reads
+            where reads.thread_id = thread.id and reads.user_id = v_actor_id
+          ), '-infinity'::timestamptz)
+      ) as unread_count
+    from public.support_threads as thread
+    where thread.conversation_kind = 'support'
+      and public.can_access_marketplace_support_thread(thread.id)
+      and (p_status is null or thread.status::text = p_status)
+      and (p_before is null or thread.last_message_at < p_before)
+    order by thread.last_message_at desc, thread.id
+    limit p_limit
+  )
+  select jsonb_build_object(
+    'items', coalesce(jsonb_agg(jsonb_build_object(
+      'id', page.id, 'public_code', page.public_code, 'subject', page.subject,
+      'status', page.status, 'order_id', page.order_id,
+      'last_message_at', page.last_message_at, 'unread_count', page.unread_count
+    ) order by page.last_message_at desc, page.id), '[]'::jsonb),
+    'next_before', case when count(*) = p_limit then min(page.last_message_at) else null end
+  ) into v_result from page;
+  return v_result;
+end;
+$$;
+
+alter function public.get_my_marketplace_support_thread_page(uuid, integer, timestamptz, uuid)
+  rename to get_my_marketplace_support_thread_page_base_chat_core;
+create or replace function public.get_my_marketplace_support_thread_page(
+  p_thread_id uuid,
+  p_limit integer default 50,
+  p_before_created_at timestamptz default null,
+  p_before_id uuid default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null or not exists (
+    select 1 from public.support_threads as thread
+    where thread.id = p_thread_id and thread.conversation_kind = 'support'
+  ) then
+    raise exception 'support_thread_not_found' using errcode = 'P0002';
+  end if;
+  if public.current_profile_is_marketplace_admin() then
+    perform public.activate_marketplace_admin_capability(
+      array['super_admin','support']::public.marketplace_admin_role[]);
+  end if;
+  return public.get_my_marketplace_support_thread_page_base_chat_core(
+    p_thread_id, p_limit, p_before_created_at, p_before_id);
+end;
+$$;
+
+create or replace function public.get_my_marketplace_support_thread(p_thread_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null or not exists (
+    select 1 from public.support_threads as thread
+    where thread.id = p_thread_id and thread.conversation_kind = 'support'
+  ) then
+    raise exception 'support_thread_not_found' using errcode = 'P0002';
+  end if;
+  if public.current_profile_is_marketplace_admin() then
+    perform public.activate_marketplace_admin_capability(
+      array['super_admin','support']::public.marketplace_admin_role[]);
+  end if;
+  return public.get_my_marketplace_support_thread_base_180000(p_thread_id);
+end;
+$$;
+
+create or replace function public.reply_my_marketplace_support_thread(
+  p_thread_id uuid,
+  p_body text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null or not exists (
+    select 1 from public.support_threads as thread
+    where thread.id = p_thread_id and thread.conversation_kind = 'support'
+  ) then
+    raise exception 'support_thread_not_found' using errcode = 'P0002';
+  end if;
+  if public.current_profile_is_marketplace_admin() then
+    perform public.activate_marketplace_admin_capability(
+      array['super_admin','support']::public.marketplace_admin_role[]);
+  end if;
+  return public.reply_my_marketplace_support_thread_base_180000(p_thread_id, p_body);
+end;
+$$;
+
+create or replace function public.close_my_marketplace_support_thread(p_thread_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null or not exists (
+    select 1 from public.support_threads as thread
+    where thread.id = p_thread_id and thread.conversation_kind = 'support'
+  ) then
+    raise exception 'support_thread_not_found' using errcode = 'P0002';
+  end if;
+  if public.current_profile_is_marketplace_admin() then
+    perform public.activate_marketplace_admin_capability(
+      array['super_admin','support']::public.marketplace_admin_role[]);
+  end if;
+  return public.close_my_marketplace_support_thread_base_180000(p_thread_id);
+end;
+$$;
+
+revoke all on function public.get_my_marketplace_support_thread_page_base_chat_core(
+  uuid, integer, timestamptz, uuid
+) from public, anon, authenticated, service_role;
+grant execute on function public.get_my_marketplace_support_thread_page_base_chat_core(
+  uuid, integer, timestamptz, uuid
+) to service_role;
+
+revoke all on function public.create_my_marketplace_support_thread(uuid, uuid, text, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.list_my_marketplace_support_threads(text, integer, timestamptz)
+  from public, anon, authenticated, service_role;
+revoke all on function public.get_my_marketplace_support_thread_page(uuid, integer, timestamptz, uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.get_my_marketplace_support_thread(uuid)
+  from public, anon, authenticated, service_role;
+revoke all on function public.reply_my_marketplace_support_thread(uuid, text)
+  from public, anon, authenticated, service_role;
+revoke all on function public.close_my_marketplace_support_thread(uuid)
+  from public, anon, authenticated, service_role;
+
+grant execute on function public.create_my_marketplace_support_thread(uuid, uuid, text, text) to authenticated;
+grant execute on function public.list_my_marketplace_support_threads(text, integer, timestamptz) to authenticated;
+grant execute on function public.get_my_marketplace_support_thread_page(uuid, integer, timestamptz, uuid) to authenticated;
+grant execute on function public.get_my_marketplace_support_thread(uuid) to authenticated;
+grant execute on function public.reply_my_marketplace_support_thread(uuid, text) to authenticated;
+grant execute on function public.close_my_marketplace_support_thread(uuid) to authenticated;
+
 -- Conversation tables are RPC-only. Revoking the historical SELECT grant on
 -- support tables preserves the legacy SECURITY DEFINER RPCs without exposing
 -- raw rows through PostgREST.
