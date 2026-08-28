@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -222,6 +223,7 @@ const TYPING_EXPIRY_MS = 4_000;
 const TYPING_THROTTLE_MS = 2_000;
 const PAGE_LIMIT = 100;
 const MAX_CONFIRMED_MESSAGES = 100;
+const useCommittedLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 class MarketplaceChatClientError extends Error {
   readonly code: ChatErrorCode;
@@ -401,6 +403,7 @@ export function createMarketplaceChatController(
   let catchUpRun: CatchUpRun | null = null;
   let catchUpGeneration = 0;
   let catchUpRestartScheduled = false;
+  let paginationVersion = 0;
   let readAcknowledgementVersion = 0;
   let loadOlderPromise: Promise<void> | null = null;
   let readQueue: Promise<void> = Promise.resolve();
@@ -451,6 +454,7 @@ export function createMarketplaceChatController(
     const generation = ++catchUpGeneration;
     const controller = createRequestController();
     const readVersionAtRequest = readAcknowledgementVersion;
+    const paginationVersionAtRequest = paginationVersion;
     const run: CatchUpRun = { generation, controller, promise: Promise.resolve() };
     catchUpRun = run;
     const promise = (async () => {
@@ -469,9 +473,12 @@ export function createMarketplaceChatController(
           || catchUpRun?.generation !== generation
         ) return;
         const messages = reconcileChatPage(snapshot.messages, incoming.messages);
+        const paginationIsCurrent = paginationVersion === paginationVersionAtRequest;
         publish({
           ...snapshot,
           messages,
+          nextCursor: paginationIsCurrent ? incoming.nextCursor : snapshot.nextCursor,
+          hasOlder: paginationIsCurrent ? incoming.nextCursor !== null : snapshot.hasOlder,
           // A fetch can overlap a local read acknowledgement. Do not let
           // its older snapshot regress the cursor we already acknowledged.
           lastReadMessageId: readAcknowledgementVersion === readVersionAtRequest
@@ -820,6 +827,7 @@ export function createMarketplaceChatController(
     const limit = Math.min(PAGE_LIMIT, MAX_CONFIRMED_MESSAGES - confirmedCount);
     if (limit <= 0) return Promise.resolve();
     const cursor = snapshot.nextCursor;
+    paginationVersion += 1;
     patchState({ isLoadingOlder: true, connectionError: null });
     const controller = createRequestController();
     loadOlderPromise = dependencies.transport.getConversationPage({
@@ -936,11 +944,10 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
   ));
   const controllerRef = useRef<MarketplaceChatController | null>(null);
   const controllerKeyRef = useRef<string | null>(null);
-  const latestKeyRef = useRef(viewerKey);
-  // This ref is deliberately updated during render so callbacks invoked by a
-  // layout effect in the same commit cannot use the previous viewer's client.
-  // eslint-disable-next-line react-hooks/refs
-  latestKeyRef.current = viewerKey;
+  const committedKeyRef = useRef(viewerKey);
+  useCommittedLayoutEffect(() => {
+    committedKeyRef.current = viewerKey;
+  }, [viewerKey]);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const presenceRole = options.currentUserPresence?.role;
   const presenceName = options.currentUserPresence?.displayName;
@@ -1024,27 +1031,29 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.conversationId, options.currentUserId, presenceRole, presenceName]);
 
-  const currentController = (): MarketplaceChatController | null => (
-    controllerKeyRef.current === latestKeyRef.current ? controllerRef.current : null
+  const currentController = (key: string): MarketplaceChatController | null => (
+    controllerKeyRef.current === key && committedKeyRef.current === key
+      ? controllerRef.current
+      : null
   );
   const send = useCallback((input: MarketplaceChatSendInput) => (
-    currentController()?.send(input) ?? Promise.resolve(null)
-  ), []);
+    currentController(viewerKey)?.send(input) ?? Promise.resolve(null)
+  ), [viewerKey]);
   const retry = useCallback((clientMessageId: string) => (
-    currentController()?.retry(clientMessageId) ?? Promise.resolve()
-  ), []);
+    currentController(viewerKey)?.retry(clientMessageId) ?? Promise.resolve()
+  ), [viewerKey]);
   const loadOlder = useCallback(() => (
-    currentController()?.loadOlder() ?? Promise.resolve()
-  ), []);
+    currentController(viewerKey)?.loadOlder() ?? Promise.resolve()
+  ), [viewerKey]);
   const markRead = useCallback((messageId: string) => (
-    currentController()?.markRead(messageId) ?? Promise.resolve()
-  ), []);
+    currentController(viewerKey)?.markRead(messageId) ?? Promise.resolve()
+  ), [viewerKey]);
   const react = useCallback((input: ChatReactionInput) => (
-    currentController()?.react(input) ?? Promise.resolve()
-  ), []);
+    currentController(viewerKey)?.react(input) ?? Promise.resolve()
+  ), [viewerKey]);
   const notifyTyping = useCallback((active: boolean) => {
-    currentController()?.notifyTyping(active);
-  }, []);
+    currentController(viewerKey)?.notifyTyping(active);
+  }, [viewerKey]);
   const composer = useMemo<MarketplaceChatComposerContract>(() => ({
     ref: composerRef,
     onInput: () => notifyTyping(true),

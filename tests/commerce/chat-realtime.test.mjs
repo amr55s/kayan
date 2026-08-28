@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import React, { createElement, useEffect, useLayoutEffect } from 'react';
+import { createElement, startTransition, Suspense, useEffect, useLayoutEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
@@ -499,6 +499,94 @@ test('catch-up refreshes retained confirmed messages in the older half of the 10
   assert.equal(refreshed.deleted, true);
   assert.equal(refreshed.body, null);
   controller.stop();
+});
+
+test('catch-up publishes authoritative cursor metadata for pending and full windows', async () => {
+  const cursor = { createdAt: '2026-08-24T08:00:00.000Z', id: IDS.olderMessage };
+  const retained = Array.from({ length: 50 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T${String(9 + Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}:00.000Z`,
+  }));
+  const pendingSend = deferred();
+  const pendingHarness = createHarness({
+    initialPage: page({ messages: retained }),
+    transport: createTransport({
+      sendMessage: () => pendingSend.promise,
+      getConversationPage: async () => page({ messages: [], nextCursor: cursor }),
+    }),
+  });
+  void pendingHarness.controller.send({
+    senderRole: 'customer',
+    kind: 'text',
+    body: 'pending',
+    replyToId: null,
+    card: null,
+  });
+  await flush();
+  await pendingHarness.controller.start();
+  pendingHarness.realtimeClient.channels[0].emitStatus('SUBSCRIBED');
+  await flush();
+  assert.equal(pendingHarness.controller.getSnapshot().nextCursor, cursor);
+  assert.equal(pendingHarness.controller.getSnapshot().hasOlder, true);
+  assert.equal(pendingHarness.controller.getSnapshot().canLoadOlder, true);
+  pendingHarness.controller.stop();
+  pendingSend.resolve(message({
+    id: crypto.randomUUID(),
+    senderId: IDS.currentUser,
+    senderRole: 'customer',
+    clientMessageId: IDS.clientMessage,
+  }));
+
+  const full = Array.from({ length: 100 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T${String(7 + Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}:00.000Z`,
+  }));
+  const fullHarness = createHarness({
+    initialPage: page({ messages: full, nextCursor: cursor }),
+    transport: createTransport({
+      getConversationPage: async () => page({ messages: [], nextCursor: null }),
+    }),
+  });
+  await fullHarness.controller.start();
+  fullHarness.realtimeClient.channels[0].emitStatus('SUBSCRIBED');
+  await flush();
+  assert.equal(fullHarness.controller.getSnapshot().nextCursor, null);
+  assert.equal(fullHarness.controller.getSnapshot().hasOlder, false);
+  assert.equal(fullHarness.controller.getSnapshot().canLoadOlder, false);
+  fullHarness.controller.stop();
+});
+
+test('a newer older-page request keeps its cursor metadata when catch-up completes later', async () => {
+  const catchUp = deferred();
+  const older = deferred();
+  const cursor = { createdAt: '2026-08-24T08:00:00.000Z', id: IDS.olderMessage };
+  const conflictingCursor = { createdAt: '2026-08-24T07:00:00.000Z', id: IDS.firstMessage };
+  const retained = Array.from({ length: 50 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T09:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  const harness = createHarness({
+    initialPage: page({ messages: retained, nextCursor: cursor }),
+    transport: createTransport({
+      getConversationPage: (input) => input.cursor ? older.promise : catchUp.promise,
+    }),
+  });
+  await harness.controller.start();
+  const channel = harness.realtimeClient.channels[0];
+  channel.emitStatus('SUBSCRIBED');
+  const olderRequest = harness.controller.loadOlder();
+  catchUp.resolve(page({ messages: [], nextCursor: conflictingCursor }));
+  await flush();
+  assert.deepEqual(harness.controller.getSnapshot().nextCursor, cursor);
+  assert.equal(harness.controller.getSnapshot().hasOlder, true);
+  assert.equal(harness.controller.getSnapshot().canLoadOlder, true);
+  older.resolve(page({ messages: retained, nextCursor: null }));
+  await olderRequest;
+  await flush();
+  assert.equal(harness.controller.getSnapshot().nextCursor, null);
+  assert.equal(harness.controller.getSnapshot().hasOlder, false);
+  assert.equal(harness.controller.getSnapshot().canLoadOlder, false);
+  harness.controller.stop();
 });
 
 test('cleanup removes listeners and channel, aborts stale work, clears timers, and ignores late completion', async () => {
@@ -1147,6 +1235,89 @@ test('React transition callbacks cannot invoke the previous viewer controller be
     assert.equal(actions.length, 5);
   } finally {
     root.unmount();
+    await flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
+});
+
+test('an abandoned suspended viewer render cannot poison the committed viewer callbacks', async () => {
+  const calls = [];
+  const harness = createHarness({
+    transport: createTransport({
+      sendMessage: async (input) => {
+        calls.push(input.clientMessageId);
+        return message({
+          id: crypto.randomUUID(),
+          senderId: IDS.currentUser,
+          senderRole: 'customer',
+          clientMessageId: input.clientMessageId,
+        });
+      },
+    }),
+  });
+  const suspended = deferred();
+  const documentTarget = new ReactTestDocument();
+  const windowTarget = {
+    document: documentTarget,
+    HTMLIFrameElement: ReactTestElement,
+    HTMLElement: ReactTestElement,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  documentTarget.defaultView = windowTarget;
+  const container = new ReactTestElement('div', documentTarget);
+  let committedActions;
+  function Probe({ currentUserId, suspend }) {
+    const state = useMarketplaceChat({
+      conversationId: IDS.conversation,
+      initialPage: page(),
+      currentUserId,
+      controllerDependencies: harness.dependencies,
+    });
+    useLayoutEffect(() => {
+      if (currentUserId === IDS.currentUser && !suspend) committedActions = state;
+    }, [currentUserId, state, suspend]);
+    if (suspend) throw suspended.promise;
+    return createElement('output', null, currentUserId);
+  }
+
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  globalThis.window = windowTarget;
+  globalThis.document = documentTarget;
+  const root = createRoot(container);
+  try {
+    flushSync(() => root.render(createElement(Probe, {
+      currentUserId: IDS.currentUser,
+      suspend: false,
+    })));
+    await flush();
+    assert.ok(committedActions);
+
+    startTransition(() => root.render(createElement(Suspense, {
+      fallback: createElement('output', null, 'loading'),
+    }, createElement(Probe, {
+      currentUserId: IDS.otherUser,
+      suspend: true,
+    }))));
+    await flush();
+    assert.equal(container.textContent, IDS.currentUser);
+
+    await committedActions.send({
+      senderRole: 'customer',
+      kind: 'text',
+      body: 'still committed',
+      replyToId: null,
+      card: null,
+    });
+    assert.equal(calls.length, 1, 'the abandoned viewer render must not disable the committed action');
+  } finally {
+    root.unmount();
+    suspended.resolve();
     await flush();
     await new Promise((resolve) => setImmediate(resolve));
     if (priorWindow === undefined) delete globalThis.window;
