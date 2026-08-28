@@ -3,7 +3,7 @@ import { CatalogControls } from './catalog-controls';
 import { MarketplaceProductCard } from './product-card';
 import { MarketplaceStatePanel } from './state-panel';
 import { ChatEntryButton } from './chat/chat-entry-button';
-import type { ChatErrorCode } from '@/lib/commerce/chat/contracts';
+import type { ChatRecoveryCode } from './chat/chat-entry-state';
 import type { ChatLoginIntent } from '@/lib/auth/safe-next';
 import type {
   MarketplaceCatalogViewModel,
@@ -20,7 +20,7 @@ type MarketplaceCatalogProps = {
     loginHref: string;
     isAuthenticated: boolean;
     storeName: string;
-    recovery?: ChatErrorCode | null;
+    recovery?: ChatRecoveryCode | null;
   } | null;
 };
 

@@ -97,6 +97,7 @@ export default async function MarketplaceProductPage({ params, searchParams }: P
   const chatRecovery = recoveryValue === 'authentication_required'
     || recoveryValue === 'rate_limited'
     || recoveryValue === 'service_unavailable'
+    || recoveryValue === 'profile_setup'
     ? recoveryValue
     : null;
   const structuredData = productJsonLd(product);

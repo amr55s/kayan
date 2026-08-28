@@ -7,8 +7,8 @@ import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { openMarketplaceConversationAction } from '@/lib/commerce/chat/actions';
 import { retryMarketplaceConversationAction } from '@/lib/commerce/chat/recovery-action';
 import type { ChatLoginIntent } from '@/lib/auth/safe-next';
-import type { ChatActionState, ChatErrorCode } from '@/lib/commerce/chat/contracts';
-import { resolveChatEntryState } from './chat-entry-state';
+import type { ChatActionState } from '@/lib/commerce/chat/contracts';
+import { resolveChatEntryState, type ChatRecoveryCode } from './chat-entry-state';
 import styles from '../marketplace.module.css';
 
 const initialState: ChatActionState = { status: 'idle' };
@@ -33,7 +33,7 @@ export function ChatEntryButton({
   returnTo: string;
   loginHref: string;
   isAuthenticated: boolean;
-  recovery?: ChatErrorCode | null;
+  recovery?: ChatRecoveryCode | null;
   label?: string;
 }) {
   const router = useRouter();

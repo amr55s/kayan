@@ -3,7 +3,7 @@ import { fetchMarketplaceCatalog } from '@/lib/commerce/catalog';
 import { createSelectedStoreChatEntry } from '@/lib/commerce/store-chat';
 import { sanitizeNextPath } from '@/lib/auth/safe-next';
 import { createClient } from '@/lib/supabase/server';
-import type { ChatErrorCode } from '@/lib/commerce/chat/contracts';
+import type { ChatRecoveryCode } from '@/components/marketplace/chat/chat-entry-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -53,9 +53,10 @@ export default async function MarketplacePage({
       isAuthenticated: Boolean(user),
     });
     const recoveryValue = single(params.chat_recovery);
-    const recovery: ChatErrorCode | null = recoveryValue === 'authentication_required'
+    const recovery: ChatRecoveryCode | null = recoveryValue === 'authentication_required'
       || recoveryValue === 'rate_limited'
       || recoveryValue === 'service_unavailable'
+      || recoveryValue === 'profile_setup'
       ? recoveryValue
       : null;
     if (storeChat && recovery) storeChat = { ...storeChat, recovery };

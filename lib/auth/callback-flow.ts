@@ -1,6 +1,7 @@
 import {
   inspectChatIntentCookie,
   transitionChatIntentCookie,
+  type OAuthFlowPhase,
 } from './chat-intent-cookie.ts';
 import {
   createChatLoginHref,
@@ -48,13 +49,13 @@ function sameIntent(actual: ChatLoginIntent | null, expected: ChatLoginIntent): 
 }
 
 async function transitionExact(
-  cookieValue: string | null | undefined,
   flowId: string,
   returnTo: string,
-  phase: 'cancelled' | 'recovery',
+  phase: OAuthFlowPhase,
   dependencies: FlowDependencies,
 ): Promise<boolean> {
-  const transitioned = transitionChatIntentCookie(cookieValue, {
+  const current = await dependencies.readCookie();
+  const transitioned = transitionChatIntentCookie(current, {
     secret: dependencies.secret,
     now: dependencies.now(),
     flowId,
@@ -98,6 +99,14 @@ function retryDestination(
   return retry.toString();
 }
 
+function profileRecoveryDestination(siteUrl: string, returnTo: string): string {
+  const retry = new URL('/signin', new URL(siteUrl).origin);
+  retry.searchParams.set('next', returnTo);
+  retry.searchParams.set('error', 'profile_setup');
+  retry.searchParams.set('recovery', 'profile_setup');
+  return retry.toString();
+}
+
 export async function handleGoogleOAuthCallback(
   input: { requestUrl: string },
   dependencies: FlowDependencies,
@@ -127,20 +136,29 @@ export async function handleGoogleOAuthCallback(
   if (pending?.phase === 'recovery') {
     return { redirectTo: withMarker(site.origin, returnTo, 'chat_recovery', 'service_unavailable') };
   }
+  if (pending.phase === 'profile_recovery') {
+    return {
+      redirectTo: pending.intent
+        ? withMarker(site.origin, returnTo, 'chat_recovery', 'profile_setup')
+        : profileRecoveryDestination(site.origin, returnTo),
+    };
+  }
   if (pending.phase === 'cancelled') {
     return {
       redirectTo: retryDestination(site.origin, returnTo, pending.intent, 'oauth_callback'),
     };
   }
   if (!request.searchParams.get('code')) {
-    await transitionExact(cookieValue, pending.flowId, returnTo, 'cancelled', dependencies);
+    await transitionExact(pending.flowId, returnTo, 'cancelled', dependencies);
     return {
       redirectTo: retryDestination(site.origin, returnTo, pending.intent, 'oauth_callback'),
     };
   }
 
+  let exchanged = false;
   try {
     await dependencies.exchangeCode(request.searchParams.get('code')!);
+    exchanged = true;
     await dependencies.ensureCustomer();
     await dependencies.claimGuestCart().catch(() => undefined);
 
@@ -154,14 +172,14 @@ export async function handleGoogleOAuthCallback(
       return { redirectTo: destination(site.origin, returnTo).toString() };
     }
     if (result.status !== 'error') {
-      await transitionExact(cookieValue, pending.flowId, returnTo, 'recovery', dependencies);
+      await transitionExact(pending.flowId, returnTo, 'recovery', dependencies);
       return {
         redirectTo: withMarker(site.origin, returnTo, 'chat_recovery', 'service_unavailable'),
         event: 'chat_open_failed',
       };
     }
     if (RECOVERY_CODES.has(result.code)) {
-      await transitionExact(cookieValue, pending.flowId, returnTo, 'recovery', dependencies);
+      await transitionExact(pending.flowId, returnTo, 'recovery', dependencies);
       return {
         redirectTo: withMarker(site.origin, returnTo, 'chat_recovery', result.code),
         event: 'chat_open_failed',
@@ -173,17 +191,59 @@ export async function handleGoogleOAuthCallback(
       event: 'chat_open_failed',
     };
   } catch {
+    if (exchanged) {
+      await transitionExact(pending.flowId, returnTo, 'profile_recovery', dependencies);
+      return {
+        redirectTo: pending.intent
+          ? withMarker(site.origin, returnTo, 'chat_recovery', 'profile_setup')
+          : profileRecoveryDestination(site.origin, returnTo),
+        event: 'callback_failed',
+      };
+    }
+    await transitionExact(pending.flowId, returnTo, 'cancelled', dependencies);
     return {
-      redirectTo: retryDestination(site.origin, returnTo, pending?.intent ?? null, 'profile_setup'),
+      redirectTo: retryDestination(site.origin, returnTo, pending.intent, 'profile_setup'),
       event: 'callback_failed',
     };
   }
 }
 
+export async function retryRecoveredProfileFlow(
+  input: { returnTo: string },
+  dependencies: Pick<FlowDependencies, 'secret' | 'now' | 'readCookie' | 'deleteCookie'> & {
+    prepareCustomer: () => Promise<void>;
+    claimGuestCart: () => Promise<void>;
+  },
+): Promise<ChatActionState> {
+  const returnTo = safeNextPath(input.returnTo);
+  if (returnTo !== input.returnTo) return { status: 'error', code: 'invalid_input' };
+  const inspected = inspectChatIntentCookie(await dependencies.readCookie(), {
+    secret: dependencies.secret,
+    now: dependencies.now(),
+  });
+  if (
+    inspected.status !== 'valid'
+    || inspected.flow.phase !== 'profile_recovery'
+    || inspected.flow.returnTo !== returnTo
+    || inspected.flow.intent !== null
+  ) return { status: 'error', code: 'invalid_input' };
+  try {
+    await dependencies.prepareCustomer();
+  } catch {
+    return { status: 'error', code: 'service_unavailable' };
+  }
+  await dependencies.claimGuestCart().catch(() => undefined);
+  await deleteExact(inspected.flow.flowId, returnTo, dependencies);
+  return { status: 'sent' };
+}
+
 export async function retryRecoveredChatIntent(
   input: { intent: ChatLoginIntent; returnTo: string },
   dependencies: Pick<FlowDependencies,
-    'secret' | 'now' | 'readCookie' | 'deleteCookie' | 'openConversation'>,
+    'secret' | 'now' | 'readCookie' | 'deleteCookie' | 'openConversation'> & {
+      prepareCustomer?: () => Promise<void>;
+      claimGuestCart?: () => Promise<void>;
+    },
 ): Promise<ChatActionState> {
   const intent = parseChatLoginIntent(input.intent);
   const returnTo = safeNextPath(input.returnTo);
@@ -194,11 +254,17 @@ export async function retryRecoveredChatIntent(
   });
   if (
     inspected.status !== 'valid'
-    || inspected.flow.phase !== 'recovery'
+    || (inspected.flow.phase !== 'recovery' && inspected.flow.phase !== 'profile_recovery')
     || inspected.flow.returnTo !== returnTo
     || !sameIntent(inspected.flow.intent, intent)
   ) return dependencies.openConversation(intent);
 
+  try {
+    await dependencies.prepareCustomer?.();
+  } catch {
+    return { status: 'error', code: 'service_unavailable' };
+  }
+  await dependencies.claimGuestCart?.().catch(() => undefined);
   const result = await dependencies.openConversation(intent);
   if (result.status === 'sent') {
     await deleteExact(inspected.flow.flowId, returnTo, dependencies);

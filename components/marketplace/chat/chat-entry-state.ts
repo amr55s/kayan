@@ -6,11 +6,19 @@ const recoveryMessages: Partial<Record<ChatErrorCode, string>> = {
   service_unavailable: 'تعذر فتح المحادثة بعد تسجيل الدخول. أعد المحاولة من هنا؛ لن نكرر تسجيل الدخول.',
 };
 
+export type ChatRecoveryCode = ChatErrorCode | 'profile_setup';
+
 export function resolveChatEntryState(input: {
   isAuthenticated: boolean;
-  recovery: ChatErrorCode | null;
+  recovery: ChatRecoveryCode | null;
 }) {
   if (!input.isAuthenticated) return { mode: 'google' as const, message: null };
+  if (input.recovery === 'profile_setup') {
+    return {
+      mode: 'recovery' as const,
+      message: 'تم تسجيل الدخول، لكن تعذر تجهيز حساب المتجر. أعد المحاولة من هنا دون إعادة استخدام تسجيل Google.',
+    };
+  }
   if (input.recovery && recoveryMessages[input.recovery]) {
     return { mode: 'recovery' as const, message: recoveryMessages[input.recovery]! };
   }

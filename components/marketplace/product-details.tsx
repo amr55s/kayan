@@ -13,6 +13,7 @@ import type {
   MarketplaceProductDetailsViewModel,
 } from './view-models';
 import styles from './marketplace.module.css';
+import type { ChatRecoveryCode } from './chat/chat-entry-state';
 
 export function MarketplaceProductDetails({
   product,
@@ -25,7 +26,7 @@ export function MarketplaceProductDetails({
   addToCartAction?: MarketplaceFormAction;
   isAuthenticated: boolean;
   chatLoginHref: string;
-  chatRecovery?: import('@/lib/commerce/chat/contracts').ChatErrorCode | null;
+  chatRecovery?: ChatRecoveryCode | null;
 }) {
   const discount = marketplaceDiscountPercentage(product.price, product.compareAtPrice);
   const showRating = Boolean(product.rating && product.rating.count > 0);

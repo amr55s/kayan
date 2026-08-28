@@ -5,6 +5,7 @@ import { chatIntentFromSearchParams, safeNextPath } from '@/lib/auth/safe-next';
 import { createClient } from '@/lib/supabase/server';
 import { BrandLogo } from '@/components/layout/BrandLogo';
 import { openMarketplaceConversationAction } from '@/lib/commerce/chat/actions';
+import { ProfileRecoveryButton } from '@/components/auth/ProfileRecoveryButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,12 +23,13 @@ export default async function SignInPage({
   const next = safeNextPath(typeof params.next === 'string' ? params.next : null);
   const intent = chatIntentFromSearchParams(params);
   const errorCode = typeof params.error === 'string' ? params.error : '';
+  const profileRecovery = params.recovery === 'profile_setup';
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!intent) {
+  if (!intent && !profileRecovery) {
     if (user) redirect(next);
   }
-  if (user) {
+  if (user && !profileRecovery) {
     if (intent) {
       const form = new FormData();
       form.set('kind', intent.kind);
@@ -55,11 +57,15 @@ export default async function SignInPage({
         </p>
         {errors[errorCode] ? <p role="alert" className="mt-4 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{errors[errorCode]}</p> : null}
         <div className="mt-6">
-          <GoogleSignInButton
-            next={next}
-            intent={intent}
-            helper={intent ? 'سنرجعك إلى الصفحة نفسها ونفتح المحادثة المطلوبة بعد اكتمال الدخول.' : undefined}
-          />
+          {profileRecovery ? (
+            <ProfileRecoveryButton returnTo={next} />
+          ) : (
+            <GoogleSignInButton
+              next={next}
+              intent={intent}
+              helper={intent ? 'سنرجعك إلى الصفحة نفسها ونفتح المحادثة المطلوبة بعد اكتمال الدخول.' : undefined}
+            />
+          )}
         </div>
         <div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-zinc-200 pt-5 text-sm font-bold">
           <Link href="/marketplace" className="text-zinc-700 underline-offset-4 hover:underline">العودة إلى المتجر</Link>

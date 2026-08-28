@@ -8,7 +8,7 @@ import {
 const INTENT_TTL_MS = 10 * 60 * 1_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
-export type OAuthFlowPhase = 'oauth' | 'cancelled' | 'recovery';
+export type OAuthFlowPhase = 'oauth' | 'cancelled' | 'recovery' | 'profile_recovery';
 
 type SignedChatIntent = {
   version: 1;
@@ -76,7 +76,12 @@ function parseSignedPayload(value: unknown): SignedChatIntent | null {
     || !Number.isSafeInteger(input.expiresAt)
     || !returnTo
     || (input.intent !== null && !intent)
-    || (input.phase !== 'oauth' && input.phase !== 'cancelled' && input.phase !== 'recovery')
+    || (
+      input.phase !== 'oauth'
+      && input.phase !== 'cancelled'
+      && input.phase !== 'recovery'
+      && input.phase !== 'profile_recovery'
+    )
   ) return null;
   return {
     version: 1,

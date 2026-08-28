@@ -435,6 +435,249 @@ test('a no-code callback retry cannot downgrade or consume a recovery intent', a
   );
 });
 
+test('exchange failure makes the exact flow immediately replaceable without discarding intent', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
+  const { startGoogleOAuthFlow } = requireModule(oauthFlow, 'oauth-flow');
+  const returnTo = `/marketplace/products/${productA}/item`;
+  const chatIntent = intent(storeA, productA);
+  const signed = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo,
+    intent: chatIntent,
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signed);
+  const failed = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=bad&flow=${flowA}&next=${encodeURIComponent(returnTo)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => { throw new Error('exchange_failed'); },
+    ensureCustomer: async () => assert.fail('must not provision'),
+    claimGuestCart: async () => assert.fail('must not claim'),
+    openConversation: async () => assert.fail('must not open'),
+  });
+  assert.equal(new URL(failed.redirectTo).searchParams.get('error'), 'profile_setup');
+  assert.deepEqual(
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt + 20_000 }).flow,
+    { flowId: flowA, returnTo, intent: chatIntent, phase: 'cancelled' },
+  );
+
+  let starts = 0;
+  const retried = await startGoogleOAuthFlow({ next: returnTo, intent: chatIntent }, {
+    secret,
+    siteUrl,
+    now: () => issuedAt + 20_001,
+    randomFlowId: () => flowB,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    isAuthenticated: async () => false,
+    startOAuth: async () => { starts += 1; return 'https://auth.example/retry'; },
+  });
+  assert.equal(retried.success, true);
+  assert.equal(starts, 1);
+  assert.equal(
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt + 20_001 }).flow.flowId,
+    flowB,
+  );
+});
+
+test('customer setup failure becomes non-replayable recovery and explicit retry completes it', async () => {
+  const { handleGoogleOAuthCallback, retryRecoveredChatIntent } = requireModule(callbackFlow, 'callback-flow');
+  const returnTo = `/marketplace/products/${productA}/item?variant=large`;
+  const chatIntent = intent(storeA, productA);
+  const signed = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo,
+    intent: chatIntent,
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signed);
+  let exchanges = 0;
+  const failed = await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=good&flow=${flowA}&next=${encodeURIComponent(returnTo)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => { exchanges += 1; },
+    ensureCustomer: async () => { throw new Error('profile_failed'); },
+    claimGuestCart: async () => assert.fail('must not claim before customer'),
+    openConversation: async () => assert.fail('must not open before customer'),
+  });
+  assert.equal(exchanges, 1);
+  assert.equal(new URL(failed.redirectTo).searchParams.get('chat_recovery'), 'profile_setup');
+  assert.equal(
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt + 20_000 }).flow.phase,
+    'profile_recovery',
+  );
+
+  await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=replayed&flow=${flowA}&next=${encodeURIComponent(returnTo)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_001,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => { exchanges += 1; },
+    ensureCustomer: async () => assert.fail('callback replay must not provision'),
+    claimGuestCart: async () => assert.fail('callback replay must not claim'),
+    openConversation: async () => assert.fail('callback replay must not open'),
+  });
+  assert.equal(exchanges, 1, 'the successful OAuth code is never reused');
+
+  const events = [];
+  const retried = await retryRecoveredChatIntent({ intent: chatIntent, returnTo }, {
+    secret,
+    now: () => issuedAt + 20_002,
+    readCookie: cookie.read,
+    deleteCookie: cookie.delete,
+    prepareCustomer: async () => { events.push('profile'); },
+    claimGuestCart: async () => { events.push('cart'); },
+    openConversation: async () => { events.push('chat'); return { status: 'sent' }; },
+  });
+  assert.deepEqual(retried, { status: 'sent' });
+  assert.deepEqual(events, ['profile', 'cart', 'chat']);
+  assert.equal(cookie.value, null);
+});
+
+test('exchange failure cannot transition or overwrite a newer tab flow', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
+  const returnA = '/marketplace?store=a';
+  const returnB = '/marketplace?store=b';
+  const signedA = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo: returnA,
+    intent: intent(storeA, null),
+    phase: 'oauth',
+  }).value;
+  const signedB = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt + 1,
+    flowId: flowB,
+    returnTo: returnB,
+    intent: intent(storeB, null),
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signedA);
+  await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=bad&flow=${flowA}&next=${encodeURIComponent(returnA)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => { cookie.write(signedB); throw new Error('exchange_failed'); },
+    ensureCustomer: async () => {},
+    claimGuestCart: async () => {},
+    openConversation: async () => ({ status: 'sent' }),
+  });
+  assert.deepEqual(
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt + 20_000 }).flow,
+    { flowId: flowB, returnTo: returnB, intent: intent(storeB, null), phase: 'oauth' },
+  );
+});
+
+test('customer failure cannot transition or overwrite a newer tab flow', async () => {
+  const { handleGoogleOAuthCallback } = requireModule(callbackFlow, 'callback-flow');
+  const returnA = '/marketplace?store=a';
+  const returnB = '/marketplace?store=b';
+  const signedA = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo: returnA,
+    intent: intent(storeA, null),
+    phase: 'oauth',
+  }).value;
+  const signedB = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt + 1,
+    flowId: flowB,
+    returnTo: returnB,
+    intent: intent(storeB, null),
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signedA);
+  await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=good&flow=${flowA}&next=${encodeURIComponent(returnA)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => {},
+    ensureCustomer: async () => { cookie.write(signedB); throw new Error('profile_failed'); },
+    claimGuestCart: async () => {},
+    openConversation: async () => ({ status: 'sent' }),
+  });
+  assert.deepEqual(
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt + 20_000 }).flow,
+    { flowId: flowB, returnTo: returnB, intent: intent(storeB, null), phase: 'oauth' },
+  );
+});
+
+test('checkout profile recovery retries setup without an OAuth code or chat intent', async () => {
+  const { handleGoogleOAuthCallback, retryRecoveredProfileFlow } = requireModule(callbackFlow, 'callback-flow');
+  assert.equal(typeof retryRecoveredProfileFlow, 'function');
+  const returnTo = '/marketplace/checkout';
+  const signed = intentCookie.signChatIntentCookie({
+    secret,
+    now: issuedAt,
+    flowId: flowA,
+    returnTo,
+    intent: null,
+    phase: 'oauth',
+  }).value;
+  const cookie = memoryCookie(signed);
+  await handleGoogleOAuthCallback({
+    requestUrl: `${siteUrl}/auth/callback?code=good&flow=${flowA}&next=${encodeURIComponent(returnTo)}`,
+  }, {
+    siteUrl,
+    secret,
+    now: () => issuedAt + 20_000,
+    readCookie: cookie.read,
+    writeCookie: cookie.write,
+    deleteCookie: cookie.delete,
+    exchangeCode: async () => {},
+    ensureCustomer: async () => { throw new Error('profile_failed'); },
+    claimGuestCart: async () => {},
+    openConversation: async () => assert.fail('checkout has no chat intent'),
+  });
+  const events = [];
+  const result = await retryRecoveredProfileFlow({ returnTo }, {
+    secret,
+    now: () => issuedAt + 20_001,
+    readCookie: cookie.read,
+    deleteCookie: cookie.delete,
+    prepareCustomer: async () => { events.push('profile'); },
+    claimGuestCart: async () => { events.push('cart'); },
+  });
+  assert.deepEqual(result, { status: 'sent' });
+  assert.deepEqual(events, ['profile', 'cart']);
+  assert.equal(cookie.value, null);
+});
+
 test('anonymous checkout/chat gates and oauth-in-progress guidance are behavioral UI states', () => {
   const chat = requireModule(entryState, 'chat-entry-state');
   const checkout = requireModule(checkoutState, 'checkout-state');
