@@ -1,7 +1,8 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useOverlayState } from '@heroui/react';
+import { Badge } from '@heroui/react/badge';
 import { Button } from '@heroui/react/button';
 import { Drawer } from '@heroui/react/drawer';
 import { Filter, X } from 'lucide-react';
@@ -98,11 +99,17 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
             >
               <Filter className="size-4" aria-hidden="true" />
               <span>تصفية المنتجات</span>
-              {activeCount > 0 ? <span className={styles.badge}>{activeCount}</span> : null}
+              {activeCount > 0 ? (
+                <Badge.Root aria-label={`${activeCount} فلاتر نشطة`}>
+                  <Badge.Label className={styles.badge}>{activeCount}</Badge.Label>
+                </Badge.Root>
+              ) : null}
             </Button>
             {activeCount > 0 ? (
-              <Link href="/marketplace" className={styles.secondaryButton}>
-                مسح الفلاتر
+              <Link href="/marketplace">
+                <Button className={styles.secondaryButton}>
+                  مسح الفلاتر
+                </Button>
               </Link>
             ) : null}
           </div>
@@ -134,8 +141,10 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
 
           {model.hasMore && model.nextCursor ? (
             <nav className={styles.pagination} aria-label="متابعة نتائج المنتجات">
-              <Link className={styles.pageLink} href={catalogHref(model, { cursor: model.nextCursor })}>
-                النتائج التالية
+              <Link href={catalogHref(model, { cursor: model.nextCursor })}>
+                <Button className={styles.pageLink}>
+                  النتائج التالية
+                </Button>
               </Link>
             </nav>
           ) : null}

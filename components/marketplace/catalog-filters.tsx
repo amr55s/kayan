@@ -1,5 +1,9 @@
 ﻿import Link from 'next/link';
 import { RotateCcw, Search } from 'lucide-react';
+import { Button } from '@heroui/react/button';
+import { Checkbox } from '@heroui/react/checkbox';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
 import type { MarketplaceCatalogViewModel } from './view-models';
 import { countActiveCatalogFilters } from './catalog-filter-state';
 import styles from './marketplace.module.css';
@@ -34,10 +38,10 @@ export function CatalogFilters({
       onSubmit={onApply}
     >
       <div className={styles.filterSection}>
-        <label htmlFor={`${idPrefix}-search`} className={styles.filterLabel}>
+        <Label.Root htmlFor={`${idPrefix}-search`} className={styles.filterLabel}>
           البحث في المنتجات
-        </label>
-        <input
+        </Label.Root>
+        <Input.Root
           id={`${idPrefix}-search`}
           name="q"
           type="search"
@@ -90,14 +94,14 @@ export function CatalogFilters({
         <span className={styles.filterLabel}>نطاق السعر (جنيه)</span>
         <div className={styles.priceRangeGrid}>
           <div>
-            <label htmlFor={`${idPrefix}-min-price`} className={styles.subLabel}>
+            <Label.Root htmlFor={`${idPrefix}-min-price`} className={styles.subLabel}>
               من
-            </label>
-            <input
+            </Label.Root>
+            <Input.Root
               id={`${idPrefix}-min-price`}
               name="min_price"
               type="number"
-              min="0"
+              min={0}
               step="0.01"
               inputMode="decimal"
               defaultValue={model.minPrice}
@@ -106,14 +110,14 @@ export function CatalogFilters({
             />
           </div>
           <div>
-            <label htmlFor={`${idPrefix}-max-price`} className={styles.subLabel}>
+            <Label.Root htmlFor={`${idPrefix}-max-price`} className={styles.subLabel}>
               إلى
-            </label>
-            <input
+            </Label.Root>
+            <Input.Root
               id={`${idPrefix}-max-price`}
               name="max_price"
               type="number"
-              min="0"
+              min={0}
               step="0.01"
               inputMode="decimal"
               defaultValue={model.maxPrice}
@@ -144,16 +148,17 @@ export function CatalogFilters({
       </div>
 
       <div className={styles.filterSection}>
-        <label className={styles.checkboxLabel}>
-          <input
-            name="stock"
-            value="1"
-            type="checkbox"
-            defaultChecked={model.inStockOnly}
-            className={styles.checkbox}
-          />
-          <span>المتوفر في المخزن فقط</span>
-        </label>
+        <Checkbox.Root
+          name="stock"
+          value="1"
+          defaultSelected={model.inStockOnly}
+          className={styles.checkboxLabel}
+        >
+          <Checkbox.Content>
+            <Checkbox.Control />
+            <span>المتوفر في المخزن فقط</span>
+          </Checkbox.Content>
+        </Checkbox.Root>
       </div>
 
       <div className={styles.filterSection}>
@@ -175,14 +180,16 @@ export function CatalogFilters({
       </div>
 
       <div className={styles.filterActions}>
-        <button type="submit" className={styles.primaryButton}>
+        <Button.Root type="submit" className={styles.primaryButton}>
           <Search className="size-4" aria-hidden="true" />
           تطبيق الفلاتر
-        </button>
+        </Button.Root>
         {activeCount > 0 ? (
-          <Link href="/marketplace" className={styles.secondaryButton}>
-            <RotateCcw className="size-4" aria-hidden="true" />
-            مسح الكل
+          <Link href="/marketplace">
+            <Button.Root className={styles.secondaryButton}>
+              <RotateCcw className="size-4" aria-hidden="true" />
+              مسح الكل
+            </Button.Root>
           </Link>
         ) : null}
       </div>
