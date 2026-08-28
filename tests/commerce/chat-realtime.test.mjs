@@ -780,6 +780,58 @@ test('coalesces concurrent older loads and reconciles concurrent read and reacti
   controller.stop();
 });
 
+test('older pagination uses only remaining confirmed capacity and preserves pending messages', async () => {
+  const initialMessages = Array.from({ length: 50 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T08:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  const olderMessages = Array.from({ length: 50 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T07:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  const pendingSend = deferred();
+  const calls = [];
+  const transport = createTransport({
+    sendMessage: () => pendingSend.promise,
+    getConversationPage(input) {
+      calls.push(input);
+      return Promise.resolve(page({ messages: olderMessages, nextCursor: {
+        createdAt: '2026-08-24T06:00:00.000Z',
+        id: IDS.olderMessage,
+      } }));
+    },
+  });
+  const initialPage = page({
+    messages: initialMessages,
+    nextCursor: { createdAt: '2026-08-24T08:00:00.000Z', id: IDS.olderMessage },
+  });
+  const { controller } = createHarness({ transport, initialPage });
+  await controller.start();
+  const pendingSendPromise = controller.send({
+    senderRole: 'customer',
+    kind: 'text',
+    body: 'رسالة معلقة',
+    replyToId: null,
+    card: null,
+  });
+  await flush();
+  await controller.loadOlder();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].limit, 50);
+  assert.equal(controller.getSnapshot().messages.filter((item) => item.status === 'sent').length, 100);
+  assert.equal(controller.getSnapshot().messages.some((item) => item.status === 'sending'), true);
+  const cursorAfterFirstLoad = controller.getSnapshot().nextCursor;
+
+  await controller.loadOlder();
+  assert.equal(calls.length, 1, 'a full confirmed window must not fetch and skip history');
+  assert.deepEqual(controller.getSnapshot().nextCursor, cursorAfterFirstLoad);
+  assert.equal(controller.getSnapshot().hasOlder, true);
+  controller.stop();
+  pendingSend.resolve(message({ id: crypto.randomUUID(), clientMessageId: IDS.clientMessage, senderId: IDS.currentUser }));
+  await pendingSendPromise;
+});
+
 test('start is idempotent and strict-style mount cleanup never leaves duplicate subscriptions', async () => {
   const realtimeClient = new FakeRealtimeClient();
   const browser = new FakeBrowserTarget();
@@ -883,11 +935,11 @@ test('React rerender hides the previous conversation before async client initial
     messages: [message({ id: secondMessageId, conversationId: secondConversationId })],
   });
   const committed = [];
-  function Probe({ conversationId, initialPage }) {
+  function Probe({ conversationId, currentUserId, initialPage }) {
     const state = useMarketplaceChat({
       conversationId,
       initialPage,
-      currentUserId: IDS.currentUser,
+      currentUserId,
     });
     useLayoutEffect(() => {
       committed.push({ conversationId, firstMessageId: state.messages[0]?.id ?? null });
@@ -903,12 +955,14 @@ test('React rerender hides the previous conversation before async client initial
   try {
     flushSync(() => root.render(createElement(Probe, {
       conversationId: IDS.conversation,
+      currentUserId: IDS.currentUser,
       initialPage: firstPage,
     })));
     assert.equal(container.textContent, IDS.firstMessage);
 
     flushSync(() => root.render(createElement(Probe, {
       conversationId: secondConversationId,
+      currentUserId: IDS.currentUser,
       initialPage: secondPage,
     })));
     assert.equal(container.textContent, secondMessageId);
@@ -926,6 +980,125 @@ test('React rerender hides the previous conversation before async client initial
     else globalThis.window = priorWindow;
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
+  }
+});
+
+test('React rerender hides the previous viewer state when the user changes', async () => {
+  const documentTarget = new ReactTestDocument();
+  const windowTarget = {
+    document: documentTarget,
+    HTMLIFrameElement: ReactTestElement,
+    HTMLElement: ReactTestElement,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  documentTarget.defaultView = windowTarget;
+  const container = new ReactTestElement('div', documentTarget);
+  const secondMessageId = crypto.randomUUID();
+  const secondPage = page({ messages: [message({ id: secondMessageId })] });
+  const committed = [];
+  function Probe({ currentUserId, initialPage }) {
+    const state = useMarketplaceChat({
+      conversationId: IDS.conversation,
+      initialPage,
+      currentUserId,
+    });
+    useLayoutEffect(() => {
+      committed.push({ currentUserId, firstMessageId: state.messages[0]?.id ?? null });
+    }, [currentUserId, state.messages]);
+    return createElement('output', null, state.messages[0]?.id ?? 'empty');
+  }
+
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  globalThis.window = windowTarget;
+  globalThis.document = documentTarget;
+  const root = createRoot(container);
+  try {
+    flushSync(() => root.render(createElement(Probe, {
+      currentUserId: IDS.currentUser,
+      initialPage: page(),
+    })));
+    assert.equal(container.textContent, IDS.firstMessage);
+    flushSync(() => root.render(createElement(Probe, {
+      currentUserId: IDS.otherUser,
+      initialPage: secondPage,
+    })));
+    assert.equal(container.textContent, secondMessageId);
+    assert.deepEqual(committed.at(-1), {
+      currentUserId: IDS.otherUser,
+      firstMessageId: secondMessageId,
+    });
+  } finally {
+    root.unmount();
+    await flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
+});
+
+test('initialization failure is attached to the new conversation and viewer key', async () => {
+  const documentTarget = new ReactTestDocument();
+  const windowTarget = {
+    document: documentTarget,
+    HTMLIFrameElement: ReactTestElement,
+    HTMLElement: ReactTestElement,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  documentTarget.defaultView = windowTarget;
+  const container = new ReactTestElement('div', documentTarget);
+  const secondMessageId = crypto.randomUUID();
+  const secondPage = page({ messages: [message({ id: secondMessageId })] });
+  function Probe({ currentUserId, initialPage }) {
+    const state = useMarketplaceChat({
+      conversationId: IDS.conversation,
+      initialPage,
+      currentUserId,
+    });
+    return createElement('output', null, `${state.messages[0]?.id ?? 'empty'}:${state.connectionState}`);
+  }
+
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const priorUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const priorKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const priorAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+  delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  globalThis.window = windowTarget;
+  globalThis.document = documentTarget;
+  const root = createRoot(container);
+  try {
+    flushSync(() => root.render(createElement(Probe, {
+      currentUserId: IDS.currentUser,
+      initialPage: page(),
+    })));
+    flushSync(() => root.render(createElement(Probe, {
+      currentUserId: IDS.otherUser,
+      initialPage: secondPage,
+    })));
+    await flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(container.textContent, `${secondMessageId}:error`);
+  } finally {
+    root.unmount();
+    await flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = priorUrl;
+    if (priorKey === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    else process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = priorKey;
+    if (priorAnon === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = priorAnon;
   }
 });
 

@@ -60,6 +60,7 @@ export type UseMarketplaceChatOptions = {
 
 export type MarketplaceChatState = {
   conversationId: string;
+  currentUserId: string;
   messages: ChatOptimisticMessage[];
   connectionState: ChatConnectionState;
   connectionError: ChatErrorCode | null;
@@ -217,6 +218,7 @@ const safeErrorCodes = new Set<ChatErrorCode>([
 const TYPING_EXPIRY_MS = 4_000;
 const TYPING_THROTTLE_MS = 2_000;
 const PAGE_LIMIT = 100;
+const MAX_CONFIRMED_MESSAGES = 100;
 
 class MarketplaceChatClientError extends Error {
   readonly code: ChatErrorCode;
@@ -336,9 +338,15 @@ function latestCursor(messages: ChatOptimisticMessage[]): ChatCursor | null {
   return latest ? { createdAt: latest.createdAt, id: latest.id } : null;
 }
 
-function initialState(page: ChatMessagePage, online: boolean, conversationId = page.conversation.id): MarketplaceChatState {
+function initialState(
+  page: ChatMessagePage,
+  online: boolean,
+  conversationId = page.conversation.id,
+  currentUserId = '',
+): MarketplaceChatState {
   return {
     conversationId,
+    currentUserId,
     messages: reconcileChatPage([], page.messages),
     connectionState: online ? 'connecting' : 'offline',
     connectionError: null,
@@ -378,7 +386,7 @@ export function createMarketplaceChatController(
   const presence = options.currentUserPresence
     ? presenceDisplaySchema.omit({ presenceId: true }).safeParse(options.currentUserPresence)
     : null;
-  let snapshot = initialState(options.initialPage, isOnline(), options.conversationId);
+  let snapshot = initialState(options.initialPage, isOnline(), options.conversationId, options.currentUserId);
   let started = false;
   let stopped = false;
   let subscribed = false;
@@ -798,12 +806,15 @@ export function createMarketplaceChatController(
   const loadOlder = (): Promise<void> => {
     if (loadOlderPromise) return loadOlderPromise;
     if (stopped || !snapshot.nextCursor) return Promise.resolve();
+    const confirmedCount = snapshot.messages.filter((item) => item.status === 'sent').length;
+    const limit = Math.min(PAGE_LIMIT, MAX_CONFIRMED_MESSAGES - confirmedCount);
+    if (limit <= 0) return Promise.resolve();
     const cursor = snapshot.nextCursor;
     patchState({ isLoadingOlder: true, connectionError: null });
     const controller = createRequestController();
     loadOlderPromise = dependencies.transport.getConversationPage({
       conversationId: options.conversationId,
-      limit: PAGE_LIMIT,
+      limit,
       cursor,
       signal: controller.signal,
     }).then((incoming) => {
@@ -910,6 +921,7 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
     options.initialPage,
     typeof navigator === 'undefined' || navigator.onLine,
     options.conversationId,
+    options.currentUserId,
   ));
   const controllerRef = useRef<MarketplaceChatController | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -919,7 +931,13 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
   // conversation from its own page so a previous conversation can never be
   // painted during that transition.
   const renderedState = state.conversationId !== options.conversationId
-    ? initialState(options.initialPage, typeof navigator === 'undefined' || navigator.onLine, options.conversationId)
+    || state.currentUserId !== options.currentUserId
+    ? initialState(
+      options.initialPage,
+      typeof navigator === 'undefined' || navigator.onLine,
+      options.conversationId,
+      options.currentUserId,
+    )
     : state;
 
   useEffect(() => {
@@ -945,11 +963,23 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
       void controller.start();
     }).catch(() => {
       if (mounted) {
-        setState((current) => ({
-          ...current,
+        setState((current) => {
+          const currentKeyMatches = current.conversationId === options.conversationId
+            && current.currentUserId === options.currentUserId;
+          const base = currentKeyMatches
+            ? current
+            : initialState(
+              options.initialPage,
+              typeof navigator === 'undefined' || navigator.onLine,
+              options.conversationId,
+              options.currentUserId,
+            );
+          return {
+            ...base,
           connectionState: 'error',
           connectionError: 'service_unavailable',
-        }));
+          };
+        });
       }
     });
     return () => {
