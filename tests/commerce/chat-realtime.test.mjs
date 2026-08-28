@@ -589,6 +589,67 @@ test('a newer older-page request keeps its cursor metadata when catch-up complet
   harness.controller.stop();
 });
 
+test('a late older-page response cannot replace newer full-window catch-up metadata', async () => {
+  const lateCatchUp = deferred();
+  const older = deferred();
+  const cursor = { createdAt: '2026-08-24T08:00:00.000Z', id: IDS.olderMessage };
+  const lateCursor = { createdAt: '2026-08-24T07:00:00.000Z', id: IDS.firstMessage };
+  const initial = Array.from({ length: 50 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T09:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  const fullWindow = Array.from({ length: 100 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T${String(10 + Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}:00.000Z`,
+  }));
+  const olderRows = Array.from({ length: 50 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T08:${String(index).padStart(2, '0')}:00.000Z`,
+  }));
+  let catchUpCalls = 0;
+  const harness = createHarness({
+    initialPage: page({ messages: initial, nextCursor: cursor }),
+    transport: createTransport({
+      getConversationPage: (input) => {
+        if (input.cursor) return older.promise;
+        catchUpCalls += 1;
+        return catchUpCalls === 1
+          ? Promise.resolve(page({ messages: [], nextCursor: cursor }))
+          : lateCatchUp.promise;
+      },
+    }),
+  });
+  await harness.controller.start();
+  const channel = harness.realtimeClient.channels[0];
+  channel.emitStatus('SUBSCRIBED');
+  await flush();
+
+  const olderRequest = harness.controller.loadOlder();
+  harness.browser.emit('focus');
+  await flush();
+  assert.equal(catchUpCalls, 2);
+
+  lateCatchUp.resolve(page({ messages: fullWindow, nextCursor: null }));
+  await flush();
+  assert.equal(harness.controller.getSnapshot().messages.length, 100);
+  assert.equal(harness.controller.getSnapshot().nextCursor, null);
+  assert.equal(harness.controller.getSnapshot().hasOlder, false);
+  assert.equal(harness.controller.getSnapshot().canLoadOlder, false);
+
+  older.resolve(page({ messages: olderRows, nextCursor: lateCursor }));
+  await olderRequest;
+  await flush();
+  assert.equal(harness.controller.getSnapshot().nextCursor, null);
+  assert.equal(harness.controller.getSnapshot().hasOlder, false);
+  assert.equal(harness.controller.getSnapshot().canLoadOlder, false);
+  assert.deepEqual(
+    harness.controller.getSnapshot().messages.map((item) => item.id),
+    fullWindow.map((item) => item.id),
+    'late history must not evict the authoritative full catch-up window',
+  );
+  harness.controller.stop();
+});
+
 test('cleanup removes listeners and channel, aborts stale work, clears timers, and ignores late completion', async () => {
   const request = deferred();
   let signal;

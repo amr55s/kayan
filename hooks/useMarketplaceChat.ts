@@ -451,6 +451,7 @@ export function createMarketplaceChatController(
 
   const startCatchUp = (): Promise<void> => {
     if (stopped || !isOnline()) return Promise.resolve();
+    paginationVersion += 1;
     const generation = ++catchUpGeneration;
     const controller = createRequestController();
     const readVersionAtRequest = readAcknowledgementVersion;
@@ -828,6 +829,7 @@ export function createMarketplaceChatController(
     if (limit <= 0) return Promise.resolve();
     const cursor = snapshot.nextCursor;
     paginationVersion += 1;
+    const paginationVersionAtRequest = paginationVersion;
     patchState({ isLoadingOlder: true, connectionError: null });
     const controller = createRequestController();
     loadOlderPromise = dependencies.transport.getConversationPage({
@@ -837,10 +839,11 @@ export function createMarketplaceChatController(
       signal: controller.signal,
     }).then((incoming) => {
       if (stopped || controller.signal.aborted) return;
+      const paginationIsCurrent = paginationVersion === paginationVersionAtRequest;
       patchState({
         messages: reconcileChatPage(snapshot.messages, incoming.messages),
-        nextCursor: incoming.nextCursor,
-        hasOlder: incoming.nextCursor !== null,
+        nextCursor: paginationIsCurrent ? incoming.nextCursor : snapshot.nextCursor,
+        hasOlder: paginationIsCurrent ? incoming.nextCursor !== null : snapshot.hasOlder,
         connectionError: null,
       });
     }).catch((error: unknown) => {
