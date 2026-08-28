@@ -1,26 +1,25 @@
-import type { ChatErrorCode } from '@/lib/commerce/chat/contracts';
-
-const recoveryMessages: Partial<Record<ChatErrorCode, string>> = {
-  authentication_required: 'انتهت جلسة الدخول. سجّل الدخول باستخدام Google ثم أعد المحاولة.',
-  rate_limited: 'تعذر فتح المحادثة بعد تسجيل الدخول بسبب كثرة المحاولات. انتظر قليلًا ثم أعد المحاولة من هنا.',
-  service_unavailable: 'تعذر فتح المحادثة بعد تسجيل الدخول. أعد المحاولة من هنا؛ لن نكرر تسجيل الدخول.',
-};
+﻿import type { ChatErrorCode } from '../../../lib/commerce/chat/contracts.ts';
+import { CHAT_RECOVERY_COPY } from '../../../lib/commerce/chat/copy.ts';
 
 export type ChatRecoveryCode = ChatErrorCode | 'profile_setup';
 
+const validRecoveryCodes = new Set<string>([
+  'authentication_required',
+  'rate_limited',
+  'service_unavailable',
+  'profile_setup',
+]);
+
+/**
+ * Resolves the visual chat entry mode and user-facing recovery guidance based on authentication state.
+ */
 export function resolveChatEntryState(input: {
   isAuthenticated: boolean;
   recovery: ChatRecoveryCode | null;
 }) {
   if (!input.isAuthenticated) return { mode: 'google' as const, message: null };
-  if (input.recovery === 'profile_setup') {
-    return {
-      mode: 'recovery' as const,
-      message: 'تم تسجيل الدخول، لكن تعذر تجهيز حساب المتجر. أعد المحاولة من هنا دون إعادة استخدام تسجيل Google.',
-    };
-  }
-  if (input.recovery && recoveryMessages[input.recovery]) {
-    return { mode: 'recovery' as const, message: recoveryMessages[input.recovery]! };
+  if (input.recovery && validRecoveryCodes.has(input.recovery) && input.recovery in CHAT_RECOVERY_COPY) {
+    return { mode: 'recovery' as const, message: CHAT_RECOVERY_COPY[input.recovery] };
   }
   return { mode: 'chat' as const, message: null };
 }

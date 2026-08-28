@@ -8,18 +8,11 @@ import { openMarketplaceConversationAction } from '@/lib/commerce/chat/actions';
 import { retryMarketplaceConversationAction } from '@/lib/commerce/chat/recovery-action';
 import type { ChatLoginIntent } from '@/lib/auth/safe-next';
 import type { ChatActionState } from '@/lib/commerce/chat/contracts';
+import { CHAT_ERROR_COPY } from '@/lib/commerce/chat/copy';
 import { resolveChatEntryState, type ChatRecoveryCode } from './chat-entry-state';
 import styles from '../marketplace.module.css';
 
 const initialState: ChatActionState = { status: 'idle' };
-const errors = {
-  authentication_required: 'انتهت جلسة الدخول. سجّل الدخول باستخدام Google ثم أعد المحاولة.',
-  invalid_input: 'تعذر تحديد المحادثة المطلوبة بأمان.',
-  not_found: 'لم يعد هذا المتجر أو الطلب متاحًا للمحادثة.',
-  closed: 'هذه المحادثة مغلقة حاليًا.',
-  rate_limited: 'أرسلت محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.',
-  service_unavailable: 'تعذر فتح المحادثة الآن. أعد المحاولة بعد قليل.',
-} as const;
 
 export function ChatEntryButton({
   intent,
@@ -93,7 +86,7 @@ export function ChatEntryButton({
       ) : null}
       {state.status === 'error' ? (
         <p role="alert" className="m-0 text-sm font-bold leading-6 text-red-800">
-          {errors[state.code]}
+          {CHAT_ERROR_COPY[state.code]}
         </p>
       ) : null}
       <p className="m-0 text-xs leading-5 text-zinc-600" aria-live="polite">

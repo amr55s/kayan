@@ -150,6 +150,102 @@
   line-height: 1.8;
 }
 
+.catalogLayout {
+  display: grid;
+  grid-template-columns: minmax(14rem, 17.5rem) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.catalogSidebar {
+  position: sticky;
+  inset-block-start: 5rem;
+  max-height: calc(100dvh - 6rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #e4e4e7;
+  border-radius: 0.5rem;
+  background: #fff;
+  padding: 1.25rem;
+}
+
+.catalogMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mobileFilterBar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-block-end: 0.75rem;
+}
+
+.mobileFilterButton {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 0.5rem;
+  background: #fff;
+  padding-inline: 1rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: #18181b;
+  cursor: pointer;
+}
+
+.filtersForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.filterSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.filterLabel {
+  color: #18181b;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.subLabel {
+  color: #71717a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-block-end: 0.2rem;
+  display: block;
+}
+
+.priceRangeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.filterActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-block-start: 0.5rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid #f4f4f5;
+}
+
+.checkbox {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #18181b;
+}
+
 .controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
@@ -219,6 +315,7 @@
   padding-inline: 1rem;
   font-weight: 800;
   cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
 }
 
 .primaryButton {
@@ -966,6 +1063,18 @@
     padding-block: 0.45rem;
   }
 
+  .catalogLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .catalogSidebar {
+    display: none;
+  }
+
+  .mobileFilterBar {
+    display: flex;
+  }
+
   .primaryNav {
     width: 100%;
     order: 2;
@@ -1006,7 +1115,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
   .productImage {
-    transition: none;
+    transition: none !important;
   }
 }

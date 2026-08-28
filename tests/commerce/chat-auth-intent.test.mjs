@@ -710,3 +710,46 @@ test('selected store surface produces a real store-level presale entry without n
   assert.equal(entry.isAuthenticated, false);
   assert.match(entry.loginHref, /^\/signin\?/u);
 });
+
+test('resolveChatEntryState covers all recovery codes and unauthenticated states deterministically', () => {
+  const chat = requireModule(entryState, 'chat-entry-state');
+  // Unauthenticated
+  assert.deepEqual(chat.resolveChatEntryState({ isAuthenticated: false, recovery: null }), { mode: 'google', message: null });
+  assert.deepEqual(chat.resolveChatEntryState({ isAuthenticated: false, recovery: 'rate_limited' }), { mode: 'google', message: null });
+
+  // Normal authenticated
+  assert.deepEqual(chat.resolveChatEntryState({ isAuthenticated: true, recovery: null }), { mode: 'chat', message: null });
+  assert.deepEqual(chat.resolveChatEntryState({ isAuthenticated: true, recovery: 'invalid_input' }), { mode: 'chat', message: null });
+
+  // Recoverable codes
+  const authRequired = chat.resolveChatEntryState({ isAuthenticated: true, recovery: 'authentication_required' });
+  assert.equal(authRequired.mode, 'recovery');
+  assert.match(authRequired.message, /انتهت جلسة الدخول/u);
+
+  const rateLimited = chat.resolveChatEntryState({ isAuthenticated: true, recovery: 'rate_limited' });
+  assert.equal(rateLimited.mode, 'recovery');
+  assert.match(rateLimited.message, /كثرة المحاولات/u);
+
+  const serviceUnavailable = chat.resolveChatEntryState({ isAuthenticated: true, recovery: 'service_unavailable' });
+  assert.equal(serviceUnavailable.mode, 'recovery');
+  assert.match(serviceUnavailable.message, /تعذر فتح المحادثة بعد تسجيل الدخول/u);
+
+  const profileSetup = chat.resolveChatEntryState({ isAuthenticated: true, recovery: 'profile_setup' });
+  assert.equal(profileSetup.mode, 'recovery');
+  assert.match(profileSetup.message, /تجهيز حساب المتجر/u);
+});
+
+test('createChatLoginHref preserves complex Arabic search and filter parameters in return destination', () => {
+  const arabicReturn = '/marketplace?q=%D8%B9%D8%B3%D9%84%20%D8%B3%D8%AF%D8%B1&category=food&min_price=150#filters';
+  const loginUrl = navigation.createChatLoginHref({
+    returnTo: arabicReturn,
+    intent: { kind: 'presale', storeId: storeA, productId: productA },
+  });
+  const parsed = new URL(loginUrl, 'https://dairtak.invalid');
+  assert.equal(parsed.pathname, '/signin');
+  assert.equal(parsed.searchParams.get('next'), arabicReturn);
+  assert.equal(parsed.searchParams.get('intent'), 'chat');
+  assert.equal(parsed.searchParams.get('kind'), 'presale');
+  assert.equal(parsed.searchParams.get('storeId'), storeA);
+  assert.equal(parsed.searchParams.get('productId'), productA);
+});
