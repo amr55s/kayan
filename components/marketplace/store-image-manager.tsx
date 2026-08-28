@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState, type FormEvent } from 'react';
 import { ArrowDown, ArrowUp, ImageOff, RotateCcw, Save, Trash2, Upload } from 'lucide-react';
 import { Button } from '@heroui/react/button';
+import { Chip } from '@heroui/react/chip';
 import { uploadMarketplaceImage } from '@/lib/media/client';
 import type { MarketplaceStore } from '@/lib/commerce/operational-setup';
 import styles from './operational-setup.module.css';
@@ -94,7 +95,9 @@ export function StoreImageManager({ store, actions }: {
           <h2 id="store-images-title">صور المتجر</h2>
           <p>حتى 15 صورة إجمالًا: شعار واحد، غلاف واحد، وباقي الصور للمعرض.</p>
         </div>
-        <span className={styles.badge} aria-live="polite">{items.length.toLocaleString('ar-EG')} / ١٥</span>
+        <Chip.Root size="sm" aria-live="polite">
+          <Chip.Label>{items.length.toLocaleString('ar-EG')} / ١٥</Chip.Label>
+        </Chip.Root>
       </div>
 
       {items.length ? (
@@ -127,7 +130,9 @@ export function StoreImageManager({ store, actions }: {
                 <Image src={item.public_url} alt={item.alt_text || store.name} fill sizes="(max-width: 48rem) 45vw, 180px" />
               </div>
               <div className={styles.mediaMeta}>
-                <span className={styles.badge}>{item.kind === 'logo' ? 'شعار' : item.kind === 'cover' ? 'غلاف' : `معرض ${index + 1}`}</span>
+                <Chip.Root size="sm">
+                  <Chip.Label>{item.kind === 'logo' ? 'شعار' : item.kind === 'cover' ? 'غلاف' : `معرض ${index + 1}`}</Chip.Label>
+                </Chip.Root>
                 <div className={styles.actions}>
                   <Button.Root type="button" isIconOnly isDisabled={index === 0} className={styles.secondary} onPress={() => move(index, index - 1)} aria-label="تحريك الصورة للخلف"><ArrowUp size={14} aria-hidden="true" /></Button.Root>
                   <Button.Root type="button" isIconOnly isDisabled={index === items.length - 1} className={styles.secondary} onPress={() => move(index, index + 1)} aria-label="تحريك الصورة للأمام"><ArrowDown size={14} aria-hidden="true" /></Button.Root>

@@ -1,4 +1,7 @@
+import { Alert } from '@heroui/react/alert';
+import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
+import { Chip } from '@heroui/react/chip';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
@@ -46,9 +49,12 @@ export default async function MarketplaceOrderPage({
   return (
     <section aria-labelledby="order-title">
       {placed ? (
-        <p role="status" className="mb-5 border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900">
-          تم إنشاء الطلب بنجاح. احتفظ برقم المتابعة الظاهر أدناه.
-        </p>
+        <Alert status="success" className="mb-5">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>تم إنشاء الطلب بنجاح. احتفظ برقم المتابعة الظاهر أدناه.</Alert.Title>
+          </Alert.Content>
+        </Alert>
       ) : null}
       <header className={styles.sectionHeader}>
         <div>
@@ -56,7 +62,11 @@ export default async function MarketplaceOrderPage({
           <h1 id="order-title" className={styles.title}>رقم المتابعة <bdi dir="ltr">{orderGroup.publicCode}</bdi></h1>
           <p className={styles.subtitle}>الدفع نقدًا عند الاستلام. ستظهر حالة كل متجر داخل هذه الصفحة.</p>
         </div>
-        <Link href="/marketplace" className={styles.secondaryButton}>متابعة التسوق</Link>
+        <Link href="/marketplace">
+          <Button.Root className={styles.secondaryButton}>
+            متابعة التسوق
+          </Button.Root>
+        </Link>
       </header>
 
       <div className={styles.cartLayout}>
@@ -65,9 +75,13 @@ export default async function MarketplaceOrderPage({
             <Card.Root key={order.id} className={styles.cartGroup}>
               <Card.Header className={styles.cartGroupHeader}>
                 <span>{order.storeName}</span>
-                <span>{statusLabels[order.status] ?? order.status}</span>
-                <Link href={`/account/orders/${order.id}`} className={styles.secondaryButton}>
-                  متابعة الطلب
+                <Chip.Root size="sm">
+                  <Chip.Label>{statusLabels[order.status] ?? order.status}</Chip.Label>
+                </Chip.Root>
+                <Link href={`/account/orders/${order.id}`}>
+                  <Button.Root className={styles.secondaryButton}>
+                    متابعة الطلب
+                  </Button.Root>
                 </Link>
               </Card.Header>
               <Card.Content className={styles.cartLines}>

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Button } from '@heroui/react/button';
+import { Checkbox } from '@heroui/react/checkbox';
 import type { MarketplaceAdminMembership, MarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import styles from './operational-setup.module.css';
 
@@ -31,15 +32,31 @@ export function AdminMembershipsPanel({ memberships, action }: {
         <p><bdi dir="ltr">{membership.phone}</bdi>{membership.profile_active ? '' : ' · الحساب موقوف'}</p>
         <fieldset className={styles.list}>
           <legend>الأدوار</legend>
-          {roleOptions.map((role) => <label className={styles.checkbox} key={role.value}>
-            <input type="checkbox" name="roles" value={role.value} defaultChecked={membership.roles.includes(role.value)} />
-            <span><strong>{role.label}</strong> — {role.description}</span>
-          </label>)}
+          {roleOptions.map((role) => (
+            <Checkbox.Root
+              key={role.value}
+              name="roles"
+              value={role.value}
+              defaultSelected={membership.roles.includes(role.value)}
+              className={styles.checkbox}
+            >
+              <Checkbox.Content>
+                <Checkbox.Control />
+                <span><strong>{role.label}</strong> — {role.description}</span>
+              </Checkbox.Content>
+            </Checkbox.Root>
+          ))}
         </fieldset>
-        <label className={styles.checkbox}>
-          <input type="checkbox" name="isActive" defaultChecked={membership.membership_active} />
-          العضوية الإدارية مفعلة
-        </label>
+        <Checkbox.Root
+          name="isActive"
+          defaultSelected={membership.membership_active}
+          className={styles.checkbox}
+        >
+          <Checkbox.Content>
+            <Checkbox.Control />
+            <span>العضوية الإدارية مفعلة</span>
+          </Checkbox.Content>
+        </Checkbox.Root>
         <div className={styles.actions}>
           <Button.Root type="submit" className={styles.primary}>حفظ الصلاحيات</Button.Root>
         </div>

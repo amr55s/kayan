@@ -1,5 +1,8 @@
-import { Button } from '@heroui/react/button';
+﻿import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { Separator } from '@heroui/react/separator';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatMarketplaceMoney, marketplaceProductHref } from './format';
@@ -64,19 +67,21 @@ function CartLine({
           {updateLineAction ? (
             <form action={updateLineAction} className={styles.cartActions}>
               <input type="hidden" name="variantId" value={line.variantId} />
-              <label className={styles.selectWrap} htmlFor={`quantity-${line.id}`}>
-                <span className={styles.label}>الكمية</span>
-                <input
+              <div className={styles.selectWrap}>
+                <Label.Root htmlFor={`quantity-${line.id}`} className={styles.label}>
+                  الكمية
+                </Label.Root>
+                <Input.Root
                   id={`quantity-${line.id}`}
                   name="quantity"
                   type="number"
                   inputMode="numeric"
                   min={1}
                   max={Math.max(1, line.maxQuantity)}
-                  defaultValue={line.quantity}
+                  defaultValue={String(line.quantity)}
                   className={styles.quantityInput}
                 />
-              </label>
+              </div>
               <Button.Root type="submit" className={styles.secondaryButton}>
                 تحديث
               </Button.Root>
@@ -177,9 +182,11 @@ export function MarketplaceCart({
               )
             ) : applyPromoAction ? (
               <form action={applyPromoAction} className={styles.purchaseForm}>
-                <label className={styles.selectWrap} htmlFor="marketplace-promo-code">
-                  <span className={styles.label}>كود الخصم</span>
-                  <input
+                <div className={styles.selectWrap}>
+                  <Label.Root htmlFor="marketplace-promo-code" className={styles.label}>
+                    كود الخصم
+                  </Label.Root>
+                  <Input.Root
                     id="marketplace-promo-code"
                     name="promoCode"
                     autoComplete="off"
@@ -187,7 +194,7 @@ export function MarketplaceCart({
                     maxLength={32}
                     className={styles.field}
                   />
-                </label>
+                </div>
                 <Button.Root type="submit" className={styles.secondaryButton}>
                   تطبيق
                 </Button.Root>
@@ -212,6 +219,7 @@ export function MarketplaceCart({
                     : 'يُحسب حسب المنطقة'}
                 </strong>
               </div>
+              <Separator />
               <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
                 <span>الإجمالي</span>
                 <strong>{formatMarketplaceMoney(model.total)}</strong>
@@ -220,8 +228,10 @@ export function MarketplaceCart({
             {hasUnavailableLines ? (
               <p className={styles.notice}>احذف المنتجات غير المتوفرة قبل المتابعة.</p>
             ) : (
-              <Link href={checkoutHref} className={styles.primaryButton}>
-                متابعة إتمام الطلب
+              <Link href={checkoutHref}>
+                <Button.Root className={styles.primaryButton}>
+                  متابعة إتمام الطلب
+                </Button.Root>
               </Link>
             )}
           </Card.Content>

@@ -356,7 +356,11 @@ function MarketplaceCheckoutLogin() {
             helper="سنستعيد سلتك ثم نرجعك إلى صفحة إتمام الطلب نفسها. يمكنك إعادة المحاولة بأمان إذا أغلقت نافذة Google."
           />
         </div>
-        <Link href="/marketplace/cart" className={styles.secondaryButton}>العودة إلى السلة</Link>
+        <Link href="/marketplace/cart">
+          <Button.Root className={styles.secondaryButton}>
+            العودة إلى السلة
+          </Button.Root>
+        </Link>
       </Card.Content>
     </Card.Root>
   );

@@ -1,5 +1,6 @@
 import { Card } from '@heroui/react/card';
 import { Chip } from '@heroui/react/chip';
+import { Separator } from '@heroui/react/separator';
 import {
   formatMarketplaceMoney,
   marketplaceDiscountPercentage,
@@ -79,7 +80,7 @@ export function MarketplaceProductDetails({
             ) : null}
           </div>
 
-          <hr className={styles.divider} />
+          <Separator className={styles.divider} />
 
           <MarketplacePurchaseForm
             productId={product.id}

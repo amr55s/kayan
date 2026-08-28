@@ -1,3 +1,4 @@
+﻿import { Badge } from '@heroui/react/badge';
 import { Card } from '@heroui/react/card';
 import { Chip } from '@heroui/react/chip';
 import Link from 'next/link';
@@ -49,9 +50,11 @@ export function MarketplaceRoleShell({
                 className={`${styles.navLink} ${active ? styles.navLinkActive : ''}`}
                 aria-current={active ? 'page' : undefined}
               >
-                {item.label}
+                <span>{item.label}</span>
                 {typeof item.badge === 'number' && item.badge > 0 ? (
-                  <span className={styles.badge}>{item.badge}</span>
+                  <Badge.Root aria-label={`${item.badge} عناصر`}>
+                    <Badge.Label className={styles.badge}>{item.badge}</Badge.Label>
+                  </Badge.Root>
                 ) : null}
               </Link>
             );

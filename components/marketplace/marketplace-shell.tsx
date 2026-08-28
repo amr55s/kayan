@@ -1,3 +1,4 @@
+﻿import { Badge } from '@heroui/react/badge';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { BrandLogo } from '@/components/layout/BrandLogo';
@@ -31,11 +32,11 @@ export function MarketplaceShell({
           <nav className={styles.primaryNav} aria-label="التنقل الرئيسي للمتجر">
             {navigation.map((item) => (
               <Link key={item.href} href={item.href} className={styles.navLink}>
-                {item.label}
+                <span>{item.label}</span>
                 {typeof item.badge === 'number' && item.badge > 0 ? (
-                  <span className={styles.badge} aria-label={`${item.badge} عناصر`}>
-                    {item.badge}
-                  </span>
+                  <Badge.Root aria-label={`${item.badge} عناصر`}>
+                    <Badge.Label className={styles.badge}>{item.badge}</Badge.Label>
+                  </Badge.Root>
                 ) : null}
               </Link>
             ))}

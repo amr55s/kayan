@@ -103,11 +103,15 @@ export function MerchantProductList({
           </p>
         </div>
         <div className={styles.inlineActions}>
-          <Link href="/merchant/marketplace/excel" className={styles.secondaryLink}>
-            استيراد أو تصدير Excel
+          <Link href="/merchant/marketplace/excel">
+            <Button.Root className={styles.secondaryLink}>
+              استيراد أو تصدير Excel
+            </Button.Root>
           </Link>
-          <Link href="/merchant/marketplace/new" className={styles.primaryLink}>
-            إضافة منتج
+          <Link href="/merchant/marketplace/new">
+            <Button.Root className={styles.primaryLink}>
+              إضافة منتج
+            </Button.Root>
           </Link>
         </div>
       </header>
@@ -247,9 +251,10 @@ export function MerchantProductList({
                     <div className={styles.rowActions}>
                       <Link
                         href={`/merchant/marketplace/${encodeURIComponent(product.id)}/edit`}
-                        className={styles.textLink}
                       >
-                        تعديل
+                        <Button.Root className={styles.textLink}>
+                          تعديل
+                        </Button.Root>
                       </Link>
                       {product.status === 'draft' || product.status === 'rejected' ? (
                         <form action={actions.submitForReviewAction}>
@@ -297,9 +302,10 @@ export function MerchantProductList({
           {viewModel.pagination.page > 1 ? (
             <Link
               href={catalogHref(viewModel.filters, viewModel.pagination.page - 1)}
-              className={styles.paginationLink}
             >
-              السابق
+              <Button.Root className={styles.paginationLink}>
+                السابق
+              </Button.Root>
             </Link>
           ) : null}
           <span className={styles.paginationCurrent} aria-current="page">
@@ -308,9 +314,10 @@ export function MerchantProductList({
           {viewModel.pagination.page < viewModel.pagination.pageCount ? (
             <Link
               href={catalogHref(viewModel.filters, viewModel.pagination.page + 1)}
-              className={styles.paginationLink}
             >
-              التالي
+              <Button.Root className={styles.paginationLink}>
+                التالي
+              </Button.Root>
             </Link>
           ) : null}
         </nav>

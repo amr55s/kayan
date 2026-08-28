@@ -1,8 +1,10 @@
-'use client';
+﻿'use client';
 
 import { Button } from '@heroui/react/button';
 import { Input } from '@heroui/react/input';
 import { Label } from '@heroui/react/label';
+import { RadioGroup } from '@heroui/react/radio-group';
+import { Radio } from '@heroui/react/radio';
 import { useState } from 'react';
 import { formatMarketplaceMoney } from './format';
 import type {
@@ -42,26 +44,29 @@ export function MarketplacePurchaseForm({
     <form className={styles.purchaseForm} action={addToCartAction}>
       <input type="hidden" name="productId" value={productId} />
       {variants.length > 0 ? (
-        <label className={styles.selectWrap} htmlFor="marketplace-variant">
-          <span className={styles.label}>الخيار</span>
-          <select
-            id="marketplace-variant"
-            name="variantId"
-            value={variantId}
-            className={styles.selectField}
-            onChange={(event) => {
-              setVariantId(event.target.value);
-              setQuantity(1);
-            }}
-          >
+        <RadioGroup
+          name="variantId"
+          value={variantId}
+          onChange={(value) => {
+            setVariantId(value);
+            setQuantity(1);
+          }}
+          className={styles.selectWrap}
+        >
+          <Label className={styles.label}>الخيارات المتاحة</Label>
+          <div className="grid gap-2">
             {variants.map((variant) => (
-              <option key={variant.id} value={variant.id} disabled={!variant.isInStock}>
-                {variant.label} — {formatMarketplaceMoney(variant.price)}
-                {variant.isInStock ? '' : ' — غير متوفر'}
-              </option>
+              <Radio key={variant.id} value={variant.id} isDisabled={!variant.isInStock}>
+                <Radio.Content>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  <span>{variant.label} — {formatMarketplaceMoney(variant.price)}{variant.isInStock ? '' : ' (غير متوفر)'}</span>
+                </Radio.Content>
+              </Radio>
             ))}
-          </select>
-        </label>
+          </div>
+        </RadioGroup>
       ) : null}
 
       <div className={styles.selectWrap}>

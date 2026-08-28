@@ -106,9 +106,10 @@ export default async function NotificationsPage({
         <div className="flex justify-center">
           <Link
             href={`/account/notifications?before=${encodeURIComponent(page.next_cursor.created_at)}&id=${encodeURIComponent(page.next_cursor.id)}`}
-            className="inline-flex min-h-11 items-center rounded-lg border border-zinc-300 bg-white px-4 text-sm font-bold text-zinc-950"
           >
-            إشعارات أقدم
+            <Button variant="outline">
+              إشعارات أقدم
+            </Button>
           </Link>
         </div>
       ) : null}

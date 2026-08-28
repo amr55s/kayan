@@ -1,4 +1,14 @@
 .shell {
+  --heroui-primary: #f97316;
+  --heroui-primary-foreground: #ffffff;
+  --heroui-background: #ffffff;
+  --heroui-foreground: #18181b;
+  --heroui-muted: #71717a;
+  --heroui-border: #e4e4e7;
+  --heroui-separator: #f4f4f5;
+  --heroui-focus: #ea580c;
+  --heroui-radius: 0.5rem;
+  --heroui-field-radius: 0.375rem;
   min-height: 100dvh;
   background: #f5f5f5;
   color: #18181b;

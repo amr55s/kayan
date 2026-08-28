@@ -1,6 +1,7 @@
-'use client';
+﻿'use client';
 
 import { Button } from '@heroui/react/button';
+import { ScrollShadow } from '@heroui/react/scroll-shadow';
 import Image from 'next/image';
 import { useState } from 'react';
 import type { MarketplaceImageViewModel } from './view-models';
@@ -42,7 +43,7 @@ export function MarketplaceProductGallery({
       </div>
 
       {galleryImages.length > 1 ? (
-        <div className={styles.thumbnailList} role="group" aria-label="اختر صورة لعرضها">
+        <ScrollShadow orientation="horizontal" className={styles.thumbnailList} role="group" aria-label="اختر صورة لعرضها">
           {galleryImages.map((image, index) => (
             <Button.Root
               key={image.id}
@@ -62,7 +63,7 @@ export function MarketplaceProductGallery({
               />
             </Button.Root>
           ))}
-        </div>
+        </ScrollShadow>
       ) : null}
     </section>
   );
