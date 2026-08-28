@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import React, { createElement, useLayoutEffect } from 'react';
+import React, { createElement, useEffect, useLayoutEffect } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
@@ -346,7 +346,24 @@ function createHarness({ transport = createTransport(), initialPage = page(), cu
       clearTimeout: clock.clearTimeout,
     },
   );
-  return { browser, clock, controller, realtimeClient, transport };
+  return {
+    browser,
+    clock,
+    controller,
+    dependencies: {
+      realtimeClient,
+      transport,
+      browser,
+      document: browser,
+      isOnline: () => browser.online,
+      randomUUID: () => IDS.clientMessage,
+      now: () => clock.now,
+      setTimeout: clock.setTimeout,
+      clearTimeout: clock.clearTimeout,
+    },
+    realtimeClient,
+    transport,
+  };
 }
 
 test('joins only the exact private conversation topic and keeps identity only in the Presence key', async () => {
@@ -807,6 +824,7 @@ test('older pagination uses only remaining confirmed capacity and preserves pend
   });
   const { controller } = createHarness({ transport, initialPage });
   await controller.start();
+  assert.equal(controller.getSnapshot().canLoadOlder, true);
   const pendingSendPromise = controller.send({
     senderRole: 'customer',
     kind: 'text',
@@ -815,11 +833,13 @@ test('older pagination uses only remaining confirmed capacity and preserves pend
     card: null,
   });
   await flush();
+  assert.equal(controller.getSnapshot().canLoadOlder, true, 'pending messages do not consume confirmed capacity');
   await controller.loadOlder();
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].limit, 50);
   assert.equal(controller.getSnapshot().messages.filter((item) => item.status === 'sent').length, 100);
+  assert.equal(controller.getSnapshot().canLoadOlder, false);
   assert.equal(controller.getSnapshot().messages.some((item) => item.status === 'sending'), true);
   const cursorAfterFirstLoad = controller.getSnapshot().nextCursor;
 
@@ -827,6 +847,7 @@ test('older pagination uses only remaining confirmed capacity and preserves pend
   assert.equal(calls.length, 1, 'a full confirmed window must not fetch and skip history');
   assert.deepEqual(controller.getSnapshot().nextCursor, cursorAfterFirstLoad);
   assert.equal(controller.getSnapshot().hasOlder, true);
+  assert.equal(controller.getSnapshot().canLoadOlder, false);
   controller.stop();
   pendingSend.resolve(message({ id: crypto.randomUUID(), clientMessageId: IDS.clientMessage, senderId: IDS.currentUser }));
   await pendingSendPromise;
@@ -1031,6 +1052,147 @@ test('React rerender hides the previous viewer state when the user changes', asy
     });
   } finally {
     root.unmount();
+    await flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
+});
+
+test('React transition callbacks cannot invoke the previous viewer controller before cleanup', async () => {
+  const calls = { send: 0, older: 0, read: 0, reaction: 0 };
+  const transport = createTransport({
+    sendMessage: () => {
+      calls.send += 1;
+      return Promise.reject(new Error('expected first send failure'));
+    },
+    getConversationPage: async (input) => {
+      if (input.cursor) calls.older += 1;
+      return page();
+    },
+    markConversationRead: async (input) => {
+      calls.read += 1;
+      return { conversationId: input.conversationId, lastReadMessageId: input.messageId };
+    },
+    setReaction: async (input) => {
+      calls.reaction += 1;
+      return message({ id: input.messageId });
+    },
+  });
+  const harness = createHarness({
+    transport,
+    initialPage: page({ nextCursor: { createdAt: '2026-08-24T08:00:00.000Z', id: IDS.olderMessage } }),
+  });
+  const documentTarget = new ReactTestDocument();
+  const windowTarget = {
+    document: documentTarget,
+    HTMLIFrameElement: ReactTestElement,
+    HTMLElement: ReactTestElement,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  documentTarget.defaultView = windowTarget;
+  const container = new ReactTestElement('div', documentTarget);
+  const actions = [];
+  function Probe({ currentUserId }) {
+    const state = useMarketplaceChat({
+      conversationId: IDS.conversation,
+      initialPage: page({ nextCursor: { createdAt: '2026-08-24T08:00:00.000Z', id: IDS.olderMessage } }),
+      currentUserId,
+      controllerDependencies: harness.dependencies,
+    });
+    const send = state.send;
+    useEffect(() => {
+      if (currentUserId === IDS.currentUser) {
+        void send({
+          senderRole: 'customer',
+          kind: 'text',
+          body: 'first viewer',
+          replyToId: null,
+          card: null,
+        });
+      }
+    }, [currentUserId, send]);
+    useLayoutEffect(() => {
+      if (currentUserId === IDS.otherUser) {
+        actions.push(
+          state.send({ senderRole: 'customer', kind: 'text', body: 'stale', replyToId: null, card: null }),
+          state.retry(IDS.clientMessage),
+          state.loadOlder(),
+          state.markRead(IDS.firstMessage),
+          state.react({ messageId: IDS.firstMessage, emoji: '👍', active: true }),
+        );
+        state.notifyTyping(true);
+      }
+    }, [currentUserId, state]);
+    return createElement('output', null, currentUserId);
+  }
+
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  globalThis.window = windowTarget;
+  globalThis.document = documentTarget;
+  const root = createRoot(container);
+  try {
+    flushSync(() => root.render(createElement(Probe, { currentUserId: IDS.currentUser })));
+    await flush();
+    flushSync(() => root.render(createElement(Probe, { currentUserId: IDS.otherUser })));
+    assert.equal(calls.send, 1, 'new viewer send must not reach the old controller');
+    assert.equal(calls.older, 0);
+    assert.equal(calls.read, 0);
+    assert.equal(calls.reaction, 0);
+    assert.equal(harness.realtimeClient.channels[0]?.sent.length ?? 0, 0);
+    assert.equal(actions.length, 5);
+  } finally {
+    root.unmount();
+    await flush();
+    await new Promise((resolve) => setImmediate(resolve));
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
+});
+
+test('React-owned composer ref remains attached across rerenders and clears only on unmount', async () => {
+  const harness = createHarness();
+  const documentTarget = new ReactTestDocument();
+  const windowTarget = {
+    document: documentTarget,
+    HTMLIFrameElement: ReactTestElement,
+    HTMLElement: ReactTestElement,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  documentTarget.defaultView = windowTarget;
+  const container = new ReactTestElement('div', documentTarget);
+  let composerRef;
+  function Probe({ currentUserId }) {
+    const state = useMarketplaceChat({
+      conversationId: IDS.conversation,
+      initialPage: page(),
+      currentUserId,
+      controllerDependencies: harness.dependencies,
+    });
+    composerRef = state.composerRef;
+    return createElement('textarea', { ref: state.composerRef });
+  }
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  globalThis.window = windowTarget;
+  globalThis.document = documentTarget;
+  const root = createRoot(container);
+  try {
+    flushSync(() => root.render(createElement(Probe, { currentUserId: IDS.currentUser })));
+    const attached = composerRef.current;
+    assert.ok(attached);
+    flushSync(() => root.render(createElement(Probe, { currentUserId: IDS.otherUser })));
+    assert.equal(composerRef.current, attached);
+  } finally {
+    root.unmount();
+    assert.equal(composerRef.current, null);
     await flush();
     await new Promise((resolve) => setImmediate(resolve));
     if (priorWindow === undefined) delete globalThis.window;

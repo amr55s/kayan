@@ -56,6 +56,8 @@ export type UseMarketplaceChatOptions = {
   currentUserId: string;
   /** Optional, bounded display state for Presence. No user id is copied into its payload. */
   currentUserPresence?: ChatPresenceDisplay;
+  /** Optional injected browser dependencies for lifecycle tests and embedders. */
+  controllerDependencies?: MarketplaceChatControllerDependencies;
 };
 
 export type MarketplaceChatState = {
@@ -67,6 +69,7 @@ export type MarketplaceChatState = {
   typingUsers: ChatTypingUser[];
   nextCursor: ChatCursor | null;
   hasOlder: boolean;
+  canLoadOlder: boolean;
   isLoadingOlder: boolean;
   lastReadMessageId: string | null;
 };
@@ -344,15 +347,18 @@ function initialState(
   conversationId = page.conversation.id,
   currentUserId = '',
 ): MarketplaceChatState {
+  const messages = reconcileChatPage([], page.messages);
+  const confirmedCount = messages.filter((item) => item.status === 'sent').length;
   return {
     conversationId,
     currentUserId,
-    messages: reconcileChatPage([], page.messages),
+    messages,
     connectionState: online ? 'connecting' : 'offline',
     connectionError: null,
     typingUsers: [],
     nextCursor: page.nextCursor,
     hasOlder: page.nextCursor !== null,
+    canLoadOlder: page.nextCursor !== null && confirmedCount < MAX_CONFIRMED_MESSAGES,
     isLoadingOlder: false,
     lastReadMessageId: page.lastReadMessageId,
   };
@@ -408,7 +414,11 @@ export function createMarketplaceChatController(
 
   const publish = (next: MarketplaceChatState): void => {
     if (stopped || Object.is(snapshot, next)) return;
-    snapshot = next;
+    const confirmedCount = next.messages.filter((item) => item.status === 'sent').length;
+    snapshot = {
+      ...next,
+      canLoadOlder: next.hasOlder && confirmedCount < MAX_CONFIRMED_MESSAGES,
+    };
     for (const listener of listeners) listener();
   };
 
@@ -917,6 +927,7 @@ export function createMarketplaceChatController(
 }
 
 export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
+  const viewerKey = `${options.conversationId}:${options.currentUserId}`;
   const [state, setState] = useState<MarketplaceChatState>(() => initialState(
     options.initialPage,
     typeof navigator === 'undefined' || navigator.onLine,
@@ -924,6 +935,12 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
     options.currentUserId,
   ));
   const controllerRef = useRef<MarketplaceChatController | null>(null);
+  const controllerKeyRef = useRef<string | null>(null);
+  const latestKeyRef = useRef(viewerKey);
+  // This ref is deliberately updated during render so callbacks invoked by a
+  // layout effect in the same commit cannot use the previous viewer's client.
+  // eslint-disable-next-line react-hooks/refs
+  latestKeyRef.current = viewerKey;
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const presenceRole = options.currentUserPresence?.role;
   const presenceName = options.currentUserPresence?.displayName;
@@ -944,49 +961,62 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
     let mounted = true;
     let controller: MarketplaceChatController | null = null;
     let unsubscribe: () => void = () => undefined;
-    composerRef.current = null;
-    void import('../lib/supabase/client.ts').then(({ createClient }) => {
+    const attachController = (dependencies: MarketplaceChatControllerDependencies): void => {
       if (!mounted) return;
-      const realtimeClient = createClient() as unknown as RealtimeClientLike;
       controller = createMarketplaceChatController(options, {
-        realtimeClient,
-        transport: createMarketplaceChatTransport(realtimeClient),
-        browser: window,
-        document,
-        isOnline: () => navigator.onLine,
+        ...dependencies,
       });
       controllerRef.current = controller;
+      controllerKeyRef.current = viewerKey;
       setState(controller.getSnapshot());
       unsubscribe = controller.subscribe(() => {
         if (mounted && controller) setState(controller.getSnapshot());
       });
       void controller.start();
-    }).catch(() => {
-      if (mounted) {
-        setState((current) => {
-          const currentKeyMatches = current.conversationId === options.conversationId
-            && current.currentUserId === options.currentUserId;
-          const base = currentKeyMatches
-            ? current
-            : initialState(
-              options.initialPage,
-              typeof navigator === 'undefined' || navigator.onLine,
-              options.conversationId,
-              options.currentUserId,
-            );
-          return {
-            ...base,
-          connectionState: 'error',
-          connectionError: 'service_unavailable',
-          };
+    };
+    if (options.controllerDependencies) {
+      attachController(options.controllerDependencies);
+    } else {
+      void import('../lib/supabase/client.ts').then(({ createClient }) => {
+        if (!mounted) return;
+        const realtimeClient = createClient() as unknown as RealtimeClientLike;
+        attachController({
+          realtimeClient,
+          transport: createMarketplaceChatTransport(realtimeClient),
+          browser: window,
+          document,
+          isOnline: () => navigator.onLine,
         });
-      }
-    });
+      }).catch(() => {
+        if (mounted) {
+          setState((current) => {
+            const currentKeyMatches = current.conversationId === options.conversationId
+              && current.currentUserId === options.currentUserId;
+            const base = currentKeyMatches
+              ? current
+              : initialState(
+                options.initialPage,
+                typeof navigator === 'undefined' || navigator.onLine,
+                options.conversationId,
+                options.currentUserId,
+              );
+            return {
+              ...base,
+              connectionState: 'error',
+              connectionError: 'service_unavailable',
+            };
+          });
+        }
+      });
+    }
     return () => {
       mounted = false;
       unsubscribe();
       controller?.stop();
-      if (controllerRef.current === controller) controllerRef.current = null;
+      if (controllerRef.current === controller) {
+        controllerRef.current = null;
+        controllerKeyRef.current = null;
+      }
     };
     // The scalar identity/display fields deliberately define subscription
     // lifetime. A parent recreating an equivalent initialPage must not cause a
@@ -994,23 +1024,26 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.conversationId, options.currentUserId, presenceRole, presenceName]);
 
+  const currentController = (): MarketplaceChatController | null => (
+    controllerKeyRef.current === latestKeyRef.current ? controllerRef.current : null
+  );
   const send = useCallback((input: MarketplaceChatSendInput) => (
-    controllerRef.current?.send(input) ?? Promise.resolve(null)
+    currentController()?.send(input) ?? Promise.resolve(null)
   ), []);
   const retry = useCallback((clientMessageId: string) => (
-    controllerRef.current?.retry(clientMessageId) ?? Promise.resolve()
+    currentController()?.retry(clientMessageId) ?? Promise.resolve()
   ), []);
   const loadOlder = useCallback(() => (
-    controllerRef.current?.loadOlder() ?? Promise.resolve()
+    currentController()?.loadOlder() ?? Promise.resolve()
   ), []);
   const markRead = useCallback((messageId: string) => (
-    controllerRef.current?.markRead(messageId) ?? Promise.resolve()
+    currentController()?.markRead(messageId) ?? Promise.resolve()
   ), []);
   const react = useCallback((input: ChatReactionInput) => (
-    controllerRef.current?.react(input) ?? Promise.resolve()
+    currentController()?.react(input) ?? Promise.resolve()
   ), []);
   const notifyTyping = useCallback((active: boolean) => {
-    controllerRef.current?.notifyTyping(active);
+    currentController()?.notifyTyping(active);
   }, []);
   const composer = useMemo<MarketplaceChatComposerContract>(() => ({
     ref: composerRef,
