@@ -4,6 +4,9 @@ import type { ChatErrorCode, ChatMessage, ChatCursor } from './contracts.ts';
 export type ChatOptimisticMessage = ChatMessage & {
   status: 'sending' | 'sent' | 'failed';
   failureCode: ChatErrorCode | null;
+  /** Optional monotonic snapshot metadata supplied by the realtime layer. */
+  revision?: number;
+  version?: number;
 };
 
 const CONFIRMED_WINDOW = 100;
@@ -18,6 +21,26 @@ type UnknownRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCard(value: unknown): boolean {
+  if (value === null) return true;
+  if (!isRecord(value) || typeof value.type !== 'string' || typeof value.label !== 'string') return false;
+  if (value.type === 'location') return Number.isFinite(value.latitude) && Number.isFinite(value.longitude);
+  return typeof value.id === 'string' && (value.type === 'product' || value.type === 'store' || value.type === 'order');
+}
+
+function isAttachment(value: unknown): boolean {
+  return value === null || (isRecord(value)
+    && typeof value.id === 'string' && typeof value.url === 'string' && typeof value.alt === 'string'
+    && Number.isFinite(value.width) && Number.isFinite(value.height)
+    && (value.width as number) >= 0 && (value.height as number) >= 0);
+}
+
+function isReactions(value: unknown): boolean {
+  return Array.isArray(value) && value.every((reaction) => isRecord(reaction)
+    && typeof reaction.emoji === 'string' && Number.isInteger(reaction.count)
+    && (reaction.count as number) >= 0 && typeof reaction.reactedByMe === 'boolean');
 }
 
 function cloneNested<T>(value: T): T {
@@ -38,9 +61,14 @@ function isMessage(value: unknown): value is ChatMessage {
     && value.conversationId.trim().length > 0
     && typeof value.createdAt === 'string'
     && value.createdAt.length > 0
+    && (value.senderId === null || (typeof value.senderId === 'string' && value.senderId.trim().length > 0))
     && (chatRoles as readonly string[]).includes(value.senderRole as string)
     && (chatMessageKinds as readonly string[]).includes(value.kind as string)
-    && Array.isArray(value.reactions)
+    && (value.deleted === true || (value.body === null || typeof value.body === 'string'))
+    && (value.deleted === true || (value.replyToId === null || typeof value.replyToId === 'string'))
+    && (value.deleted === true || isCard(value.card))
+    && (value.deleted === true || isAttachment(value.attachment))
+    && isReactions(value.reactions)
     && typeof value.deleted === 'boolean'
     && (value.clientMessageId === null || typeof value.clientMessageId === 'string');
 }
@@ -71,7 +99,9 @@ function normalize(value: unknown, allowPending: boolean): ChatOptimisticMessage
 }
 
 function identity(message: ChatOptimisticMessage): string {
-  if (message.clientMessageId) return `client:${message.clientMessageId}`;
+  if (message.status !== 'sent' && message.clientMessageId) {
+    return `pending:${message.senderId ?? ''}:${message.clientMessageId}`;
+  }
   return `id:${message.id}`;
 }
 
@@ -98,6 +128,17 @@ function choose(existing: ChatOptimisticMessage, candidate: ChatOptimisticMessag
   if (existing.status === 'sent' && candidate.status !== 'sent') return existing;
   if (candidate.status === 'sent' && existing.status !== 'sent') return candidate;
   if (existing.deleted !== candidate.deleted) return existing.deleted ? existing : candidate;
+  const existingMeta = existing as { revision?: unknown; version?: unknown };
+  const candidateMeta = candidate as { revision?: unknown; version?: unknown };
+  const existingRev = typeof existingMeta.revision === 'number' ? existingMeta.revision
+    : typeof existingMeta.version === 'number' ? existingMeta.version : null;
+  const candidateRev = typeof candidateMeta.revision === 'number' ? candidateMeta.revision
+    : typeof candidateMeta.version === 'number' ? candidateMeta.version : null;
+  if (existingRev !== null || candidateRev !== null) {
+    if (existingRev === null) return candidate;
+    if (candidateRev === null) return existing;
+    if (existingRev !== candidateRev) return candidateRev > existingRev ? candidate : existing;
+  }
   if (existing.status !== 'sent' && candidate.status !== 'sent') {
     const byPendingStatus = pendingRank(existing) - pendingRank(candidate);
     if (byPendingStatus !== 0) return byPendingStatus < 0 ? existing : candidate;
@@ -132,11 +173,13 @@ export function reconcileChatPage(
   for (const value of Array.isArray(incoming) ? incoming : []) {
     const message = normalize(value, false);
     if (!message) continue;
-    // A confirmation with the idempotency key removes every pending retry,
-    // while a server message without one is deduplicated by its server ID.
+    // A confirmation with the idempotency key removes the pending retry
+    // from the same sender, while a server message from another sender is preserved.
     if (message.clientMessageId) {
-      for (const [key, prior] of byIdentity) {
-        if (prior.status !== 'sent' && prior.clientMessageId === message.clientMessageId) byIdentity.delete(key);
+      const pendingKey = `pending:${message.senderId ?? ''}:${message.clientMessageId}`;
+      const existingPending = byIdentity.get(pendingKey);
+      if (existingPending && existingPending.senderId === message.senderId) {
+        byIdentity.delete(pendingKey);
       }
     }
     const key = identity(message);
