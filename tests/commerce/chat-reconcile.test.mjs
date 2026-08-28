@@ -117,6 +117,19 @@ test('newer revisions win regardless of snapshot arrival order and reapplication
   assert.deepEqual(forward[0].reactions, newer.reactions);
 });
 
+test('equal-revision conflicting snapshots converge canonically under reversal and reapplication', () => {
+  const left = message({ id: 'equal-revision', revision: 7, reactions: [{ emoji: '👍', count: 1, reactedByMe: false }] });
+  const right = message({ id: 'equal-revision', revision: 7, reactions: [{ emoji: '❤️', count: 3, reactedByMe: true }] });
+  const forward = reconcileChatPage([], [left, right]);
+  const reverse = reconcileChatPage([], [right, left]);
+  assert.deepEqual(forward, reverse);
+  assert.deepEqual(reconcileChatPage(reverse, [left]), reverse);
+  assert.ok(
+    JSON.stringify(forward[0].reactions) === JSON.stringify(left.reactions)
+      || JSON.stringify(forward[0].reactions) === JSON.stringify(right.reactions),
+  );
+});
+
 test('rejects malformed nested message values without throwing', () => {
   const valid = message({ id: 'valid' });
   const invalid = [

@@ -141,6 +141,8 @@ test('message snapshots expose a durable monotonic revision and bump on reaction
   assert.match(sql, /add column if not exists revision bigint not null default 1/iu);
   assert.match(routineSql('marketplace_chat_message_json'), /'revision', message\.revision/u);
   assert.match(sql, /create trigger marketplace_chat_reaction_revision[\s\S]*after insert or update or delete/u);
+  assert.match(sql, /if tg_op = 'UPDATE'[\s\S]*old\.message_id is distinct from new\.message_id[\s\S]*where id = old\.message_id[\s\S]*where id = new\.message_id/u);
+  assert.match(sql, /else[\s\S]*where id = coalesce\(new\.message_id, old\.message_id\)/u);
   assert.match(routineSql('delete_my_marketplace_chat_message'), /revision = revision \+ 1/u);
 });
 

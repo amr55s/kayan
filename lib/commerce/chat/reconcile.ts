@@ -1,4 +1,4 @@
-import { chatMessageSchema } from './input.ts';
+import { chatReconcileMessageSchema } from './input.ts';
 import type { ChatErrorCode, ChatMessage, ChatCursor } from './contracts.ts';
 
 export type ChatOptimisticMessage = ChatMessage & {
@@ -57,7 +57,7 @@ function normalize(value: unknown, allowPending: boolean): ChatOptimisticMessage
     raw.attachment = null;
     if (typeof raw.replyToId !== 'string' && raw.replyToId !== null) raw.replyToId = null;
   }
-  const parsed = chatMessageSchema.safeParse(raw);
+  const parsed = chatReconcileMessageSchema.safeParse(raw);
   if (!parsed.success) return null;
   const candidate = {
     ...parsed.data,

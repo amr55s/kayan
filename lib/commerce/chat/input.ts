@@ -51,16 +51,24 @@ export const parseChatReportInput = (input: unknown) => z.object({ messageId: uu
 
 export type ParsedChatSearchInput = ChatSearchInput;
 
+const chatLabel = codePointBound(500);
 const chatCardOutputSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.enum(['product', 'store', 'order']), id: z.string().min(1), label: z.string() }).strict(),
-  z.object({ type: z.literal('location'), latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180), label: z.string() }).strict(),
+  z.object({ type: z.enum(['product', 'store', 'order']), id: uuid, label: chatLabel }).strict(),
+  z.object({ type: z.literal('location'), latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180), label: chatLabel }).strict(),
 ]);
-const chatAttachmentOutputSchema = z.object({ id: z.string().min(1), url: z.string(), width: z.number().finite().nonnegative(), height: z.number().finite().nonnegative(), alt: z.string() }).strict();
-const chatReactionOutputSchema = z.object({ emoji: z.string().min(1), count: z.number().int().nonnegative(), reactedByMe: z.boolean() }).strict();
-/** Sole strict parser for the ChatMessage display/wire DTO consumed by service and reconciliation. */
-export const chatMessageSchema: z.ZodType<ChatMessage> = z.object({
-  id: z.string().min(1), clientMessageId: z.string().nullable(), conversationId: z.string().min(1), senderId: z.string().nullable(),
-  senderRole: z.enum(['customer', 'merchant', 'driver', 'admin', 'system']), kind: z.enum(['text', 'image', 'product', 'store', 'order', 'location', 'system']), body: z.string().nullable(), replyToId: z.string().nullable(),
+const chatAttachmentOutputSchema = z.object({ id: uuid, url: z.string().url().refine((value) => /^https?:\/\//u.test(value)), width: z.number().int().min(1).max(4096), height: z.number().int().min(1).max(4096), alt: chatLabel }).strict();
+const chatReactionOutputSchema = z.object({ emoji: z.enum(['👍', '❤️', '✅', '🙏', '😄']), count: z.number().int().nonnegative(), reactedByMe: z.boolean() }).strict();
+/** Sole strict parser for the ChatMessage service/wire DTO. */
+const chatMessageObject = z.object({
+  id: uuid, clientMessageId: uuid.nullable(), conversationId: uuid, senderId: uuid.nullable(),
+  senderRole: z.enum(['customer', 'merchant', 'driver', 'admin', 'system']), kind: z.enum(['text', 'image', 'product', 'store', 'order', 'location', 'system']), body: codePointBound(5000).nullable(), replyToId: uuid.nullable(),
   card: chatCardOutputSchema.nullable(), attachment: chatAttachmentOutputSchema.nullable(), reactions: z.array(chatReactionOutputSchema).max(5),
-  deleted: z.boolean(), createdAt: z.string().min(1), revision: z.number().int().positive(),
+  deleted: z.boolean(), createdAt: z.string().datetime({ offset: true }), revision: z.number().int().positive(),
 }).strict();
+export const chatMessageSchema: z.ZodType<ChatMessage> = chatMessageObject;
+
+/** Reconciliation-only derivative: preserves all nested/wire constraints while allowing local non-UUID IDs/timestamps. */
+export const chatReconcileMessageSchema: z.ZodType<ChatMessage> = chatMessageObject.extend({
+  id: z.string().min(1), clientMessageId: z.string().nullable(), conversationId: z.string().min(1), senderId: z.string().nullable(),
+  replyToId: z.string().nullable(), createdAt: z.string().min(1),
+});

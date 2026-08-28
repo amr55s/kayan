@@ -96,9 +96,14 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  update public.support_messages
-  set revision = revision + 1
-  where id = coalesce(new.message_id, old.message_id);
+  if tg_op = 'UPDATE' and old.message_id is distinct from new.message_id then
+    update public.support_messages set revision = revision + 1 where id = old.message_id;
+    update public.support_messages set revision = revision + 1 where id = new.message_id;
+  else
+    update public.support_messages
+    set revision = revision + 1
+    where id = coalesce(new.message_id, old.message_id);
+  end if;
   return coalesce(new, old);
 end;
 $$;
