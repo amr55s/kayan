@@ -5,6 +5,7 @@ import {
   parseConversationIntent,
   parseSendMessageForm,
 } from '../../lib/commerce/chat/input.ts';
+import { chatMessageSchema as sharedChatMessageSchema } from '../../lib/commerce/chat/input.ts';
 
 test('message input accepts one bounded payload and a UUID idempotency key', () => {
   const form = new FormData();
@@ -80,4 +81,15 @@ test('message cards are parsed and must match the message kind', () => {
   assert.equal(form('location', null, { type: 'location', latitude: 30, longitude: 31, href: 'https://evil.example' }), false);
   assert.equal(form('system', 'client-authored system message'), false);
   assert.equal(form('product', null, '{bad json'), false);
+});
+
+test('shared ChatMessage schema requires a positive integer durable revision', () => {
+  const value = {
+    id: crypto.randomUUID(), clientMessageId: null, conversationId: crypto.randomUUID(), senderId: crypto.randomUUID(),
+    senderRole: 'customer', kind: 'text', body: 'hello', replyToId: null, card: null, attachment: null,
+    reactions: [], deleted: false, createdAt: '2026-08-24T10:00:00.000Z', revision: 1,
+  };
+  assert.equal(sharedChatMessageSchema.safeParse(value).success, true);
+  assert.equal(sharedChatMessageSchema.safeParse({ ...value, revision: 1.5 }).success, false);
+  assert.equal(sharedChatMessageSchema.safeParse({ ...value, revision: Number.NaN }).success, false);
 });

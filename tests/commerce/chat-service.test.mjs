@@ -99,6 +99,7 @@ const message = {
   attachment: null,
   reactions: [],
   deleted: false,
+  revision: 1,
   createdAt: NOW,
 };
 const cursor = { createdAt: NOW, id: IDS.message };

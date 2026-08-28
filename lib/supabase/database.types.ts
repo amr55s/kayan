@@ -5458,6 +5458,7 @@ export type Database = {
           body: string
           created_at: string
           id: string
+          revision: number
           sender_kind: string
           sender_user_id: string | null
           thread_id: string
@@ -5466,6 +5467,7 @@ export type Database = {
           body: string
           created_at?: string
           id?: string
+          revision?: number
           sender_kind: string
           sender_user_id?: string | null
           thread_id: string
@@ -5474,6 +5476,7 @@ export type Database = {
           body?: string
           created_at?: string
           id?: string
+          revision?: number
           sender_kind?: string
           sender_user_id?: string | null
           thread_id?: string

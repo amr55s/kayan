@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ChatReactionInput, ChatSearchInput, ConversationIntent, SendMessageInput } from './contracts';
+import type { ChatMessage, ChatReactionInput, ChatSearchInput, ConversationIntent, SendMessageInput } from './contracts';
 
 const uuid = z.string().uuid();
 const cursor = z.object({ createdAt: z.string().datetime(), id: uuid });
@@ -50,3 +50,17 @@ export const parseChatBlockInput = (input: unknown) => z.object({ userId: uuid, 
 export const parseChatReportInput = (input: unknown) => z.object({ messageId: uuid.nullable().optional(), conversationId: uuid.nullable().optional(), reason: z.string().trim().min(1).max(500) }).refine((value) => value.messageId !== null && value.messageId !== undefined || value.conversationId !== null && value.conversationId !== undefined).safeParse(input);
 
 export type ParsedChatSearchInput = ChatSearchInput;
+
+const chatCardOutputSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.enum(['product', 'store', 'order']), id: z.string().min(1), label: z.string() }).strict(),
+  z.object({ type: z.literal('location'), latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180), label: z.string() }).strict(),
+]);
+const chatAttachmentOutputSchema = z.object({ id: z.string().min(1), url: z.string(), width: z.number().finite().nonnegative(), height: z.number().finite().nonnegative(), alt: z.string() }).strict();
+const chatReactionOutputSchema = z.object({ emoji: z.string().min(1), count: z.number().int().nonnegative(), reactedByMe: z.boolean() }).strict();
+/** Sole strict parser for the ChatMessage display/wire DTO consumed by service and reconciliation. */
+export const chatMessageSchema: z.ZodType<ChatMessage> = z.object({
+  id: z.string().min(1), clientMessageId: z.string().nullable(), conversationId: z.string().min(1), senderId: z.string().nullable(),
+  senderRole: z.enum(['customer', 'merchant', 'driver', 'admin', 'system']), kind: z.enum(['text', 'image', 'product', 'store', 'order', 'location', 'system']), body: z.string().nullable(), replyToId: z.string().nullable(),
+  card: chatCardOutputSchema.nullable(), attachment: chatAttachmentOutputSchema.nullable(), reactions: z.array(chatReactionOutputSchema).max(5),
+  deleted: z.boolean(), createdAt: z.string().min(1), revision: z.number().int().positive(),
+}).strict();

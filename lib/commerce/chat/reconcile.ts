@@ -1,12 +1,9 @@
-import { chatMessageKinds, chatRoles } from './contracts.ts';
+import { chatMessageSchema } from './input.ts';
 import type { ChatErrorCode, ChatMessage, ChatCursor } from './contracts.ts';
 
 export type ChatOptimisticMessage = ChatMessage & {
   status: 'sending' | 'sent' | 'failed';
   failureCode: ChatErrorCode | null;
-  /** Optional monotonic snapshot metadata supplied by the realtime layer. */
-  revision?: number;
-  version?: number;
 };
 
 const CONFIRMED_WINDOW = 100;
@@ -23,26 +20,6 @@ function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isCard(value: unknown): boolean {
-  if (value === null) return true;
-  if (!isRecord(value) || typeof value.type !== 'string' || typeof value.label !== 'string') return false;
-  if (value.type === 'location') return Number.isFinite(value.latitude) && Number.isFinite(value.longitude);
-  return typeof value.id === 'string' && (value.type === 'product' || value.type === 'store' || value.type === 'order');
-}
-
-function isAttachment(value: unknown): boolean {
-  return value === null || (isRecord(value)
-    && typeof value.id === 'string' && typeof value.url === 'string' && typeof value.alt === 'string'
-    && Number.isFinite(value.width) && Number.isFinite(value.height)
-    && (value.width as number) >= 0 && (value.height as number) >= 0);
-}
-
-function isReactions(value: unknown): boolean {
-  return Array.isArray(value) && value.every((reaction) => isRecord(reaction)
-    && typeof reaction.emoji === 'string' && Number.isInteger(reaction.count)
-    && (reaction.count as number) >= 0 && typeof reaction.reactedByMe === 'boolean');
-}
-
 function cloneNested<T>(value: T): T {
   if (Array.isArray(value)) return value.map((item) => cloneNested(item)) as T;
   if (isRecord(value)) {
@@ -51,26 +28,6 @@ function cloneNested<T>(value: T): T {
     return result as T;
   }
   return value;
-}
-
-function isMessage(value: unknown): value is ChatMessage {
-  if (!isRecord(value)) return false;
-  return typeof value.id === 'string'
-    && value.id.trim().length > 0
-    && typeof value.conversationId === 'string'
-    && value.conversationId.trim().length > 0
-    && typeof value.createdAt === 'string'
-    && value.createdAt.length > 0
-    && (value.senderId === null || (typeof value.senderId === 'string' && value.senderId.trim().length > 0))
-    && (chatRoles as readonly string[]).includes(value.senderRole as string)
-    && (chatMessageKinds as readonly string[]).includes(value.kind as string)
-    && (value.deleted === true || (value.body === null || typeof value.body === 'string'))
-    && (value.deleted === true || (value.replyToId === null || typeof value.replyToId === 'string'))
-    && (value.deleted === true || isCard(value.card))
-    && (value.deleted === true || isAttachment(value.attachment))
-    && isReactions(value.reactions)
-    && typeof value.deleted === 'boolean'
-    && (value.clientMessageId === null || typeof value.clientMessageId === 'string');
 }
 
 function copyMessage(value: ChatMessage, status: ChatOptimisticMessage['status'] = 'sent', failureCode: ChatErrorCode | null = null): ChatOptimisticMessage {
@@ -86,8 +43,27 @@ function copyMessage(value: ChatMessage, status: ChatOptimisticMessage['status']
 }
 
 function normalize(value: unknown, allowPending: boolean): ChatOptimisticMessage | null {
-  if (!isMessage(value)) return null;
-  const candidate = value as ChatMessage & Partial<Pick<ChatOptimisticMessage, 'status' | 'failureCode'>>;
+  if (!isRecord(value)) return null;
+  const raw = cloneNested(value);
+  const statusInput = raw.status;
+  const failureInput = raw.failureCode;
+  delete raw.status;
+  delete raw.failureCode;
+  if (raw.deleted === true) {
+    // Deleted rows are redacted at the boundary; malformed optional fields
+    // must not make the safe tombstone disappear from the conversation.
+    raw.body = null;
+    raw.card = null;
+    raw.attachment = null;
+    if (typeof raw.replyToId !== 'string' && raw.replyToId !== null) raw.replyToId = null;
+  }
+  const parsed = chatMessageSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const candidate = {
+    ...parsed.data,
+    status: statusInput,
+    failureCode: failureInput,
+  } as ChatMessage & Partial<Pick<ChatOptimisticMessage, 'status' | 'failureCode'>>;
   const status = allowPending && statuses.has(candidate.status as ChatOptimisticMessage['status'])
     ? candidate.status as ChatOptimisticMessage['status']
     : 'sent';
@@ -128,12 +104,8 @@ function choose(existing: ChatOptimisticMessage, candidate: ChatOptimisticMessag
   if (existing.status === 'sent' && candidate.status !== 'sent') return existing;
   if (candidate.status === 'sent' && existing.status !== 'sent') return candidate;
   if (existing.deleted !== candidate.deleted) return existing.deleted ? existing : candidate;
-  const existingMeta = existing as { revision?: unknown; version?: unknown };
-  const candidateMeta = candidate as { revision?: unknown; version?: unknown };
-  const existingRev = typeof existingMeta.revision === 'number' ? existingMeta.revision
-    : typeof existingMeta.version === 'number' ? existingMeta.version : null;
-  const candidateRev = typeof candidateMeta.revision === 'number' ? candidateMeta.revision
-    : typeof candidateMeta.version === 'number' ? candidateMeta.version : null;
+  const existingRev = existing.revision;
+  const candidateRev = candidate.revision;
   if (existingRev !== null || candidateRev !== null) {
     if (existingRev === null) return candidate;
     if (candidateRev === null) return existing;

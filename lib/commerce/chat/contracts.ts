@@ -15,7 +15,7 @@ export type ChatMessage = {
     { type: 'location'; latitude: number; longitude: number; label: string } | null;
   attachment: { id: string; url: string; width: number; height: number; alt: string } | null;
   reactions: Array<{ emoji: string; count: number; reactedByMe: boolean }>;
-  deleted: boolean; createdAt: string;
+  deleted: boolean; createdAt: string; revision: number;
 };
 
 export type ChatConversationSummary = {

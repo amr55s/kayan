@@ -22,6 +22,7 @@ import {
 } from './contracts';
 import {
   chatSearchSchema,
+  chatMessageSchema,
   conversationIntentSchema,
   reactionSchema,
   sendMessageSchema,
@@ -83,47 +84,7 @@ export type ChatBlockResult = {
 
 const uuid = z.uuid();
 const timestamp = z.iso.datetime({ offset: true });
-const codePointBound = (max: number) => z.string().refine(
-  (value) => [...value].length <= max,
-  `Must contain at most ${max} Unicode characters`,
-);
 const chatCursorSchema = z.object({ createdAt: timestamp, id: uuid }).strict();
-const chatCardSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.enum(['product', 'store', 'order']), id: uuid, label: z.string().min(1).max(500) }).strict(),
-  z.object({
-    type: z.literal('location'),
-    latitude: z.number().finite().min(-90).max(90),
-    longitude: z.number().finite().min(-180).max(180),
-    label: z.string().min(1).max(500),
-  }).strict(),
-]);
-const chatAttachmentSchema = z.object({
-  id: uuid,
-  url: z.url(),
-  width: z.number().int().min(1).max(4096),
-  height: z.number().int().min(1).max(4096),
-  alt: z.string().max(500),
-}).strict();
-const chatReactionSummarySchema = z.object({
-  emoji: z.string().min(1).max(16),
-  count: z.number().int().nonnegative(),
-  reactedByMe: z.boolean(),
-}).strict();
-const chatMessageSchema: z.ZodType<ChatMessage> = z.object({
-  id: uuid,
-  clientMessageId: uuid.nullable(),
-  conversationId: uuid,
-  senderId: uuid.nullable(),
-  senderRole: z.enum(chatRoles),
-  kind: z.enum(chatMessageKinds),
-  body: codePointBound(5_000).nullable(),
-  replyToId: uuid.nullable(),
-  card: chatCardSchema.nullable(),
-  attachment: chatAttachmentSchema.nullable(),
-  reactions: z.array(chatReactionSummarySchema).max(5),
-  deleted: z.boolean(),
-  createdAt: timestamp,
-}).strict();
 const chatConversationSummarySchema: z.ZodType<ChatConversationSummary> = z.object({
   id: uuid,
   publicCode: z.string().min(1).max(64),

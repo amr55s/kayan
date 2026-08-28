@@ -137,6 +137,13 @@ test('message DTOs enrich card inputs to match the Task 1 output contract', () =
   assert.match(sql, /'label', 'Shared location'/u);
 });
 
+test('message snapshots expose a durable monotonic revision and bump on reaction or tombstone mutations', () => {
+  assert.match(sql, /add column if not exists revision bigint not null default 1/iu);
+  assert.match(routineSql('marketplace_chat_message_json'), /'revision', message\.revision/u);
+  assert.match(sql, /create trigger marketplace_chat_reaction_revision[\s\S]*after insert or update or delete/u);
+  assert.match(routineSql('delete_my_marketplace_chat_message'), /revision = revision \+ 1/u);
+});
+
 test('Realtime broadcasts only reconciliation hints and never deleted content', () => {
   const broadcast = routineSql('broadcast_marketplace_chat_change');
   assert.match(broadcast, /realtime\.send\(/u);

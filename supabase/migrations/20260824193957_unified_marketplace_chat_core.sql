@@ -59,6 +59,8 @@ alter table public.support_messages
   add column if not exists card_data jsonb,
   add column if not exists deleted_at timestamptz,
   add column if not exists deleted_body text,
+  add column if not exists revision bigint not null default 1
+    check (revision > 0),
   add column if not exists search_document tsvector generated always as (
     to_tsvector('simple', coalesce(body, ''))
   ) stored;
@@ -85,6 +87,26 @@ create table public.marketplace_chat_reactions (
   created_at timestamptz not null default now(),
   primary key (message_id, user_id, emoji)
 );
+
+-- Every reaction mutation, including retention cleanup, advances the message
+-- snapshot revision in the same transaction as the reaction row change.
+create or replace function public.bump_marketplace_chat_message_revision()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  update public.support_messages
+  set revision = revision + 1
+  where id = coalesce(new.message_id, old.message_id);
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists marketplace_chat_reaction_revision on public.marketplace_chat_reactions;
+create trigger marketplace_chat_reaction_revision
+after insert or update or delete on public.marketplace_chat_reactions
+for each row execute function public.bump_marketplace_chat_message_revision();
 
 create unique index support_messages_sender_client_key
   on public.support_messages(thread_id, sender_user_id, client_message_id)
@@ -309,6 +331,7 @@ as $$
       ) as reaction_count
     ), '[]'::jsonb),
     'deleted', message.deleted_at is not null,
+    'revision', message.revision,
     'createdAt', message.created_at
   )
   from public.support_messages as message
@@ -1003,7 +1026,7 @@ begin
   end if;
   if v_message.deleted_at is null then
     update public.support_messages
-    set deleted_body = body, body = null, deleted_at = now()
+    set deleted_body = body, body = null, deleted_at = now(), revision = revision + 1
     where id = p_message_id;
   end if;
   return public.marketplace_chat_message_json(p_message_id, v_actor_id);

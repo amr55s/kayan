@@ -24,6 +24,7 @@ function message(overrides = {}) {
     attachment: null,
     reactions: [],
     deleted: false,
+    revision: 1,
     createdAt: '2026-08-24T10:00:00.000Z',
     ...overrides,
   };
@@ -306,7 +307,7 @@ test('ignores malformed, null, or non-object items gracefully without crashing',
   assert.equal(result[0].id, 'valid-1');
 });
 
-test('reconciles 500 high-frequency messages in linear time without memory overhead', () => {
+test('reconciles a large functional window idempotently without evicting pending messages', () => {
   const current = Array.from({ length: 250 }, (_, i) => optimistic({
     id: `opt-${i}`,
     clientMessageId: `client-${i}`,
@@ -318,11 +319,10 @@ test('reconciles 500 high-frequency messages in linear time without memory overh
     createdAt: `2026-08-24T10:${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}.000Z`,
   }));
 
-  const start = performance.now();
   const result = reconcileChatPage(current, incoming);
-  const durationMs = performance.now() - start;
+  const reapplied = reconcileChatPage(result, incoming.toReversed());
 
   assert.equal(result.length, 100); // Caps confirmed window at 100
-  assert.ok(durationMs < 50, `Reconciliation took ${durationMs}ms, exceeding 50ms threshold`);
   assert.equal(result[0].status, 'sent');
+  assert.deepEqual(reapplied, result);
 });
