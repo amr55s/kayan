@@ -59,6 +59,7 @@ export type UseMarketplaceChatOptions = {
 };
 
 export type MarketplaceChatState = {
+  conversationId: string;
   messages: ChatOptimisticMessage[];
   connectionState: ChatConnectionState;
   connectionError: ChatErrorCode | null;
@@ -132,6 +133,11 @@ type BrowserTarget = {
 
 type DocumentTarget = BrowserTarget & { visibilityState?: string };
 type TimeoutHandle = ReturnType<typeof globalThis.setTimeout>;
+type CatchUpRun = {
+  generation: number;
+  controller: AbortController;
+  promise: Promise<void>;
+};
 
 export type MarketplaceChatControllerDependencies = {
   realtimeClient: RealtimeClientLike;
@@ -210,7 +216,7 @@ const safeErrorCodes = new Set<ChatErrorCode>([
 ]);
 const TYPING_EXPIRY_MS = 4_000;
 const TYPING_THROTTLE_MS = 2_000;
-const PAGE_LIMIT = 50;
+const PAGE_LIMIT = 100;
 
 class MarketplaceChatClientError extends Error {
   readonly code: ChatErrorCode;
@@ -330,8 +336,9 @@ function latestCursor(messages: ChatOptimisticMessage[]): ChatCursor | null {
   return latest ? { createdAt: latest.createdAt, id: latest.id } : null;
 }
 
-function initialState(page: ChatMessagePage, online: boolean): MarketplaceChatState {
+function initialState(page: ChatMessagePage, online: boolean, conversationId = page.conversation.id): MarketplaceChatState {
   return {
+    conversationId,
     messages: reconcileChatPage([], page.messages),
     connectionState: online ? 'connecting' : 'offline',
     connectionError: null,
@@ -371,14 +378,15 @@ export function createMarketplaceChatController(
   const presence = options.currentUserPresence
     ? presenceDisplaySchema.omit({ presenceId: true }).safeParse(options.currentUserPresence)
     : null;
-  let snapshot = initialState(options.initialPage, isOnline());
+  let snapshot = initialState(options.initialPage, isOnline(), options.conversationId);
   let started = false;
   let stopped = false;
   let subscribed = false;
   let startPromise: Promise<void> | null = null;
   let channel: RealtimeChannelLike | null = null;
-  let catchUpPromise: Promise<void> | null = null;
-  let catchUpQueued = false;
+  let catchUpRun: CatchUpRun | null = null;
+  let catchUpGeneration = 0;
+  let catchUpRestartScheduled = false;
   let readAcknowledgementVersion = 0;
   let loadOlderPromise: Promise<void> | null = null;
   let readQueue: Promise<void> = Promise.resolve();
@@ -420,52 +428,81 @@ export function createMarketplaceChatController(
     }
   };
 
+  const startCatchUp = (): Promise<void> => {
+    if (stopped || !isOnline()) return Promise.resolve();
+    const generation = ++catchUpGeneration;
+    const controller = createRequestController();
+    const readVersionAtRequest = readAcknowledgementVersion;
+    const run: CatchUpRun = { generation, controller, promise: Promise.resolve() };
+    catchUpRun = run;
+    const promise = (async () => {
+      patchState({ connectionState: 'recovering', connectionError: null });
+      try {
+        const incoming = await dependencies.transport.getConversationPage({
+          conversationId: options.conversationId,
+          limit: PAGE_LIMIT,
+          cursor: null,
+          signal: controller.signal,
+        });
+        if (
+          stopped
+          || controller.signal.aborted
+          || catchUpGeneration !== generation
+          || catchUpRun?.generation !== generation
+        ) return;
+        const messages = reconcileChatPage(snapshot.messages, incoming.messages);
+        publish({
+          ...snapshot,
+          messages,
+          // A fetch can overlap a local read acknowledgement. Do not let
+          // its older snapshot regress the cursor we already acknowledged.
+          lastReadMessageId: readAcknowledgementVersion === readVersionAtRequest
+            ? incoming.lastReadMessageId
+            : snapshot.lastReadMessageId,
+          connectionError: null,
+        });
+        settleConnection();
+      } catch (error) {
+        if (
+          stopped
+          || controller.signal.aborted
+          || catchUpGeneration !== generation
+          || catchUpRun?.generation !== generation
+        ) return;
+        patchState({
+          connectionState: isOnline() ? 'error' : 'offline',
+          connectionError: safeErrorCode(error),
+        });
+      } finally {
+        releaseRequestController(controller);
+        if (catchUpRun?.generation === generation) catchUpRun = null;
+      }
+    })();
+    run.promise = promise;
+    return promise;
+  };
+
+  const scheduleLatestCatchUp = (): void => {
+    if (catchUpRestartScheduled) return;
+    catchUpRestartScheduled = true;
+    const restart = (): void => {
+      catchUpRestartScheduled = false;
+      if (!stopped && isOnline()) void startCatchUp();
+    };
+    if (typeof globalThis.queueMicrotask === 'function') globalThis.queueMicrotask(restart);
+    else void Promise.resolve().then(restart);
+  };
+
   const requestCatchUp = (): Promise<void> => {
     if (stopped || !isOnline()) return Promise.resolve();
-    catchUpQueued = true;
-    if (catchUpPromise) return catchUpPromise;
-    catchUpPromise = (async () => {
-      patchState({ connectionState: 'recovering', connectionError: null });
-      while (catchUpQueued && !stopped && isOnline()) {
-        catchUpQueued = false;
-        const controller = createRequestController();
-        const readVersionAtRequest = readAcknowledgementVersion;
-        try {
-          const incoming = await dependencies.transport.getConversationPage({
-            conversationId: options.conversationId,
-            limit: PAGE_LIMIT,
-            cursor: null,
-            signal: controller.signal,
-          });
-          if (stopped || controller.signal.aborted) return;
-          const messages = reconcileChatPage(snapshot.messages, incoming.messages);
-          publish({
-            ...snapshot,
-            messages,
-            // A fetch can overlap a local read acknowledgement. Do not let
-            // its older snapshot regress the cursor we already acknowledged.
-            lastReadMessageId: readAcknowledgementVersion === readVersionAtRequest
-              ? incoming.lastReadMessageId
-              : snapshot.lastReadMessageId,
-            connectionError: null,
-          });
-        } catch (error) {
-          if (stopped || controller.signal.aborted) return;
-          catchUpQueued = false;
-          patchState({
-            connectionState: isOnline() ? 'error' : 'offline',
-            connectionError: safeErrorCode(error),
-          });
-          return;
-        } finally {
-          releaseRequestController(controller);
-        }
-      }
-      if (!stopped) settleConnection();
-    })().finally(() => {
-      catchUpPromise = null;
-    });
-    return catchUpPromise;
+    if (catchUpRun) {
+      catchUpRun.controller.abort();
+      catchUpGeneration += 1;
+      scheduleLatestCatchUp();
+      return catchUpRun.promise;
+    }
+    if (catchUpRestartScheduled) return Promise.resolve();
+    return startCatchUp();
   };
 
   const broadcast = (event: BroadcastEnvelope['event'], payload: Record<string, unknown>): void => {
@@ -642,7 +679,10 @@ export function createMarketplaceChatController(
     if (stopped) return;
     stopped = true;
     subscribed = false;
-    catchUpQueued = false;
+    catchUpGeneration += 1;
+    catchUpRun?.controller.abort();
+    catchUpRun = null;
+    catchUpRestartScheduled = false;
     browser?.removeEventListener('focus', onFocus);
     browser?.removeEventListener('online', onOnline);
     browser?.removeEventListener('offline', onOffline);
@@ -869,16 +909,24 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
   const [state, setState] = useState<MarketplaceChatState>(() => initialState(
     options.initialPage,
     typeof navigator === 'undefined' || navigator.onLine,
+    options.conversationId,
   ));
   const controllerRef = useRef<MarketplaceChatController | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const presenceRole = options.currentUserPresence?.role;
   const presenceName = options.currentUserPresence?.displayName;
+  // Effects run after the commit. Derive the first render for a new
+  // conversation from its own page so a previous conversation can never be
+  // painted during that transition.
+  const renderedState = state.conversationId !== options.conversationId
+    ? initialState(options.initialPage, typeof navigator === 'undefined' || navigator.onLine, options.conversationId)
+    : state;
 
   useEffect(() => {
     let mounted = true;
     let controller: MarketplaceChatController | null = null;
     let unsubscribe: () => void = () => undefined;
+    composerRef.current = null;
     void import('../lib/supabase/client.ts').then(({ createClient }) => {
       if (!mounted) return;
       const realtimeClient = createClient() as unknown as RealtimeClientLike;
@@ -941,7 +989,7 @@ export function useMarketplaceChat(options: UseMarketplaceChatOptions) {
   }), [notifyTyping]);
 
   return {
-    ...state,
+    ...renderedState,
     send,
     retry,
     loadOlder,

@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import React, { createElement, useLayoutEffect } from 'react';
+import { flushSync } from 'react-dom';
+import { createRoot } from 'react-dom/client';
 
 import {
   createMarketplaceChatController,
   createMarketplaceChatTransport,
+  useMarketplaceChat,
 } from '../../hooks/useMarketplaceChat.ts';
 
 const IDS = {
@@ -190,6 +194,111 @@ class FakeRealtimeClient {
   }
 }
 
+class ReactTestNode {
+  constructor(nodeType, nodeName, ownerDocument) {
+    this.nodeType = nodeType;
+    this.nodeName = nodeName;
+    this.ownerDocument = ownerDocument;
+    this.parentNode = null;
+    this.childNodes = [];
+    this.listeners = new Map();
+  }
+
+  appendChild(node) {
+    node.parentNode = this;
+    this.childNodes.push(node);
+    return node;
+  }
+
+  insertBefore(node, before) {
+    node.parentNode = this;
+    const index = this.childNodes.indexOf(before);
+    this.childNodes.splice(index < 0 ? this.childNodes.length : index, 0, node);
+    return node;
+  }
+
+  removeChild(node) {
+    const index = this.childNodes.indexOf(node);
+    if (index >= 0) this.childNodes.splice(index, 1);
+    node.parentNode = null;
+    return node;
+  }
+
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type, listener) {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  contains(node) {
+    return node === this || this.childNodes.some((child) => child.contains?.(node));
+  }
+}
+
+class ReactTestElement extends ReactTestNode {
+  constructor(tagName, ownerDocument) {
+    super(1, tagName.toUpperCase(), ownerDocument);
+    this.tagName = tagName.toUpperCase();
+    this.style = {};
+    this.attributes = new Map();
+    this.namespaceURI = 'http://www.w3.org/1999/xhtml';
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
+
+  get textContent() {
+    return this.childNodes.map((child) => child.textContent ?? '').join('');
+  }
+
+  set textContent(value) {
+    this.childNodes = [new ReactTestText(String(value), this.ownerDocument)];
+  }
+}
+
+class ReactTestText extends ReactTestNode {
+  constructor(value, ownerDocument) {
+    super(3, '#text', ownerDocument);
+    this.nodeValue = value;
+  }
+
+  get textContent() {
+    return this.nodeValue;
+  }
+}
+
+class ReactTestDocument extends ReactTestNode {
+  constructor() {
+    super(9, '#document', null);
+    this.defaultView = null;
+    this.activeElement = null;
+    this.documentElement = new ReactTestElement('html', this);
+    this.body = new ReactTestElement('body', this);
+    this.documentElement.appendChild(this.body);
+  }
+
+  createElement(tagName) {
+    return new ReactTestElement(tagName, this);
+  }
+
+  createElementNS(_namespace, tagName) {
+    return new ReactTestElement(tagName, this);
+  }
+
+  createTextNode(value) {
+    return new ReactTestText(value, this);
+  }
+}
+
 function createTransport(overrides = {}) {
   return {
     getConversationPage: async () => page(),
@@ -324,6 +433,57 @@ test('serializes subscribed, focus, online, gap, and out-of-order catch-ups with
   controller.stop();
 });
 
+test('catch-up refreshes retained confirmed messages in the older half of the 100-message window', async () => {
+  const retained = Array.from({ length: 100 }, (_, index) => message({
+    id: crypto.randomUUID(),
+    createdAt: `2026-08-24T${String(8 + Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}:00.000Z`,
+    body: `رسالة ${index}`,
+  }));
+  const target = retained[20];
+  let calls = 0;
+  const transport = createTransport({
+    getConversationPage(input) {
+      calls += 1;
+      if (calls === 1) return Promise.resolve(page({ messages: [] }));
+      return Promise.resolve(page({ messages: input.limit === 100
+        ? [message({
+          ...target,
+          revision: 2,
+          deleted: true,
+          body: null,
+          card: null,
+          attachment: null,
+          reactions: [],
+        })]
+        : [] }));
+    },
+  });
+  const { controller, realtimeClient } = createHarness({
+    transport,
+    initialPage: page({ messages: retained }),
+  });
+  await controller.start();
+  const channel = realtimeClient.channels[0];
+  channel.emitStatus('SUBSCRIBED');
+  await flush();
+  channel.emit('broadcast', 'message_changed', {
+    payload: {
+      action: 'message_changed',
+      messageId: target.id,
+      cursor: { createdAt: target.createdAt, id: target.id },
+      revision: 2,
+    },
+  });
+  await flush();
+
+  const refreshed = controller.getSnapshot().messages.find((item) => item.id === target.id);
+  assert.equal(calls, 2);
+  assert.equal(refreshed.revision, 2);
+  assert.equal(refreshed.deleted, true);
+  assert.equal(refreshed.body, null);
+  controller.stop();
+});
+
 test('cleanup removes listeners and channel, aborts stale work, clears timers, and ignores late completion', async () => {
   const request = deferred();
   let signal;
@@ -395,6 +555,51 @@ test('a stale concurrent catch-up cannot regress a newer acknowledged read curso
   }));
   await flush();
   assert.equal(controller.getSnapshot().lastReadMessageId, IDS.secondMessage);
+  controller.stop();
+});
+
+test('new focus and gap triggers abort a hung catch-up and apply only the latest result', async () => {
+  const first = deferred();
+  const latest = deferred();
+  let calls = 0;
+  let firstSignal;
+  const transport = createTransport({
+    getConversationPage(input) {
+      calls += 1;
+      if (calls === 1) {
+        firstSignal = input.signal;
+        return first.promise;
+      }
+      return latest.promise;
+    },
+  });
+  const { browser, controller, realtimeClient } = createHarness({ transport });
+  await controller.start();
+  const channel = realtimeClient.channels[0];
+  channel.emitStatus('SUBSCRIBED');
+  assert.equal(calls, 1);
+
+  browser.emit('focus');
+  channel.emit('broadcast', 'message_changed', {
+    payload: {
+      action: 'message_changed',
+      messageId: IDS.secondMessage,
+      cursor: { createdAt: '2026-08-24T10:02:00.000Z', id: IDS.secondMessage },
+      revision: 2,
+    },
+  });
+  await flush();
+  assert.equal(firstSignal.aborted, true);
+  assert.equal(calls, 2);
+
+  latest.resolve(page({ messages: [message({
+    id: IDS.secondMessage,
+    createdAt: '2026-08-24T10:02:00.000Z',
+    revision: 2,
+  })] }));
+  await flush();
+  assert.equal(controller.getSnapshot().messages.at(-1).id, IDS.secondMessage);
+  assert.equal(controller.getSnapshot().connectionState, 'online');
   controller.stop();
 });
 
@@ -657,6 +862,71 @@ test('client transport calls only participant-scoped allowlisted RPCs, applies A
   });
   assert.equal('senderId' in calls[1].args, false);
   assert.equal('senderRole' in calls[1].args, false);
+});
+
+test('React rerender hides the previous conversation before async client initialization', async () => {
+  const documentTarget = new ReactTestDocument();
+  const windowTarget = {
+    document: documentTarget,
+    HTMLIFrameElement: ReactTestElement,
+    HTMLElement: ReactTestElement,
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  documentTarget.defaultView = windowTarget;
+  const container = new ReactTestElement('div', documentTarget);
+  const firstPage = page();
+  const secondConversationId = crypto.randomUUID();
+  const secondMessageId = crypto.randomUUID();
+  const secondPage = page({
+    conversation: { ...summary(), id: secondConversationId },
+    messages: [message({ id: secondMessageId, conversationId: secondConversationId })],
+  });
+  const committed = [];
+  function Probe({ conversationId, initialPage }) {
+    const state = useMarketplaceChat({
+      conversationId,
+      initialPage,
+      currentUserId: IDS.currentUser,
+    });
+    useLayoutEffect(() => {
+      committed.push({ conversationId, firstMessageId: state.messages[0]?.id ?? null });
+    }, [conversationId, state.messages]);
+    return createElement('output', null, state.messages[0]?.id ?? 'empty');
+  }
+
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  globalThis.window = windowTarget;
+  globalThis.document = documentTarget;
+  const root = createRoot(container);
+  try {
+    flushSync(() => root.render(createElement(Probe, {
+      conversationId: IDS.conversation,
+      initialPage: firstPage,
+    })));
+    assert.equal(container.textContent, IDS.firstMessage);
+
+    flushSync(() => root.render(createElement(Probe, {
+      conversationId: secondConversationId,
+      initialPage: secondPage,
+    })));
+    assert.equal(container.textContent, secondMessageId);
+    assert.deepEqual(committed.slice(-1)[0], {
+      conversationId: secondConversationId,
+      firstMessageId: secondMessageId,
+    });
+  } finally {
+    root.unmount();
+    await flush();
+    // React's event-system cleanup can run on a later task; let that task
+    // observe the test DOM before restoring Node's globals.
+    await new Promise((resolve) => setImmediate(resolve));
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+  }
 });
 
 test('the client hook has no server-only action or service import', async () => {
