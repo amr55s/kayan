@@ -85,6 +85,12 @@ function compareStrings(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+  if (isRecord(value)) return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
+  return JSON.stringify(value) ?? 'null';
+}
+
 function compareMessages(a: ChatOptimisticMessage, b: ChatOptimisticMessage): number {
   const byTime = compareStrings(a.createdAt, b.createdAt);
   if (byTime !== 0) return byTime;
@@ -118,9 +124,9 @@ function choose(existing: ChatOptimisticMessage, candidate: ChatOptimisticMessag
   // Different server IDs sharing an idempotency key represent the same
   // durable message; choose one deterministically rather than by arrival.
   if (existing.id !== candidate.id) return compareStrings(existing.id, candidate.id) <= 0 ? existing : candidate;
-  // For the same server ID an incoming DTO is authoritative (reactions and
-  // other mutable display fields are replaced, never merged).
-  return candidate;
+  // Equal revisions are a valid tie (for example, two pages carrying the
+  // same snapshot). Choose by canonical payload, never by arrival order.
+  return stableSerialize(candidate) > stableSerialize(existing) ? candidate : existing;
 }
 
 function trimAndSort(messages: ChatOptimisticMessage[]): ChatOptimisticMessage[] {
