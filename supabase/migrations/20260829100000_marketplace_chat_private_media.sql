@@ -117,10 +117,59 @@ begin
   end if;
 end; $$;
 
+-- This finalization RPC is service-role only. Its values are derived from a
+-- server-side object read + Sharp decode, never from a browser request.
+create or replace function public.finalize_marketplace_chat_attachment_from_server(
+  p_attachment_id uuid, p_width integer, p_height integer, p_actual_sha256 text,
+  p_actual_byte_size integer, p_actual_content_type text
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_attachment public.marketplace_chat_attachments;
+begin
+  select * into v_attachment from public.marketplace_chat_attachments where id = p_attachment_id for update;
+  if v_attachment is null then raise exception 'not_found' using errcode = 'P0002'; end if;
+  if v_attachment.status = 'verified' then
+    return jsonb_build_object('id', v_attachment.id, 'threadId', v_attachment.thread_id, 'ownerId', v_attachment.owner_id,
+      'objectKey', v_attachment.object_key, 'contentType', v_attachment.actual_content_type, 'sha256', v_attachment.actual_sha256,
+      'byteSize', v_attachment.actual_byte_size, 'width', v_attachment.width, 'height', v_attachment.height, 'status', v_attachment.status);
+  end if;
+  if v_attachment.status <> 'pending' or v_attachment.expires_at < now()
+     or p_width not between 1 and 4096 or p_height not between 1 and 4096
+     or p_actual_content_type is distinct from v_attachment.expected_content_type
+     or p_actual_byte_size is distinct from v_attachment.expected_byte_size
+     or p_actual_sha256 is distinct from v_attachment.expected_sha256 then
+    update public.marketplace_chat_attachments set status = 'quarantined', quarantined_at = now(), deleted_at = now(), delete_reason = 'server_validation_failed' where id = p_attachment_id;
+    raise exception 'invalid_input' using errcode = '22023';
+  end if;
+  update public.marketplace_chat_attachments set status = 'verified', width = p_width, height = p_height,
+    actual_sha256 = p_actual_sha256, actual_content_type = p_actual_content_type, actual_byte_size = p_actual_byte_size,
+    verified_at = now() where id = p_attachment_id;
+  return jsonb_build_object('id', v_attachment.id, 'threadId', v_attachment.thread_id, 'ownerId', v_attachment.owner_id,
+    'objectKey', v_attachment.object_key, 'contentType', p_actual_content_type, 'sha256', p_actual_sha256,
+    'byteSize', p_actual_byte_size, 'width', p_width, 'height', p_height, 'status', 'verified');
+end; $$;
+
+create or replace function public.expire_marketplace_chat_attachments(p_limit integer default 100)
+returns integer language plpgsql security definer set search_path = '' as $$
+declare v_count integer;
+begin
+  if p_limit is null or p_limit not between 1 and 1000 then raise exception 'invalid_input' using errcode = '22023'; end if;
+  with expired as (
+    select id from public.marketplace_chat_attachments
+    where status = 'pending' and expires_at < now()
+    order by expires_at asc limit p_limit for update skip locked
+  ) update public.marketplace_chat_attachments as attachment
+    set status = 'deleted', deleted_at = now(), delete_reason = 'expired_pending_cleanup'
+    from expired where attachment.id = expired.id;
+  get diagnostics v_count = row_count;
+  return v_count;
+end; $$;
+
 -- Keep the existing message JSON projection as the source of every non-media
 -- field, then add a same-origin, authorization-checked attachment handle.
 alter function public.marketplace_chat_message_json(uuid, uuid)
   rename to marketplace_chat_message_json_base_private_media;
+revoke all on function public.marketplace_chat_message_json_base_private_media(uuid, uuid)
+  from public, anon, authenticated, service_role;
 create or replace function public.marketplace_chat_message_json(p_message_id uuid, p_actor_id uuid)
 returns jsonb language sql stable set search_path = '' as $$
   select public.marketplace_chat_message_json_base_private_media(p_message_id, p_actor_id)
@@ -160,11 +209,14 @@ revoke all on function public.create_my_marketplace_chat_attachment(uuid, uuid, 
 revoke all on function public.get_my_marketplace_chat_attachment(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.complete_my_marketplace_chat_attachment(uuid, integer, integer, text, integer, text) from public, anon, authenticated, service_role;
 revoke all on function public.discard_my_marketplace_chat_attachment(uuid, text) from public, anon, authenticated, service_role;
+revoke all on function public.finalize_marketplace_chat_attachment_from_server(uuid, integer, integer, text, integer, text) from public, anon, authenticated;
+revoke all on function public.expire_marketplace_chat_attachments(integer) from public, anon, authenticated;
 revoke all on function public.send_my_marketplace_chat_image(uuid, uuid, uuid, uuid) from public, anon, authenticated, service_role;
 grant execute on function public.create_my_marketplace_chat_attachment(uuid, uuid, text, text, integer, text) to authenticated;
 grant execute on function public.get_my_marketplace_chat_attachment(uuid) to authenticated;
-grant execute on function public.complete_my_marketplace_chat_attachment(uuid, integer, integer, text, integer, text) to authenticated;
 grant execute on function public.discard_my_marketplace_chat_attachment(uuid, text) to authenticated;
+grant execute on function public.finalize_marketplace_chat_attachment_from_server(uuid, integer, integer, text, integer, text) to service_role;
+grant execute on function public.expire_marketplace_chat_attachments(integer) to service_role;
 grant execute on function public.send_my_marketplace_chat_image(uuid, uuid, uuid, uuid) to authenticated;
 
 commit;

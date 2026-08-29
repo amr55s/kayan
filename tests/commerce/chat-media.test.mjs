@@ -19,6 +19,7 @@ test('private chat media has a server-only contract and no client-controlled obj
   assert.match(source, /sharp\(/u);
   assert.match(source, /4096/u);
   assert.match(source, /createHash\('sha256'\)/u);
+  assert.match(source, /createAdminClient\(\).*finalize_marketplace_chat_attachment_from_server/u);
   assert.doesNotMatch(source, /input\.(?:bucket|objectKey|key)/u);
   assert.doesNotMatch(source, /public-read/u);
 });
@@ -27,6 +28,7 @@ test('attachment route enforces same-origin auth and completion validation', () 
   assert.equal(existsSync(routePath), true);
   const source = read(routePath);
   assert.match(source, /requestOrigin\(request\)/u);
+  assert.match(source, /if \(!requestOrigin\(request\)\)/u);
   assert.match(source, /supabase\.auth\.getUser\(\)/u);
   assert.match(source, /beginChatAttachment/u);
   assert.match(source, /completeChatAttachment/u);
@@ -43,6 +45,10 @@ test('migration keeps attachment metadata RPC-only and participant-scoped', () =
   assert.match(sql, /revoke all on table public\.marketplace_chat_attachments from public, anon, authenticated/u);
   assert.match(sql, /create_my_marketplace_chat_attachment/u);
   assert.match(sql, /complete_my_marketplace_chat_attachment/u);
+  assert.match(sql, /finalize_marketplace_chat_attachment_from_server/u);
+  assert.match(sql, /expire_marketplace_chat_attachments/u);
+  assert.match(sql, /revoke all on function public\.marketplace_chat_message_json_base_private_media/u);
+  assert.doesNotMatch(sql, /grant execute on function public\.complete_my_marketplace_chat_attachment[^\n]*to authenticated/u);
   assert.match(sql, /get_my_marketplace_chat_attachment/u);
   assert.match(sql, /discard_my_marketplace_chat_attachment/u);
   assert.match(sql, /can_send_marketplace_chat_thread\(p_thread_id\)/u);
@@ -59,5 +65,15 @@ test('composer offers explicit one-off location consent and image attachment aff
   assert.match(composer, /navigator\.geolocation\.getCurrentPosition/u);
   assert.doesNotMatch(composer, /watchPosition/u);
   assert.match(card, /attachment\.url/u);
+  assert.match(card, /isIssuedAttachmentUrl/u);
   assert.match(card, /loading="lazy"/u);
+});
+
+test('only issued same-origin attachment paths enter message DTOs and maintenance cleans expired pending uploads', () => {
+  const input = read(new URL('../../lib/commerce/chat/input.ts', import.meta.url));
+  const maintenance = read(new URL('../../app/api/cron/maintenance/route.ts', import.meta.url));
+  assert.match(input, /attachments/u);
+  assert.doesNotMatch(input, /z\.url\(\)/u);
+  assert.match(maintenance, /expire_marketplace_chat_attachments/u);
+  assert.match(maintenance, /chatMediaExpired/u);
 });

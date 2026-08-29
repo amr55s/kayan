@@ -33,15 +33,17 @@ export async function GET(request: Request) {
   console.info(JSON.stringify({ level: 'info', message: 'maintenance_started', requestId }));
   try {
     const admin = createAdminClient();
-    const [delivery, marketplace, legacyMedia, notifications] = await Promise.all([
+    const [delivery, marketplace, legacyMedia, chatMedia, notifications] = await Promise.all([
       (admin as any).rpc('expire_delivery_offers'),
       (admin as any).rpc('run_marketplace_maintenance'),
       (admin as any).rpc('expire_legacy_media_uploads', { p_limit: 100 }),
+      (admin as any).rpc('expire_marketplace_chat_attachments', { p_limit: 100 }),
       (admin as any).rpc('run_marketplace_notification_maintenance'),
     ]);
     if (delivery.error) throw new Error(`delivery_maintenance_failed:${delivery.error.code ?? 'unknown'}`);
     if (marketplace.error) throw new Error(`marketplace_maintenance_failed:${marketplace.error.code ?? 'unknown'}`);
     if (legacyMedia.error) throw new Error(`legacy_media_maintenance_failed:${legacyMedia.error.code ?? 'unknown'}`);
+    if (chatMedia.error) throw new Error(`chat_media_maintenance_failed:${chatMedia.error.code ?? 'unknown'}`);
     if (notifications.error) throw new Error(`notification_maintenance_failed:${notifications.error.code ?? 'unknown'}`);
     const [outbox, catalogImages, push] = await Promise.all([
       processMarketplaceDeletionOutbox(15),
@@ -60,6 +62,7 @@ export async function GET(request: Request) {
       deliveryExpired: delivery.data ?? 0,
       marketplace: marketplace.data ?? {},
       legacyMediaExpired: legacyMedia.data ?? 0,
+      chatMediaExpired: chatMedia.data ?? 0,
       notifications: notifications.data ?? {},
       outbox,
       catalogImages,

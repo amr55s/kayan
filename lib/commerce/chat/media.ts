@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import {
   createPrivateMediaDownload,
   createPrivateStageUpload,
@@ -127,7 +128,7 @@ export async function completeChatAttachment(input: z.input<typeof attachmentIdI
     if (!actualMime || actualMime !== attachment.contentType || !metadata.width || !metadata.height || metadata.width > 4096 || metadata.height > 4096) {
       throw new ChatMediaError('invalid_media');
     }
-    const { data, error } = await (supabase as any).rpc('complete_my_marketplace_chat_attachment', {
+    const { data, error } = await (createAdminClient() as any).rpc('finalize_marketplace_chat_attachment_from_server', {
       p_attachment_id: attachment.id, p_width: metadata.width, p_height: metadata.height,
       p_actual_sha256: actualHash, p_actual_byte_size: bytes.byteLength, p_actual_content_type: actualMime,
     });

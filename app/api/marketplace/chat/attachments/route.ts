@@ -49,11 +49,14 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  if (!requestOrigin(request)) return Response.json({ error: 'invalid_origin' }, { status: 403, headers: NO_STORE });
   if (!await requireAuth()) return Response.json({ error: 'authentication_required' }, { status: 401, headers: NO_STORE });
   const attachmentId = z.uuid().safeParse(new URL(request.url).searchParams.get('id'));
   if (!attachmentId.success) return Response.json({ error: 'invalid_input' }, { status: 400, headers: NO_STORE });
   try {
     const signed = await signChatAttachmentRead({ attachmentId: attachmentId.data });
-    return Response.redirect(signed.url, 307);
+    const response = Response.redirect(signed.url, 307);
+    response.headers.set('cache-control', NO_STORE['cache-control']);
+    return response;
   } catch (error) { return failure(error); }
 }

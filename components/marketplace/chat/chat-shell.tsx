@@ -413,6 +413,7 @@ function ActiveConversation({
         onCancelReply={() => setReplyTo(null)}
         onSend={readOnly ? async () => null : chat.send}
         onRetry={readOnly ? async () => undefined : chat.retry}
+        allowLocationShare={conversation.kind === 'order' && conversation.status !== 'closed' && conversation.status !== 'resolved' && !readOnly}
       />
 
       <Drawer.Backdrop isOpen={drawerOpen} onOpenChange={setDrawerOpen} variant="blur">
