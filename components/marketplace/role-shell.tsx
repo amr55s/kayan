@@ -21,6 +21,7 @@ type MarketplaceRoleShellProps = {
   displayName: string;
   navigation: MarketplaceNavigationItem[];
   activeHref: string;
+  unreadChatCount?: number;
   children: ReactNode;
 };
 
@@ -29,8 +30,15 @@ export function MarketplaceRoleShell({
   displayName,
   navigation,
   activeHref,
+  unreadChatCount = 0,
   children,
 }: MarketplaceRoleShellProps) {
+  const chatHref = role === 'customer'
+    ? '/account/chat'
+    : `/${role}/marketplace/chat`;
+  const roleNavigation = navigation.some((item) => item.href === chatHref)
+    ? navigation
+    : [...navigation, { href: chatHref, label: 'الرسائل', badge: unreadChatCount }];
   return (
     <div className={styles.roleLayout}>
       <aside className={styles.roleSidebar} aria-label={roleLabels[role]}>
@@ -41,7 +49,7 @@ export function MarketplaceRoleShell({
           </Chip.Root>
         </div>
         <nav className={styles.roleNav} aria-label="أقسام الحساب">
-          {navigation.map((item) => {
+          {roleNavigation.map((item) => {
             const active = item.href === activeHref;
             return (
               <Link

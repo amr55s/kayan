@@ -21,6 +21,7 @@ export function ChatEntryButton({
   isAuthenticated,
   recovery = null,
   label = 'اسأل المتجر',
+  chatRoute = '/account/chat',
 }: {
   intent: ChatLoginIntent;
   returnTo: string;
@@ -28,6 +29,7 @@ export function ChatEntryButton({
   isAuthenticated: boolean;
   recovery?: ChatRecoveryCode | null;
   label?: string;
+  chatRoute?: '/account/chat' | '/merchant/marketplace/chat' | '/driver/marketplace/chat' | '/admin/marketplace/chat';
 }) {
   const router = useRouter();
   const entry = resolveChatEntryState({ isAuthenticated, recovery });
@@ -39,8 +41,8 @@ export function ChatEntryButton({
   );
 
   useEffect(() => {
-    if (state.status === 'sent') router.push('/account/chat');
-  }, [router, state]);
+    if (state.status === 'sent') router.push(chatRoute);
+  }, [chatRoute, router, state]);
 
   if (!isAuthenticated) {
     return (
@@ -61,7 +63,7 @@ export function ChatEntryButton({
   return (
     <form action={formAction} className="grid w-full gap-2" dir="rtl">
       <input type="hidden" name="kind" value={intent.kind} />
-      <input type="hidden" name="chatRoute" value="/account/chat" />
+      <input type="hidden" name="chatRoute" value={chatRoute} />
       <input type="hidden" name="returnTo" value={returnTo} />
       {intent.kind === 'presale' ? (
         <>

@@ -6,6 +6,7 @@ import { createMarketplaceSupportThreadAction, createPartialMarketplaceReturnAct
 import type { MarketplaceOrderDetail, MarketplaceOrderStatus } from '@/lib/commerce/operations';
 import { marketplaceStatusLabels } from './order-status';
 import { DeliveryProofUploader } from './delivery-proof-uploader';
+import { ChatEntryButton } from '@/components/marketplace/chat/chat-entry-button';
 import styles from './commerce-operations.module.css';
 
 type Role = 'customer' | 'merchant' | 'admin' | 'driver';
@@ -87,6 +88,14 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
   const showRecipientPhone = role !== 'merchant' || order.deliveryMode === 'self';
   const returnableItems = order.items.filter((item) => item.returnedQuantity < item.quantity);
   const canManageReturns = role === 'merchant' || role === 'admin';
+  const chatRoute = role === 'merchant'
+    ? '/merchant/marketplace/chat'
+    : role === 'driver'
+      ? '/driver/marketplace/chat'
+      : role === 'admin'
+        ? '/admin/marketplace/chat'
+        : '/account/chat';
+  const mayChatAboutOrder = role !== 'driver' || order.status === 'out_for_delivery';
   const createReturnPanel = role === 'customer' && order.status === 'delivered' && returnableItems.length > 0 ? (
     <section className={styles.panel} aria-labelledby="partial-return-title">
       <h2 id="partial-return-title">طلب إرجاع جزئي</h2>
@@ -195,9 +204,22 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
 
       {role === 'driver' && order.deliveryMode === 'platform' && order.status === 'out_for_delivery' && !order.delivery?.proofAvailable
         ? <DeliveryProofUploader orderId={order.id} /> : null}
-      {order.delivery?.proofAvailable && order.delivery.proofAssetId
+          {order.delivery?.proofAvailable && order.delivery.proofAssetId
         ? <p><a className={styles.link} href={`/api/media/assets/${order.delivery.proofAssetId}/view`} target="_blank" rel="noreferrer">عرض إثبات التسليم الخاص</a></p>
-        : null}
+            : null}
+
+          {mayChatAboutOrder ? <section className={styles.panel} aria-labelledby="order-chat-title">
+            <h2 id="order-chat-title">رسائل الطلب</h2>
+            <p className={styles.subtitle}>تواصل داخل المنصة بخصوص هذا الطلب، مع حفظ سجل الرسائل للمراجعة عند الحاجة.</p>
+            <ChatEntryButton
+              intent={{ kind: 'order', orderId: order.id }}
+              returnTo={returnTo}
+              loginHref={`/signin?next=${encodeURIComponent(returnTo)}`}
+              isAuthenticated
+              chatRoute={chatRoute}
+              label="فتح محادثة الطلب"
+            />
+          </section> : null}
 
       {role !== 'driver' ? <section className={styles.panel} aria-labelledby="support-title"><h2 id="support-title">تحتاج مساعدة؟</h2><form className={styles.form} action={createMarketplaceSupportThreadAction}><input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="storeId" value={order.storeId} /><input type="hidden" name="returnTo" value={returnTo} /><label className={styles.label}>الموضوع<input className={styles.field} name="subject" required minLength={3} maxLength={160} /></label><label className={styles.label}>الرسالة<textarea className={styles.field} name="message" required maxLength={5000} rows={3} /></label><button className={styles.button}>فتح محادثة دعم داخل الموقع</button></form></section> : null}
 
