@@ -402,6 +402,7 @@ function ActiveConversation({
       ) : null}
 
       <MessageComposer
+        conversationId={conversation.id}
         senderRole={role}
         composerRef={chat.composer.ref}
         onComposerInput={chat.composer.onInput}

@@ -307,14 +307,23 @@ export async function searchConversationMessages(input: ChatSearchInput): Promis
 export async function sendMessage(input: SendMessageInput): Promise<ChatMessage> {
   const parsedInput = parseServiceInput(sendMessageSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await resolveChatRpc(supabase.rpc('send_my_marketplace_chat_message', {
-    p_thread_id: parsedInput.conversationId,
-    p_client_message_id: parsedInput.clientMessageId,
-    p_kind: parsedInput.kind,
-    p_body: parsedInput.body,
-    p_reply_to_id: parsedInput.replyToId,
-    p_card_data: parsedInput.card,
-  }));
+  const data = parsedInput.kind === 'image' && parsedInput.attachmentId
+    ? await resolveChatRpc(
+      // Generated database types are refreshed only after Staging migration apply.
+      // @ts-expect-error Task 9 locally committed RPC is intentionally not yet generated.
+      supabase.rpc('send_my_marketplace_chat_image', {
+        p_thread_id: parsedInput.conversationId, p_client_message_id: parsedInput.clientMessageId,
+        p_attachment_id: parsedInput.attachmentId, p_reply_to_id: parsedInput.replyToId,
+      }),
+    )
+    : await resolveChatRpc(supabase.rpc('send_my_marketplace_chat_message', {
+      p_thread_id: parsedInput.conversationId,
+      p_client_message_id: parsedInput.clientMessageId,
+      p_kind: parsedInput.kind,
+      p_body: parsedInput.body,
+      p_reply_to_id: parsedInput.replyToId,
+      p_card_data: parsedInput.card,
+    }));
   try {
     return parseChatMessage(data);
   } catch {

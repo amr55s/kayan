@@ -386,6 +386,16 @@
   border-radius: 0.75rem;
 }
 
+.chatAttachmentImage {
+  display: block;
+  inline-size: min(100%, 28rem);
+  block-size: auto;
+  max-block-size: 32rem;
+  border-radius: 0.75rem;
+  object-fit: contain;
+  background: #f4f4f5;
+}
+
 .attachmentPlaceholder small,
 .sharedCard small {
   opacity: 0.75;

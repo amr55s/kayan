@@ -40,6 +40,11 @@ export function chatMessagePlainSummary(message: ChatOptimisticMessage): string 
 function MessageBody({ message }: { message: ChatOptimisticMessage }) {
   if (message.deleted) return <p className={styles.tombstone}>{CHAT_STATUS_COPY.deleted}</p>;
   if (message.kind === 'image') {
+    if (message.attachment?.url) {
+      // Signed private attachment URLs cannot use the public image optimizer.
+      // eslint-disable-next-line @next/next/no-img-element
+      return <img className={styles.chatAttachmentImage} src={message.attachment.url} alt={message.attachment.alt} width={message.attachment.width} height={message.attachment.height} loading="lazy" />;
+    }
     return (
       <div className={styles.attachmentPlaceholder}>
         <span aria-hidden="true">▧</span>

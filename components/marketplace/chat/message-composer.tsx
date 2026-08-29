@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Label, TextArea } from '@heroui/react';
-import { cloneElement, useState, type FormEvent, type ReactElement } from 'react';
+import { cloneElement, useRef, useState, type ChangeEvent, type FormEvent, type ReactElement } from 'react';
 import type { ChatRole } from '@/lib/commerce/chat/contracts';
 import { getChatErrorMessage } from '@/lib/commerce/chat/copy';
 import type {
@@ -13,6 +13,7 @@ import { ChatComposerStatus } from './presentational/chat-composer-status';
 import styles from './chat.module.css';
 
 export type MessageComposerProps = {
+  conversationId: string;
   senderRole: Exclude<ChatRole, 'system'>;
   composerRef: MarketplaceChatComposerContract['ref'];
   onComposerInput: MarketplaceChatComposerContract['onInput'];
@@ -23,6 +24,8 @@ export type MessageComposerProps = {
   onCancelReply: () => void;
   onSend: (input: MarketplaceChatSendInput) => Promise<string | null>;
   onRetry: (clientMessageId: string) => Promise<void>;
+  /** Only order conversations with an active delivery may opt into this. */
+  allowLocationShare?: boolean;
 };
 
 function RestrainedComposerStatus(props: Parameters<typeof ChatComposerStatus>[0]) {
@@ -36,6 +39,7 @@ function RestrainedComposerStatus(props: Parameters<typeof ChatComposerStatus>[0
 }
 
 export function MessageComposer({
+  conversationId,
   senderRole,
   composerRef,
   onComposerInput,
@@ -46,11 +50,14 @@ export function MessageComposer({
   onCancelReply,
   onSend,
   onRetry,
+  allowLocationShare = false,
 }: MessageComposerProps) {
   const [body, setBody] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const isDisabled = Boolean(disabledReason);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -74,6 +81,7 @@ export function MessageComposer({
         body: trimmed,
         replyToId: replyTo?.id ?? null,
         card: null,
+        attachmentId: null,
         senderRole,
       });
       if (clientMessageId) {
@@ -95,6 +103,60 @@ export function MessageComposer({
     } finally {
       setIsRetrying(false);
     }
+  };
+
+  const sendImage = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || isDisabled || isUploading) return;
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type) || file.size > 8 * 1024 * 1024) {
+      setValidationError('الصورة يجب أن تكون JPEG أو PNG أو WebP أو AVIF وبحد أقصى 8 ميغابايت.');
+      return;
+    }
+    setIsUploading(true);
+    setValidationError(null);
+    let attachmentId: string | null = null;
+    try {
+      const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+      const sha256 = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      const begin = await fetch('/api/marketplace/chat/attachments', {
+        method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'begin', conversationId, contentType: file.type, sizeBytes: file.size, sha256 }),
+      });
+      const prepared = await begin.json() as { attachmentId?: string; uploadUrl?: string; requiredHeaders?: Record<string, string> };
+      if (!begin.ok || !prepared.attachmentId || !prepared.uploadUrl) throw new Error('attachment_begin_failed');
+      attachmentId = prepared.attachmentId;
+      const upload = await fetch(prepared.uploadUrl, { method: 'PUT', headers: prepared.requiredHeaders, body: file });
+      if (!upload.ok) throw new Error('attachment_upload_failed');
+      const complete = await fetch('/api/marketplace/chat/attachments', {
+        method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'complete', attachmentId }),
+      });
+      if (!complete.ok) throw new Error('attachment_complete_failed');
+      const clientMessageId = await onSend({ kind: 'image', body: null, replyToId: replyTo?.id ?? null, card: null, attachmentId, senderRole });
+      if (!clientMessageId) throw new Error('image_message_failed');
+      onCancelReply();
+    } catch {
+      if (attachmentId) void fetch('/api/marketplace/chat/attachments', {
+        method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', attachmentId }),
+      });
+      setValidationError('تعذر رفع الصورة بشكل آمن. حاول مرة أخرى.');
+    } finally { setIsUploading(false); }
+  };
+
+  const shareLocation = () => {
+    if (!allowLocationShare || !navigator.geolocation) {
+      setValidationError('مشاركة الموقع متاحة للطلبات النشطة فقط.');
+      return;
+    }
+    const accepted = window.confirm('هل تريد مشاركة موقعك الحالي مرة واحدة لهذه المحادثة؟ لن يتم تتبعك في الخلفية.');
+    if (!accepted) return;
+    navigator.geolocation.getCurrentPosition((position) => {
+      void onSend({ kind: 'location', body: null, replyToId: replyTo?.id ?? null, card: {
+        type: 'location', latitude: position.coords.latitude, longitude: position.coords.longitude,
+      }, attachmentId: null, senderRole });
+    }, () => setValidationError('تعذر الوصول إلى موقعك. تحقق من الإذن وحاول مجددًا.'), { enableHighAccuracy: false, timeout: 10_000, maximumAge: 0 });
   };
 
   return (
@@ -145,6 +207,13 @@ export function MessageComposer({
       <div className={styles.composerHelpRow}>
         <small id="chat-composer-help">نص عادي فقط · {body.length}/5000</small>
         {disabledReason ? <small>{disabledReason}</small> : null}
+      </div>
+      <div className={styles.composerHelpRow}>
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={sendImage} hidden />
+        <Button type="button" variant="ghost" isDisabled={isDisabled || isUploading} onPress={() => fileInputRef.current?.click()}>
+          {isUploading ? 'جارٍ رفع الصورة…' : 'إرفاق صورة'}
+        </Button>
+        {allowLocationShare ? <Button type="button" variant="ghost" isDisabled={isDisabled || isUploading} onPress={shareLocation}>مشاركة موقعي مرة واحدة</Button> : null}
       </div>
 
       <div id="chat-composer-feedback">

@@ -296,6 +296,12 @@ export function createMarketplaceChatTransport(
     sendMessage(input, signal) {
       const parsed = sendMessageSchema.safeParse(input);
       if (!parsed.success) return Promise.reject(new MarketplaceChatClientError('invalid_input'));
+      if (parsed.data.kind === 'image' && parsed.data.attachmentId) return resolveRpc(
+        supabase.rpc('send_my_marketplace_chat_image', {
+          p_thread_id: parsed.data.conversationId, p_client_message_id: parsed.data.clientMessageId,
+          p_attachment_id: parsed.data.attachmentId, p_reply_to_id: parsed.data.replyToId,
+        }), signal, chatMessageSchema,
+      );
       return resolveRpc(
         supabase.rpc('send_my_marketplace_chat_message', {
           p_thread_id: parsed.data.conversationId,
@@ -762,7 +768,7 @@ export function createMarketplaceChatController(
       kind: input.kind,
       body: input.body,
       replyToId: input.replyToId,
-      card: input.card,
+      card: input.card, attachmentId: input.attachmentId,
     };
     const parsed = sendMessageSchema.safeParse(rpc);
     const role = z.enum(['customer', 'merchant', 'driver', 'admin']).safeParse(input.senderRole);
@@ -784,7 +790,7 @@ export function createMarketplaceChatController(
         : parsed.data.card
           ? { ...parsed.data.card, label: 'بطاقة مشتركة' }
           : null,
-      attachment: null,
+      attachment: input.attachmentId ? { id: input.attachmentId, url: `/api/marketplace/chat/attachments?id=${input.attachmentId}`, width: 1, height: 1, alt: 'صورة مرفقة' } : null,
       reactions: [],
       deleted: false,
       createdAt: new Date(now()).toISOString(),

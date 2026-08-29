@@ -15,10 +15,10 @@ const searchQuery = z.string().trim().refine(
   'Must contain between 1 and 200 Unicode characters',
 );
 
-export const sendMessageSchema = z.object({ conversationId: uuid, clientMessageId: uuid, kind, body: body.nullable(), replyToId: uuid.nullable(), card: card.nullable() }).strict().superRefine((value, context) => {
-  if (value.kind === 'text' && (!value.body || value.body.trim().length === 0 || value.card !== null)) context.addIssue({ code: 'custom', message: 'Text messages require a nonblank body and no card' });
-  if (value.kind === 'image' && (value.body !== null || value.card !== null)) context.addIssue({ code: 'custom', message: 'Image messages cannot include a body or card' });
-  if (['product', 'store', 'order', 'location'].includes(value.kind) && (value.body !== null || value.card === null || value.card.type !== value.kind)) context.addIssue({ code: 'custom', message: 'Card messages require a matching card and no body' });
+export const sendMessageSchema = z.object({ conversationId: uuid, clientMessageId: uuid, kind, body: body.nullable(), replyToId: uuid.nullable(), card: card.nullable(), attachmentId: uuid.nullable().default(null) }).strict().superRefine((value, context) => {
+  if (value.kind === 'text' && (!value.body || value.body.trim().length === 0 || value.card !== null || value.attachmentId !== null)) context.addIssue({ code: 'custom', message: 'Text messages require a nonblank body and no card' });
+  if (value.kind === 'image' && (value.body !== null || value.card !== null)) context.addIssue({ code: 'custom', message: 'Image messages cannot include body or cards' });
+  if (['product', 'store', 'order', 'location'].includes(value.kind) && (value.body !== null || value.card === null || value.card.type !== value.kind || value.attachmentId !== null)) context.addIssue({ code: 'custom', message: 'Card messages require a matching card and no body' });
 });
 export function parseSendMessageForm(formData: FormData) {
   const value = (name: string) => { const item = formData.get(name); return typeof item === 'string' ? item : null; };
@@ -28,7 +28,7 @@ export function parseSendMessageForm(formData: FormData) {
   if (rawCard !== null) {
     try { parsedCard = JSON.parse(rawCard); } catch { parsedCard = undefined; }
   }
-  return sendMessageSchema.safeParse({ conversationId: value('conversationId'), clientMessageId: value('clientMessageId'), kind: value('kind') ?? 'text', body: rawBody === null || rawBody === '' ? null : rawBody, replyToId: value('replyToId'), card: parsedCard });
+  return sendMessageSchema.safeParse({ conversationId: value('conversationId'), clientMessageId: value('clientMessageId'), kind: value('kind') ?? 'text', body: rawBody === null || rawBody === '' ? null : rawBody, replyToId: value('replyToId'), card: parsedCard, attachmentId: value('attachmentId') });
 }
 
 export const conversationIntentSchema = z.discriminatedUnion('kind', [
@@ -56,7 +56,7 @@ const chatCardOutputSchema = z.discriminatedUnion('type', [
   z.object({ type: z.enum(['product', 'store', 'order']), id: uuid, label: chatOutputLabel }).strict(),
   z.object({ type: z.literal('location'), latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180), label: chatOutputLabel }).strict(),
 ]);
-const chatAttachmentOutputSchema = z.object({ id: uuid, url: z.string().url(), width: z.number().int().min(1).max(4096), height: z.number().int().min(1).max(4096), alt: chatOutputLabel }).strict();
+const chatAttachmentOutputSchema = z.object({ id: uuid, url: z.union([z.url(), z.string().regex(/^\/api\/marketplace\/chat\/attachments\?id=/u)]), width: z.number().int().min(1).max(4096), height: z.number().int().min(1).max(4096), alt: chatOutputLabel }).strict();
 const chatReactionOutputSchema = z.object({ emoji: z.string().min(1).max(16), count: z.number().int().nonnegative(), reactedByMe: z.boolean() }).strict();
 /** Sole strict parser for the ChatMessage service/wire DTO. */
 const chatMessageObject = z.object({

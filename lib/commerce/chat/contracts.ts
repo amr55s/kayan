@@ -32,7 +32,7 @@ export type ChatErrorCode = 'invalid_input' | 'authentication_required' | 'not_f
 export type ChatActionState = { status: 'idle' | 'sent' } | { status: 'error'; code: ChatErrorCode };
 
 export type ChatCardInput = { type: 'product' | 'store' | 'order'; id: string } | { type: 'location'; latitude: number; longitude: number };
-export type SendMessageInput = { conversationId: string; clientMessageId: string; kind: ChatUserMessageKind; body: string | null; replyToId: string | null; card: ChatCardInput | null };
+export type SendMessageInput = { conversationId: string; clientMessageId: string; kind: ChatUserMessageKind; body: string | null; replyToId: string | null; card: ChatCardInput | null; attachmentId?: string | null };
 export type ConversationIntent = { kind: 'presale'; storeId: string; productId: string | null } | { kind: 'order'; orderId: string };
 export type ChatSearchInput = { conversationId: string; query: string; limit: number; cursor: ChatCursor | null };
 export type ChatReactionInput = { messageId: string; emoji: '👍' | '❤️' | '✅' | '🙏' | '😄'; active: boolean };
