@@ -61,7 +61,7 @@ test('monitor capability is distinct from support and legacy monitor lookup uses
     read('lib/auth/guards.ts'),
     read('app/admin/marketplace/support/[id]/page.tsx'),
     read('lib/supabase/database.types.ts'),
-    read('lib/admin/marketplace-memberships.ts'),
+    read('lib/admin/membership-input.ts'),
   ]);
   assert.match(guard, /p_roles: \['chat_monitor'\]/);
   assert.doesNotMatch(guard, /\(supabase as any\)\.rpc/);

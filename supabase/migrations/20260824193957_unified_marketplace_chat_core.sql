@@ -12,22 +12,6 @@ begin;
 
 alter type public.marketplace_admin_role add value if not exists 'chat_monitor';
 
--- Include a monitor-only membership in self-introspection. This is additive to
--- the granular-admin migration and does not grant message authoring rights.
-create or replace function public.get_my_marketplace_admin_roles()
-returns jsonb language plpgsql stable security definer set search_path = '' as $$
-begin
-  if not public.has_marketplace_admin_role(array[
-    'super_admin','operations','support','finance','catalog_reviewer','chat_monitor'
-  ]::public.marketplace_admin_role[]) then
-    raise exception 'admin_membership_required' using errcode = '42501';
-  end if;
-  return coalesce((select jsonb_agg(membership.role order by membership.role)
-    from public.admin_memberships as membership
-    where membership.user_id = (select auth.uid()) and membership.is_active), '[]'::jsonb);
-end;
-$$;
-
 alter table public.support_threads
   add column if not exists conversation_kind text not null default 'support'
     check (conversation_kind in ('presale', 'order', 'support', 'dispute')),

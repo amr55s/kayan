@@ -4,10 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
-  marketplaceAdminRoles,
   saveMarketplaceAdminMembership,
-  type MarketplaceAdminRole,
 } from '@/lib/admin/marketplace-memberships';
+import { parseMarketplaceAdminMembershipRoles } from '@/lib/admin/membership-input';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -15,18 +14,17 @@ export async function saveMarketplaceAdminMembershipAction(form: FormData): Prom
   const userId = String(form.get('userId') ?? '');
   const expectedVersionRaw = String(form.get('expectedVersion') ?? '');
   const requestedRoles = form.getAll('roles').filter((value): value is string => typeof value === 'string');
-  const roles = marketplaceAdminRoles.filter((role) => requestedRoles.includes(role));
+  const roles = parseMarketplaceAdminMembershipRoles(requestedRoles);
   const suppliedKey = String(form.get('idempotencyKey') ?? '');
   let destination = '/admin/marketplace/memberships?notice=membership_saved';
   try {
     if (!UUID.test(userId) || !/^\d{1,12}$/u.test(expectedVersionRaw)
-      || roles.length < 1 || roles.length !== requestedRoles.length
-      || requestedRoles.length !== new Set(requestedRoles).size) {
+      || !roles) {
       throw new Error('invalid_admin_membership');
     }
     await saveMarketplaceAdminMembership({
       userId,
-      roles: roles as MarketplaceAdminRole[],
+      roles,
       isActive: form.get('isActive') === 'on',
       expectedVersion: Number(expectedVersionRaw),
       idempotencyKey: UUID.test(suppliedKey) ? suppliedKey : randomUUID(),

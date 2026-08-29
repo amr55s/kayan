@@ -8,6 +8,9 @@ const migration = readFileSync(new URL(
 const chatMigration = readFileSync(new URL(
   '../../supabase/migrations/20260824193957_unified_marketplace_chat_core.sql', import.meta.url,
 ), 'utf8');
+const monitorIntrospectionMigration = readFileSync(new URL(
+  '../../supabase/migrations/20260824194000_marketplace_chat_monitor_role_introspection.sql', import.meta.url,
+), 'utf8');
 const adapter = readFileSync(new URL('../../lib/admin/marketplace-memberships.ts', import.meta.url), 'utf8');
 const action = readFileSync(new URL(
   '../../app/admin/marketplace/memberships/actions.ts', import.meta.url,
@@ -33,8 +36,11 @@ test('granular admin roles are additive and existing admins are backfilled safel
 
 test('chat monitor is introspectable without expanding the five-role assignment limit', () => {
   assert.match(chatMigration, /add value if not exists 'chat_monitor'/u);
-  assert.match(chatMigration, /get_my_marketplace_admin_roles\(\)[\s\S]*'chat_monitor'/u);
-  assert.match(chatMigration, /'super_admin','operations','support','finance','catalog_reviewer','chat_monitor'/u);
+  assert.doesNotMatch(chatMigration, /get_my_marketplace_admin_roles\(/u);
+  assert.match(monitorIntrospectionMigration, /get_my_marketplace_admin_roles\(\)[\s\S]*'chat_monitor'/u);
+  assert.match(monitorIntrospectionMigration, /'super_admin', 'operations', 'support', 'finance', 'catalog_reviewer', 'chat_monitor'/u);
+  assert.match(monitorIntrospectionMigration, /revoke all on function public\.get_my_marketplace_admin_roles\(\) from public, anon/u);
+  assert.match(monitorIntrospectionMigration, /grant execute on function public\.get_my_marketplace_admin_roles\(\) to authenticated/u);
   assert.match(adapter, /z\.array\(roleSchema\)\.max\(5\)/u);
   assert.doesNotMatch(adapter, /z\.array\(roleSchema\)\.max\(6\)/u);
   assert.match(migration, /not between 1 and 5/u);
@@ -80,7 +86,7 @@ test('server adapter and UI require super admin and submit bounded role values',
   assert.match(adapter, /requireMarketplaceAdminRole/u);
   assert.match(adapter, /await requireAdminAal2/u);
   assert.match(action, /form\.getAll\('roles'\)/u);
-  assert.match(action, /requestedRoles\.length !== new Set\(requestedRoles\)\.size/u);
+  assert.match(action, /parseMarketplaceAdminMembershipRoles\(requestedRoles\)/u);
   assert.match(page, /requireMarketplaceAdminRole\(\['super_admin'\]/u);
   assert.match(panel, /لا يمكن تعطيل آخر مدير كامل/u);
   assert.doesNotMatch(panel, /dangerouslySetInnerHTML/u);

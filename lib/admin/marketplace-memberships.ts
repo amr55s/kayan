@@ -4,11 +4,10 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireAdminAal2, type RequireAdminAal2Options } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
+import { marketplaceAdminRoles, type MarketplaceAdminRole } from './membership-input';
 
-export const marketplaceAdminRoles = [
-  'super_admin', 'operations', 'support', 'finance', 'catalog_reviewer', 'chat_monitor',
-] as const;
-export type MarketplaceAdminRole = (typeof marketplaceAdminRoles)[number];
+export { marketplaceAdminRoles } from './membership-input';
+export type { MarketplaceAdminRole } from './membership-input';
 
 const roleSchema = z.enum(marketplaceAdminRoles);
 const membershipSchema = z.object({
