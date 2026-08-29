@@ -5,6 +5,9 @@ import test from 'node:test';
 const migration = readFileSync(new URL(
   '../../supabase/migrations/20260818180000_granular_admin_memberships.sql', import.meta.url,
 ), 'utf8');
+const chatMigration = readFileSync(new URL(
+  '../../supabase/migrations/20260824193957_unified_marketplace_chat_core.sql', import.meta.url,
+), 'utf8');
 const adapter = readFileSync(new URL('../../lib/admin/marketplace-memberships.ts', import.meta.url), 'utf8');
 const action = readFileSync(new URL(
   '../../app/admin/marketplace/memberships/actions.ts', import.meta.url,
@@ -26,6 +29,15 @@ test('granular admin roles are additive and existing admins are backfilled safel
   assert.match(migration, /create table public\.admin_memberships/u);
   assert.match(migration, /from public\.profiles as profile\s+where profile\.role = 'admin'/u);
   assert.match(migration, /on conflict \(user_id, role\) do update set is_active = true/u);
+});
+
+test('chat monitor is introspectable without expanding the five-role assignment limit', () => {
+  assert.match(chatMigration, /add value if not exists 'chat_monitor'/u);
+  assert.match(chatMigration, /get_my_marketplace_admin_roles\(\)[\s\S]*'chat_monitor'/u);
+  assert.match(chatMigration, /'super_admin','operations','support','finance','catalog_reviewer','chat_monitor'/u);
+  assert.match(adapter, /z\.array\(roleSchema\)\.max\(5\)/u);
+  assert.doesNotMatch(adapter, /z\.array\(roleSchema\)\.max\(6\)/u);
+  assert.match(migration, /not between 1 and 5/u);
 });
 
 test('authorization requires AAL2 membership and uses transaction-scoped capability', () => {
