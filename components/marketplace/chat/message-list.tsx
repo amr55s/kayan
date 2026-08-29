@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@heroui/react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChatReactionInput } from '@/lib/commerce/chat/contracts';
 import type { ChatMessageDeliveryStatus } from '@/lib/commerce/chat/presentation';
 import type { ChatOptimisticMessage } from '@/lib/commerce/chat/reconcile';
@@ -19,29 +19,86 @@ export function initialViewportFollowsNewest(firstUnreadMessageId: string | null
   return firstUnreadMessageId === null;
 }
 
+type VisibleMessageEntry = {
+  messageId: string;
+  isIntersecting: boolean;
+  intersectionRatio: number;
+};
+
+export function selectVisibleIncomingReadTarget(input: {
+  messages: readonly ChatOptimisticMessage[];
+  currentUserId: string;
+  lastReadMessageId: string | null;
+  entries: readonly VisibleMessageEntry[];
+  documentVisibility: DocumentVisibilityState;
+}): string | null {
+  if (input.documentVisibility !== 'visible') return null;
+  const readIndex = input.lastReadMessageId
+    ? input.messages.findIndex((message) => message.id === input.lastReadMessageId)
+    : -1;
+  const visibleIds = new Set(input.entries
+    .filter((entry) => entry.isIntersecting && entry.intersectionRatio >= 0.6)
+    .map((entry) => entry.messageId));
+  let targetId: string | null = null;
+  input.messages.forEach((message, index) => {
+    if (
+      index > readIndex
+      && visibleIds.has(message.id)
+      && message.status === 'sent'
+      && message.senderRole !== 'system'
+      && message.senderId !== input.currentUserId
+    ) targetId = message.id;
+  });
+  return targetId;
+}
+
+export function classifyOlderPageChange(input: {
+  beforeFirstKey: string | null;
+  beforeLastKey: string | null;
+  afterFirstKey: string | null;
+  afterLastKey: string | null;
+}): 'prepend' | 'unchanged' | 'nonprepend' {
+  if (input.afterFirstKey === input.beforeFirstKey && input.afterLastKey === input.beforeLastKey) return 'unchanged';
+  if (
+    input.beforeFirstKey !== null
+    && input.afterFirstKey !== input.beforeFirstKey
+    && input.afterLastKey === input.beforeLastKey
+  ) return 'prepend';
+  return 'nonprepend';
+}
+
 export type MessageListProps = {
   messages: readonly ChatOptimisticMessage[];
   currentUserId: string;
   firstUnreadMessageId?: string | null;
+  lastReadMessageId: string | null;
   canLoadOlder: boolean;
   isLoadingOlder: boolean;
   deliveryStatusByMessageId?: Readonly<Record<string, Exclude<ChatMessageDeliveryStatus, 'sending' | 'failed'> | undefined>>;
   onLoadOlder: () => Promise<void>;
+  onVisibleIncomingMessage: (messageId: string) => void;
   onRetry: (clientMessageId: string) => void;
   onReply: (message: ChatOptimisticMessage) => void;
   onReact: (input: ChatReactionInput) => void;
 };
 
-type PrependMeasurement = { scrollHeight: number; scrollTop: number };
+type PrependMeasurement = {
+  scrollHeight: number;
+  scrollTop: number;
+  beforeFirstKey: string | null;
+  beforeLastKey: string | null;
+};
 
 export function MessageList({
   messages,
   currentUserId,
   firstUnreadMessageId = null,
+  lastReadMessageId,
   canLoadOlder,
   isLoadingOlder,
   deliveryStatusByMessageId = {},
   onLoadOlder,
+  onVisibleIncomingMessage,
   onRetry,
   onReply,
   onReact,
@@ -52,6 +109,9 @@ export function MessageList({
   const wasAtLatestRef = useRef(true);
   const previousLastKeyRef = useRef<string | null>(null);
   const prependMeasurementRef = useRef<PrependMeasurement | null>(null);
+  const previousLoadingOlderRef = useRef(isLoadingOlder);
+  const [olderLoadSettlement, setOlderLoadSettlement] = useState(0);
+  const previousOlderLoadSettlementRef = useRef(olderLoadSettlement);
   const [hasUnseenNewest, setHasUnseenNewest] = useState(false);
   const lastKey = messages.at(-1)?.id ?? null;
   const firstKey = messages.at(0)?.id ?? null;
@@ -61,9 +121,21 @@ export function MessageList({
     const list = listRef.current;
     if (!viewport || !list) return;
 
+    const loadFinished = previousLoadingOlderRef.current && !isLoadingOlder;
+    previousLoadingOlderRef.current = isLoadingOlder;
+    const loadSettled = previousOlderLoadSettlementRef.current !== olderLoadSettlement;
+    previousOlderLoadSettlementRef.current = olderLoadSettlement;
     const prepend = prependMeasurementRef.current;
-    if (prepend) {
-      viewport.scrollTop = prepend.scrollTop + (viewport.scrollHeight - prepend.scrollHeight);
+    if (prepend && (loadFinished || loadSettled)) {
+      const change = classifyOlderPageChange({
+        beforeFirstKey: prepend.beforeFirstKey,
+        beforeLastKey: prepend.beforeLastKey,
+        afterFirstKey: firstKey,
+        afterLastKey: lastKey,
+      });
+      if (change === 'prepend') {
+        viewport.scrollTop = prepend.scrollTop + (viewport.scrollHeight - prepend.scrollHeight);
+      }
       prependMeasurementRef.current = null;
       previousLastKeyRef.current = lastKey;
       return;
@@ -90,7 +162,43 @@ export function MessageList({
       }
       previousLastKeyRef.current = lastKey;
     }
-  }, [firstKey, firstUnreadMessageId, lastKey]);
+  }, [firstKey, firstUnreadMessageId, isLoadingOlder, lastKey, olderLoadSettlement]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const list = listRef.current;
+    if (!viewport || !list || typeof IntersectionObserver === 'undefined') return;
+    const visibleEntries = new Map<string, VisibleMessageEntry>();
+    const evaluate = () => {
+      const target = selectVisibleIncomingReadTarget({
+        messages,
+        currentUserId,
+        lastReadMessageId,
+        entries: [...visibleEntries.values()],
+        documentVisibility: document.visibilityState,
+      });
+      if (target) onVisibleIncomingMessage(target);
+    };
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        const messageId = (entry.target as HTMLElement).dataset.messageId;
+        if (messageId) {
+          visibleEntries.set(messageId, {
+            messageId,
+            isIntersecting: entry.isIntersecting,
+            intersectionRatio: entry.intersectionRatio,
+          });
+        }
+      });
+      evaluate();
+    }, { root: viewport, threshold: [0.6] });
+    list.querySelectorAll<HTMLElement>('[data-message-id]').forEach((element) => observer.observe(element));
+    document.addEventListener('visibilitychange', evaluate);
+    return () => {
+      document.removeEventListener('visibilitychange', evaluate);
+      observer.disconnect();
+    };
+  }, [currentUserId, lastReadMessageId, messages, onVisibleIncomingMessage]);
 
   const updateLatestEdge = () => {
     const viewport = viewportRef.current;
@@ -103,8 +211,19 @@ export function MessageList({
   const loadOlder = async () => {
     const viewport = viewportRef.current;
     if (!viewport || !canLoadOlder || isLoadingOlder) return;
-    prependMeasurementRef.current = { scrollHeight: viewport.scrollHeight, scrollTop: viewport.scrollTop };
-    await onLoadOlder();
+    prependMeasurementRef.current = {
+      scrollHeight: viewport.scrollHeight,
+      scrollTop: viewport.scrollTop,
+      beforeFirstKey: firstKey,
+      beforeLastKey: lastKey,
+    };
+    try {
+      await onLoadOlder();
+    } catch {
+      // The persistent error UI belongs to the hook; this prevents an unhandled rejection.
+    } finally {
+      setOlderLoadSettlement((current) => current + 1);
+    }
   };
 
   const jumpToNewest = () => {

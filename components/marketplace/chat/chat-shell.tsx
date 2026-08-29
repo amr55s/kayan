@@ -2,7 +2,7 @@
 
 import { Button, Drawer, Dropdown, Label } from '@heroui/react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { cloneElement, useMemo, useState, type FormEvent, type ReactElement } from 'react';
 import type {
   ChatActionState,
   ChatConversationPage,
@@ -97,22 +97,26 @@ export function canSendMarketplaceChatMessage(input: SendAvailabilityInput): boo
 }
 
 export function deriveMessageDeliveryStatuses(
-  messages: readonly ChatOptimisticMessage[],
-  currentUserId: string,
-  lastReadMessageId: string | null,
+  _messages: readonly ChatOptimisticMessage[],
+  _currentUserId: string,
+  _lastReadMessageId: string | null,
   explicit: MarketplaceChatShellProps['deliveryStatusByMessageId'] = {},
 ): Record<string, Exclude<ChatMessageDeliveryStatus, 'sending' | 'failed'>> {
   const result: Record<string, Exclude<ChatMessageDeliveryStatus, 'sending' | 'failed'>> = {};
-  const readIndex = lastReadMessageId ? messages.findIndex((message) => message.id === lastReadMessageId) : -1;
-  messages.forEach((message, index) => {
-    if (message.status === 'sent' && message.senderId === currentUserId) {
-      result[message.id] = index <= readIndex ? 'read' : 'sent';
-    }
-  });
   for (const [messageId, status] of Object.entries(explicit ?? {})) {
     if (status) result[messageId] = status;
   }
   return result;
+}
+
+export async function runMarketplaceChatMenuAction<T extends ChatActionState | MarketplaceChatBlockResult>(
+  action: () => Promise<T>,
+): Promise<T | FailedActionState> {
+  try {
+    return await action();
+  } catch {
+    return { status: 'error', code: 'service_unavailable' };
+  }
 }
 
 function safeActionCopy(value: string): string {
@@ -123,6 +127,14 @@ function connectionMessage(state: ChatConnectionState): string | undefined {
   if (state === 'offline') return 'أنت غير متصل الآن. يعود الإرسال بعد استعادة الشبكة.';
   if (state === 'error') return 'تعذر مزامنة المحادثة بأمان. حاول مجددًا بعد قليل.';
   return undefined;
+}
+
+function PoliteConnectionNotice({ state }: { state: ChatConnectionState }) {
+  const notice = ChatConnectionNotice({ state, message: connectionMessage(state) });
+  return notice ? cloneElement(
+    notice as ReactElement<{ role?: string; 'aria-live'?: 'polite' }>,
+    { role: 'status', 'aria-live': 'polite' },
+  ) : null;
 }
 
 function disabledComposerReason(
@@ -200,12 +212,7 @@ function ActiveConversation({
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const conversation = page.conversation;
-  const {
-    connectionState,
-    lastReadMessageId,
-    markRead,
-    messages,
-  } = chat;
+  const { connectionState, lastReadMessageId, messages } = chat;
   const canSend = canSendMarketplaceChatMessage({
     status: conversation.status,
     blocked,
@@ -226,15 +233,6 @@ function ActiveConversation({
     [lastReadMessageId, messages, currentUserId, deliveryStatusByMessageId],
   );
 
-  useEffect(() => {
-    const latestIncoming = [...messages].reverse().find((message) => (
-      message.status === 'sent' && message.senderId !== currentUserId && message.senderRole !== 'system'
-    ));
-    if (latestIncoming && connectionState === 'online' && latestIncoming.id !== lastReadMessageId) {
-      void markRead(latestIncoming.id);
-    }
-  }, [connectionState, currentUserId, lastReadMessageId, markRead, messages]);
-
   const runMenuAction = async (action: 'mute' | 'report' | 'block') => {
     if (!menuActions || menuPending) return;
     setMenuPending(action);
@@ -242,22 +240,28 @@ function ActiveConversation({
     setActionMessage('');
     try {
       if (action === 'mute') {
-        const result = await menuActions.setMuted({ conversationId: conversation.id, muted: !muted });
+        const result = await runMarketplaceChatMenuAction(() => menuActions.setMuted({
+          conversationId: conversation.id,
+          muted: !muted,
+        }));
         if (result.status === 'error') setActionError(getChatErrorMessage(result.code));
         else {
           setMuted(!muted);
           setActionMessage(!muted ? 'تم كتم إشعارات هذه المحادثة.' : 'تم تشغيل إشعارات هذه المحادثة.');
         }
       } else if (action === 'report') {
-        const result = await menuActions.reportConversation({ conversationId: conversation.id, reason: 'abuse' });
+        const result = await runMarketplaceChatMenuAction(() => menuActions.reportConversation({
+          conversationId: conversation.id,
+          reason: 'abuse',
+        }));
         if (result.status === 'error') setActionError(getChatErrorMessage(result.code));
         else setActionMessage('تم إرسال البلاغ للمراجعة دون مشاركة محتوى المحادثة خارج المنصة.');
       } else if (counterpartyUserId) {
-        const result = await menuActions.setBlocked({
+        const result = await runMarketplaceChatMenuAction(() => menuActions.setBlocked({
           conversationId: conversation.id,
           counterpartyUserId,
           blocked: !blocked,
-        });
+        }));
         if (result.status === 'error') setActionError(getChatErrorMessage(result.code));
         else {
           setBlocked(result.blocked);
@@ -347,8 +351,8 @@ function ActiveConversation({
         </Dropdown>
       </header>
 
-      <ChatConnectionNotice state={connectionState} message={connectionMessage(connectionState)} />
-      <div className={styles.actionAnnouncement} role="status" aria-live="polite" aria-atomic="true">
+      <PoliteConnectionNotice state={connectionState} />
+      <div className={styles.actionAnnouncement}>
         {actionError || actionMessage}
       </div>
 
@@ -368,10 +372,12 @@ function ActiveConversation({
           messages={messages}
           currentUserId={currentUserId}
           firstUnreadMessageId={unreadId}
+          lastReadMessageId={lastReadMessageId}
           canLoadOlder={chat.canLoadOlder}
           isLoadingOlder={chat.isLoadingOlder}
           deliveryStatusByMessageId={resolvedDeliveryStatuses}
           onLoadOlder={chat.loadOlder}
+          onVisibleIncomingMessage={(messageId) => void chat.markRead(messageId)}
           onRetry={(clientMessageId) => void chat.retry(clientMessageId)}
           onReply={setReplyTo}
           onReact={(input) => void chat.react(input)}

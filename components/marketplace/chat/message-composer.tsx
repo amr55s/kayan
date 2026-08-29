@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Label, TextArea } from '@heroui/react';
-import { useState, type FormEvent } from 'react';
+import { cloneElement, useState, type FormEvent, type ReactElement } from 'react';
 import type { ChatRole } from '@/lib/commerce/chat/contracts';
 import { getChatErrorMessage } from '@/lib/commerce/chat/copy';
 import type {
@@ -24,6 +24,16 @@ export type MessageComposerProps = {
   onSend: (input: MarketplaceChatSendInput) => Promise<string | null>;
   onRetry: (clientMessageId: string) => Promise<void>;
 };
+
+function RestrainedComposerStatus(props: Parameters<typeof ChatComposerStatus>[0]) {
+  const status = ChatComposerStatus(props);
+  if (!status) return null;
+  const announcesFailure = props.status === 'failed';
+  return cloneElement(status as ReactElement<{ role?: string; 'aria-live'?: 'polite' }>, {
+    role: announcesFailure ? 'status' : undefined,
+    'aria-live': announcesFailure ? 'polite' : undefined,
+  });
+}
 
 export function MessageComposer({
   senderRole,
@@ -98,7 +108,7 @@ export function MessageComposer({
         </div>
       ) : null}
 
-      <Label htmlFor="chat-body" isRequired isDisabled={isDisabled} isInvalid={Boolean(validationError)}>
+      <Label htmlFor="chat-body" isRequired isDisabled={isDisabled || isPending || isRetrying} isInvalid={Boolean(validationError)}>
         اكتب رسالة
       </Label>
       <div className={styles.composerRow}>
@@ -110,7 +120,7 @@ export function MessageComposer({
           rows={2}
           maxLength={5000}
           required
-          disabled={isDisabled}
+          disabled={isDisabled || isPending || isRetrying}
           aria-invalid={Boolean(validationError)}
           aria-errormessage={validationError ? 'chat-composer-feedback' : undefined}
           onInput={onComposerInput}
@@ -137,10 +147,10 @@ export function MessageComposer({
         {disabledReason ? <small>{disabledReason}</small> : null}
       </div>
 
-      <div id="chat-composer-feedback" role="status" aria-live="polite" aria-atomic="true">
+      <div id="chat-composer-feedback">
         {validationError ?? ''}
       </div>
-      <ChatComposerStatus
+      <RestrainedComposerStatus
         status={isRetrying ? 'retrying' : failedMessage ? 'failed' : isPending ? 'sending' : 'idle'}
         errorMessage={failedMessage?.failureCode ? getChatErrorMessage(failedMessage.failureCode) : undefined}
         onRetry={failedMessage ? () => void retry() : undefined}

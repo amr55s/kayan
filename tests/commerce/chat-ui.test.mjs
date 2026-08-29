@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { createElement } from 'react';
+import { act, createElement, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import postcss from 'postcss';
 import ts from 'typescript';
@@ -174,6 +175,255 @@ function fixtureConversation(overrides = {}) {
   };
 }
 
+function deferred() {
+  let resolvePromise;
+  let rejectPromise;
+  const promise = new Promise((resolveValue, rejectValue) => {
+    resolvePromise = resolveValue;
+    rejectPromise = rejectValue;
+  });
+  return { promise, resolve: resolvePromise, reject: rejectPromise };
+}
+
+async function flush() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
+class ReactTestNode {
+  constructor(nodeType, nodeName, ownerDocument) {
+    this.nodeType = nodeType;
+    this.nodeName = nodeName;
+    this.ownerDocument = ownerDocument;
+    this.parentNode = null;
+    this.childNodes = [];
+    this.listeners = new Map();
+  }
+
+  appendChild(node) {
+    node.parentNode = this;
+    this.childNodes.push(node);
+    return node;
+  }
+
+  insertBefore(node, before) {
+    node.parentNode = this;
+    const index = this.childNodes.indexOf(before);
+    this.childNodes.splice(index < 0 ? this.childNodes.length : index, 0, node);
+    return node;
+  }
+
+  removeChild(node) {
+    const index = this.childNodes.indexOf(node);
+    if (index >= 0) this.childNodes.splice(index, 1);
+    node.parentNode = null;
+    return node;
+  }
+
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type, listener) {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  contains(node) {
+    return node === this || this.childNodes.some((child) => child.contains?.(node));
+  }
+}
+
+class ReactTestElement extends ReactTestNode {
+  constructor(tagName, ownerDocument) {
+    super(1, tagName.toUpperCase(), ownerDocument);
+    this.tagName = tagName.toUpperCase();
+    this.style = {};
+    this.attributes = new Map();
+    this.namespaceURI = 'http://www.w3.org/1999/xhtml';
+    this.scrollHeight = 600;
+    this.scrollTop = 0;
+    this.clientHeight = 300;
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  getAttribute(name) {
+    return this.attributes.get(name) ?? null;
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
+
+  get disabled() {
+    return this.attributes.has('disabled');
+  }
+
+  set disabled(value) {
+    if (value) this.attributes.set('disabled', '');
+    else this.attributes.delete('disabled');
+  }
+
+  focus() {
+    this.ownerDocument.activeElement = this;
+  }
+
+  scrollIntoView() {
+    this.scrolledIntoView = true;
+  }
+
+  get dataset() {
+    const values = {};
+    for (const [name, value] of this.attributes) {
+      if (name.startsWith('data-')) {
+        values[name.slice(5).replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase())] = value;
+      }
+    }
+    return values;
+  }
+
+  get firstElementChild() {
+    return this.childNodes.find((child) => child.nodeType === 1) ?? null;
+  }
+
+  get lastElementChild() {
+    return [...this.childNodes].reverse().find((child) => child.nodeType === 1) ?? null;
+  }
+
+  querySelectorAll(selector) {
+    const matches = [];
+    const visit = (node) => {
+      if (node.nodeType === 1) {
+        if (selector === '[data-message-id]' && node.attributes.has('data-message-id')) matches.push(node);
+        else if (/^[a-z]+$/i.test(selector) && node.tagName === selector.toUpperCase()) matches.push(node);
+        node.childNodes.forEach(visit);
+      }
+    };
+    this.childNodes.forEach(visit);
+    return matches;
+  }
+
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] ?? null;
+  }
+
+  get textContent() {
+    return this.childNodes.map((child) => child.textContent ?? '').join('');
+  }
+
+  set textContent(value) {
+    this.childNodes = value === '' ? [] : [new ReactTestText(String(value), this.ownerDocument)];
+  }
+}
+
+class ReactTestText extends ReactTestNode {
+  constructor(value, ownerDocument) {
+    super(3, '#text', ownerDocument);
+    this.nodeValue = value;
+  }
+
+  get textContent() {
+    return this.nodeValue;
+  }
+}
+
+class ReactTestDocument extends ReactTestNode {
+  constructor() {
+    super(9, '#document', null);
+    this.defaultView = null;
+    this.activeElement = null;
+    this.visibilityState = 'visible';
+    this.documentElement = new ReactTestElement('html', this);
+    this.body = new ReactTestElement('body', this);
+    this.documentElement.appendChild(this.body);
+  }
+
+  createElement(tagName) {
+    return new ReactTestElement(tagName, this);
+  }
+
+  createElementNS(_namespace, tagName) {
+    return new ReactTestElement(tagName, this);
+  }
+
+  createTextNode(value) {
+    return new ReactTestText(value, this);
+  }
+}
+
+function reactProps(node) {
+  const key = Object.keys(node).find((name) => name.startsWith('__reactProps$'));
+  assert.ok(key, `React props are attached to ${node.tagName}`);
+  return node[key];
+}
+
+function reactAncestorProps(node, propName) {
+  const key = Object.keys(node).find((name) => name.startsWith('__reactFiber$'));
+  assert.ok(key, `React fiber is attached to ${node.tagName}`);
+  let fiber = node[key];
+  while (fiber) {
+    if (typeof fiber.memoizedProps?.[propName] === 'function') return fiber.memoizedProps;
+    fiber = fiber.return;
+  }
+  assert.fail(`No React ancestor exposes ${propName}`);
+}
+
+async function withMountedReact(run) {
+  const documentTarget = new ReactTestDocument();
+  const windowTarget = {
+    document: documentTarget,
+    HTMLIFrameElement: ReactTestElement,
+    HTMLElement: ReactTestElement,
+    SVGElement: ReactTestElement,
+    Node: ReactTestNode,
+    addEventListener() {},
+    removeEventListener() {},
+    getComputedStyle: () => ({ getPropertyValue: () => '', direction: 'rtl' }),
+  };
+  documentTarget.defaultView = windowTarget;
+  const container = new ReactTestElement('div', documentTarget);
+  const priorWindow = globalThis.window;
+  const priorDocument = globalThis.document;
+  const priorCss = globalThis.CSS;
+  const priorHtmlElement = globalThis.HTMLElement;
+  const priorSvgElement = globalThis.SVGElement;
+  const priorNode = globalThis.Node;
+  const priorAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
+  globalThis.window = windowTarget;
+  globalThis.document = documentTarget;
+  globalThis.CSS = { escape: (value) => String(value) };
+  globalThis.HTMLElement = ReactTestElement;
+  globalThis.SVGElement = ReactTestElement;
+  globalThis.Node = ReactTestNode;
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const root = createRoot(container);
+  try {
+    await run({ root, container, documentTarget, windowTarget });
+  } finally {
+    await act(async () => root.unmount());
+    await flush();
+    await new Promise((resolveValue) => setImmediate(resolveValue));
+    if (priorWindow === undefined) delete globalThis.window;
+    else globalThis.window = priorWindow;
+    if (priorDocument === undefined) delete globalThis.document;
+    else globalThis.document = priorDocument;
+    if (priorCss === undefined) delete globalThis.CSS;
+    else globalThis.CSS = priorCss;
+    if (priorHtmlElement === undefined) delete globalThis.HTMLElement;
+    else globalThis.HTMLElement = priorHtmlElement;
+    if (priorSvgElement === undefined) delete globalThis.SVGElement;
+    else globalThis.SVGElement = priorSvgElement;
+    if (priorNode === undefined) delete globalThis.Node;
+    else globalThis.Node = priorNode;
+    if (priorAct === undefined) delete globalThis.IS_REACT_ACT_ENVIRONMENT;
+    else globalThis.IS_REACT_ACT_ENVIRONMENT = priorAct;
+  }
+}
+
 test('Task 7 components use the documented HeroUI v3 anatomy and accessible form association', () => {
   const sources = taskFiles.map((file) => ({ file, source: read(file) }));
   const nodes = sources.flatMap(({ file, source }) => jsxNodes(source, file));
@@ -233,7 +483,36 @@ test('chat decision helpers bound search, sending, previews, and scrolling', asy
   const ownTwo = fixtureMessage({ id: '10000000-0000-4000-8000-000000000032', senderId: '10000000-0000-4000-8000-000000000009', senderRole: 'customer' });
   assert.deepEqual(
     shell.deriveMessageDeliveryStatuses([ownOne, ownTwo], '10000000-0000-4000-8000-000000000009', ownOne.id, { [ownTwo.id]: 'delivered' }),
-    { [ownOne.id]: 'read', [ownTwo.id]: 'delivered' },
+    { [ownTwo.id]: 'delivered' },
+  );
+
+  const incomingOld = fixtureMessage({ id: '10000000-0000-4000-8000-000000000041' });
+  const outgoing = fixtureMessage({ id: '10000000-0000-4000-8000-000000000042', senderId: '10000000-0000-4000-8000-000000000009', senderRole: 'customer' });
+  const incomingLatest = fixtureMessage({ id: '10000000-0000-4000-8000-000000000043' });
+  const visibilityInput = {
+    messages: [incomingOld, outgoing, incomingLatest],
+    currentUserId: '10000000-0000-4000-8000-000000000009',
+    lastReadMessageId: incomingOld.id,
+    entries: [
+      { messageId: outgoing.id, isIntersecting: true, intersectionRatio: 1 },
+      { messageId: incomingLatest.id, isIntersecting: true, intersectionRatio: 0.8 },
+    ],
+  };
+  assert.equal(list.selectVisibleIncomingReadTarget({ ...visibilityInput, documentVisibility: 'hidden' }), null);
+  assert.equal(list.selectVisibleIncomingReadTarget({
+    ...visibilityInput,
+    documentVisibility: 'visible',
+    entries: [{ messageId: incomingOld.id, isIntersecting: true, intersectionRatio: 1 }],
+  }), null);
+  assert.equal(list.selectVisibleIncomingReadTarget({ ...visibilityInput, documentVisibility: 'visible' }), incomingLatest.id);
+
+  assert.equal(list.classifyOlderPageChange({ beforeFirstKey: 'b', beforeLastKey: 'z', afterFirstKey: 'a', afterLastKey: 'z' }), 'prepend');
+  assert.equal(list.classifyOlderPageChange({ beforeFirstKey: 'b', beforeLastKey: 'z', afterFirstKey: 'b', afterLastKey: 'z' }), 'unchanged');
+  assert.equal(list.classifyOlderPageChange({ beforeFirstKey: 'b', beforeLastKey: 'z', afterFirstKey: 'b', afterLastKey: 'zz' }), 'nonprepend');
+
+  assert.deepEqual(
+    await shell.runMarketplaceChatMenuAction(async () => { throw new Error('private provider failure'); }),
+    { status: 'error', code: 'service_unavailable' },
   );
 });
 
@@ -278,6 +557,8 @@ test('rendered inbox and conversation expose semantic Arabic UI without unsafe m
   assert.match(html, /تم التسليم/);
   assert.doesNotMatch(html, /attacker\.invalid|<img|javascript:|mailto:|tel:/i);
   assert.doesNotMatch(html, /aria-live="(?:polite|assertive)"[^>]*aria-label="رسائل المحادثة"/);
+  assert.deepEqual([...html.matchAll(/aria-live="([^"]+)"/g)].map((match) => match[1]), ['polite']);
+  assert.doesNotMatch(html, /aria-live="assertive"/);
 
   for (const [status, expected] of [['closed', 'المحادثة مغلقة'], ['paused', 'المحادثة متوقفة مؤقتًا']]) {
     const stateConversation = fixtureConversation({ status });
@@ -321,6 +602,188 @@ test('message card renders deleted, card, reaction, read, and optimistic states 
   assert.match(html, /جارٍ الإرسال/);
   assert.match(html, /تعذر الإرسال/);
   assert.match(html, /إعادة إرسال الرسالة/);
+});
+
+test('mounted composer disables editing while the submitted snapshot is pending and only send failure is polite', async () => {
+  const { MessageComposer } = await importWorkspaceTsx('components/marketplace/chat/message-composer.tsx');
+  const pendingSend = deferred();
+  const composerRef = { current: null };
+  const sent = [];
+  await withMountedReact(async ({ root, container }) => {
+    await act(async () => root.render(createElement(MessageComposer, {
+      senderRole: 'customer',
+      composerRef,
+      onComposerInput: () => undefined,
+      onComposerBlur: () => undefined,
+      disabledReason: null,
+      replyTo: null,
+      failedMessage: null,
+      onCancelReply: () => undefined,
+      onSend: async (input) => {
+        sent.push(input);
+        return pendingSend.promise;
+      },
+      onRetry: async () => undefined,
+    })));
+    const textarea = container.querySelector('textarea');
+    const form = container.querySelector('form');
+    assert.ok(textarea && form);
+    await act(async () => reactProps(textarea).onChange({ target: { value: 'رسالة أثناء الطلب' } }));
+    let submitPromise;
+    act(() => {
+      submitPromise = reactProps(form).onSubmit({ preventDefault() {} });
+    });
+    await flush();
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].body, 'رسالة أثناء الطلب');
+    assert.equal(textarea.disabled, true);
+    assert.equal(reactProps(textarea).disabled, true);
+    await act(async () => {
+      pendingSend.resolve('10000000-0000-4000-8000-000000000090');
+      await submitPromise;
+    });
+  });
+
+  const failedHtml = renderToStaticMarkup(createElement(MessageComposer, {
+    senderRole: 'customer',
+    composerRef,
+    onComposerInput: () => undefined,
+    onComposerBlur: () => undefined,
+    disabledReason: null,
+    replyTo: null,
+    failedMessage: fixtureMessage({
+      id: 'optimistic:failed-live',
+      clientMessageId: '10000000-0000-4000-8000-000000000091',
+      senderId: '10000000-0000-4000-8000-000000000009',
+      senderRole: 'customer',
+      status: 'failed',
+      failureCode: 'service_unavailable',
+    }),
+    onCancelReply: () => undefined,
+    onSend: async () => null,
+    onRetry: async () => undefined,
+  }));
+  assert.deepEqual([...failedHtml.matchAll(/aria-live="([^"]+)"/g)].map((match) => match[1]), ['polite']);
+  assert.doesNotMatch(failedHtml, /aria-live="assertive"/);
+});
+
+test('mounted message list advances read only for visible incoming content in a visible document', async () => {
+  const { MessageList } = await importWorkspaceTsx('components/marketplace/chat/message-list.tsx');
+  const incomingOld = fixtureMessage({ id: '10000000-0000-4000-8000-000000000061' });
+  const outgoing = fixtureMessage({ id: '10000000-0000-4000-8000-000000000062', senderId: '10000000-0000-4000-8000-000000000009', senderRole: 'customer' });
+  const incomingLatest = fixtureMessage({ id: '10000000-0000-4000-8000-000000000063' });
+  const observers = [];
+  const priorObserver = globalThis.IntersectionObserver;
+  class FakeIntersectionObserver {
+    constructor(callback) {
+      this.callback = callback;
+      this.observed = [];
+      observers.push(this);
+    }
+    observe(element) { this.observed.push(element); }
+    disconnect() { this.disconnected = true; }
+    emit(entries) { this.callback(entries); }
+  }
+  globalThis.IntersectionObserver = FakeIntersectionObserver;
+  const marked = [];
+  try {
+    await withMountedReact(async ({ root, documentTarget }) => {
+      await act(async () => root.render(createElement(MessageList, {
+        messages: [incomingOld, outgoing, incomingLatest],
+        currentUserId: '10000000-0000-4000-8000-000000000009',
+        firstUnreadMessageId: null,
+        lastReadMessageId: incomingOld.id,
+        canLoadOlder: false,
+        isLoadingOlder: false,
+        onLoadOlder: async () => undefined,
+        onVisibleIncomingMessage: (messageId) => marked.push(messageId),
+        onRetry: () => undefined,
+        onReply: () => undefined,
+        onReact: () => undefined,
+      })));
+      await flush();
+      assert.equal(observers.length, 1);
+      const observer = observers[0];
+      const byId = new Map(observer.observed.map((element) => [element.dataset.messageId, element]));
+      documentTarget.visibilityState = 'hidden';
+      await act(async () => observer.emit([{ target: byId.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
+      assert.deepEqual(marked, []);
+      documentTarget.visibilityState = 'visible';
+      await act(async () => observer.emit([
+        { target: byId.get(incomingLatest.id), isIntersecting: false, intersectionRatio: 0 },
+        { target: byId.get(incomingOld.id), isIntersecting: true, intersectionRatio: 1 },
+      ]));
+      assert.deepEqual(marked, []);
+      await act(async () => observer.emit([{ target: byId.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 0.8 }]));
+      assert.deepEqual(marked, [incomingLatest.id]);
+    });
+  } finally {
+    if (priorObserver === undefined) delete globalThis.IntersectionObserver;
+    else globalThis.IntersectionObserver = priorObserver;
+  }
+});
+
+test('mounted empty and rejected older-page requests clear prepend bookkeeping before a later append', async () => {
+  const { MessageList } = await importWorkspaceTsx('components/marketplace/chat/message-list.tsx');
+  const initial = fixtureMessage({ id: '10000000-0000-4000-8000-000000000071' });
+  const appended = fixtureMessage({ id: '10000000-0000-4000-8000-000000000072' });
+  async function assertSettlementClearsPrepend(rejectRequest) {
+    const older = deferred();
+    let appendMessage = () => undefined;
+
+    function Harness() {
+      const [messages, setMessages] = useState([initial]);
+      const [loading, setLoading] = useState(false);
+      appendMessage = () => setMessages((current) => [...current, appended]);
+      return createElement(MessageList, {
+        messages,
+        currentUserId: '10000000-0000-4000-8000-000000000009',
+        firstUnreadMessageId: null,
+        lastReadMessageId: null,
+        canLoadOlder: true,
+        isLoadingOlder: loading,
+        onLoadOlder: async () => {
+          setLoading(true);
+          try {
+            await older.promise;
+          } finally {
+            setLoading(false);
+          }
+        },
+        onVisibleIncomingMessage: () => undefined,
+        onRetry: () => undefined,
+        onReply: () => undefined,
+        onReact: () => undefined,
+      });
+    }
+
+    await withMountedReact(async ({ root, container }) => {
+      await act(async () => root.render(createElement(Harness)));
+      const viewport = container.querySelectorAll('div').find((node) => reactProps(node).className === 'messageViewport');
+      const loadButton = container.querySelectorAll('button').find((node) => node.textContent.includes('تحميل رسائل أقدم'));
+      assert.ok(viewport && loadButton);
+      viewport.scrollHeight = 700;
+      viewport.clientHeight = 300;
+      viewport.scrollTop = 0;
+      await act(async () => reactProps(viewport).onScroll());
+      await act(async () => reactAncestorProps(loadButton, 'onPress').onPress());
+      await act(async () => {
+        if (rejectRequest) older.reject(new Error('page unavailable'));
+        else older.resolve();
+        try {
+          await older.promise;
+        } catch {
+          // The component owns this rejection path; the test only waits for settlement.
+        }
+        await flush();
+      });
+      await act(async () => appendMessage());
+      assert.match(container.textContent, /رسائل جديدة — الانتقال إلى الأحدث/);
+    });
+  }
+
+  await assertSettlementClearsPrepend(false);
+  await assertSettlementClearsPrepend(true);
 });
 
 test('chat CSS provides responsive two-surface layout, logical RTL sizing, safe area, focus, and reduced motion', () => {
