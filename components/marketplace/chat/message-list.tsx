@@ -10,6 +10,8 @@ import { MessageCard } from './message-card';
 import styles from './chat.module.css';
 
 const LATEST_EDGE_PX = 64;
+const READ_ACK_GRACE_MS = 80;
+const MAX_VISIBLE_READ_ATTEMPTS = 2;
 
 export function shouldFollowNewest(input: { wasAtLatest: boolean; prepending: boolean }): boolean {
   return input.wasAtLatest && !input.prepending;
@@ -17,6 +19,17 @@ export function shouldFollowNewest(input: { wasAtLatest: boolean; prepending: bo
 
 export function initialViewportFollowsNewest(firstUnreadMessageId: string | null): boolean {
   return firstUnreadMessageId === null;
+}
+
+export function readCursorCoversMessage(
+  messages: readonly ChatOptimisticMessage[],
+  lastReadMessageId: string | null,
+  targetMessageId: string,
+): boolean {
+  if (!lastReadMessageId) return false;
+  const readIndex = messages.findIndex((message) => message.id === lastReadMessageId);
+  const targetIndex = messages.findIndex((message) => message.id === targetMessageId);
+  return readIndex >= 0 && targetIndex >= 0 && readIndex >= targetIndex;
 }
 
 type VisibleMessageEntry = {
@@ -88,8 +101,8 @@ export type MessageListProps = {
 };
 
 type PrependMeasurement = {
-  scrollHeight: number;
-  scrollTop: number;
+  anchorMessageId: string | null;
+  anchorTop: number | null;
   beforeFirstKey: string | null;
   beforeLastKey: string | null;
 };
@@ -124,35 +137,51 @@ export function MessageList({
   const latestVisibleMessageIdRef = useRef<string | null>(null);
   const lastRequestedMessageIdRef = useRef<string | null>(null);
   const inFlightMessageIdRef = useRef<string | null>(null);
-  const queuedMessageIdRef = useRef<string | null>(null);
+  const readRequestTargetRef = useRef<string | null>(null);
+  const readRequestAttemptsRef = useRef(0);
+  const readRequestGenerationRef = useRef(0);
+  const [readSettlement, setReadSettlement] = useState(0);
   const [hasUnseenNewest, setHasUnseenNewest] = useState(false);
   const lastKey = messages.at(-1)?.id ?? null;
   const firstKey = messages.at(0)?.id ?? null;
-  readOnlineRef.current = isReadOnline;
-  onVisibleIncomingMessageRef.current = onVisibleIncomingMessage;
+
+  useLayoutEffect(() => {
+    readOnlineRef.current = isReadOnline;
+    onVisibleIncomingMessageRef.current = onVisibleIncomingMessage;
+  }, [isReadOnline, onVisibleIncomingMessage]);
+
+  const resetVisibleReadRequest = useCallback((clearVisibleTarget: boolean): void => {
+    readRequestGenerationRef.current += 1;
+    readRequestTargetRef.current = null;
+    readRequestAttemptsRef.current = 0;
+    lastRequestedMessageIdRef.current = null;
+    inFlightMessageIdRef.current = null;
+    if (clearVisibleTarget) latestVisibleMessageIdRef.current = null;
+  }, []);
 
   const requestVisibleMessage = useCallback(function requestVisibleMessage(messageId: string): void {
     latestVisibleMessageIdRef.current = messageId;
     if (!readOnlineRef.current || document.visibilityState !== 'visible') return;
-    const inFlightMessageId = inFlightMessageIdRef.current;
-    if (inFlightMessageId) {
-      if (inFlightMessageId !== messageId) queuedMessageIdRef.current = messageId;
-      return;
+    if (readRequestTargetRef.current !== messageId) {
+      readRequestGenerationRef.current += 1;
+      readRequestTargetRef.current = messageId;
+      readRequestAttemptsRef.current = 0;
+      lastRequestedMessageIdRef.current = null;
+      inFlightMessageIdRef.current = null;
     }
+    if (inFlightMessageIdRef.current === messageId) return;
     if (lastRequestedMessageIdRef.current === messageId) return;
+    if (readRequestAttemptsRef.current >= MAX_VISIBLE_READ_ATTEMPTS) return;
+    readRequestAttemptsRef.current += 1;
     lastRequestedMessageIdRef.current = messageId;
     inFlightMessageIdRef.current = messageId;
+    const generation = readRequestGenerationRef.current;
     void Promise.resolve(onVisibleIncomingMessageRef.current(messageId))
       .catch(() => undefined)
       .finally(() => {
+        if (readRequestGenerationRef.current !== generation) return;
         if (inFlightMessageIdRef.current === messageId) inFlightMessageIdRef.current = null;
-        const queuedMessageId = queuedMessageIdRef.current;
-        queuedMessageIdRef.current = null;
-        if (
-          queuedMessageId
-          && readOnlineRef.current
-          && queuedMessageId !== lastRequestedMessageIdRef.current
-        ) requestVisibleMessage(queuedMessageId);
+        setReadSettlement((current) => current + 1);
       });
   }, []);
 
@@ -175,8 +204,13 @@ export function MessageList({
         afterMessageKeys: messages.map((message) => message.id),
       });
       const historyPrepended = change === 'prepend';
-      if (change === 'prepend') {
-        viewport.scrollTop = prepend.scrollTop + (viewport.scrollHeight - prepend.scrollHeight);
+      if (change === 'prepend' && prepend.anchorMessageId && prepend.anchorTop !== null) {
+        const retainedAnchor = list.querySelector<HTMLElement>(
+          `[data-message-id="${CSS.escape(prepend.anchorMessageId)}"]`,
+        );
+        if (retainedAnchor) {
+          viewport.scrollTop += retainedAnchor.getBoundingClientRect().top - prepend.anchorTop;
+        }
       }
       prependMeasurementRef.current = null;
       if (previousLastKeyRef.current !== null && lastKey && lastKey !== previousLastKeyRef.current) {
@@ -218,28 +252,53 @@ export function MessageList({
     const wasOnline = wasReadOnlineRef.current;
     wasReadOnlineRef.current = isReadOnline;
     if (!isReadOnline) {
-      queuedMessageIdRef.current = null;
+      resetVisibleReadRequest(false);
       return;
     }
     if (!wasOnline) {
-      lastRequestedMessageIdRef.current = null;
       const latestVisibleMessageId = latestVisibleMessageIdRef.current;
       if (latestVisibleMessageId && document.visibilityState === 'visible') {
         requestVisibleMessage(latestVisibleMessageId);
       }
     }
-  }, [isReadOnline, requestVisibleMessage]);
+  }, [isReadOnline, requestVisibleMessage, resetVisibleReadRequest]);
 
   useEffect(() => {
-    const latestVisibleMessageId = latestVisibleMessageIdRef.current;
-    if (!latestVisibleMessageId || !lastReadMessageId) return;
-    const visibleIndex = messages.findIndex((message) => message.id === latestVisibleMessageId);
-    const readIndex = messages.findIndex((message) => message.id === lastReadMessageId);
-    if (visibleIndex >= 0 && readIndex >= visibleIndex) {
-      latestVisibleMessageIdRef.current = null;
-      queuedMessageIdRef.current = null;
+    const targetMessageId = readRequestTargetRef.current;
+    if (targetMessageId && readCursorCoversMessage(messages, lastReadMessageId, targetMessageId)) {
+      resetVisibleReadRequest(true);
     }
-  }, [lastReadMessageId, messages]);
+  }, [lastReadMessageId, messages, resetVisibleReadRequest]);
+
+  useEffect(() => {
+    const targetMessageId = readRequestTargetRef.current;
+    if (
+      !targetMessageId
+      || inFlightMessageIdRef.current
+      || !isReadOnline
+      || document.visibilityState !== 'visible'
+      || readCursorCoversMessage(messages, lastReadMessageId, targetMessageId)
+      || readRequestAttemptsRef.current >= MAX_VISIBLE_READ_ATTEMPTS
+    ) return;
+    const generation = readRequestGenerationRef.current;
+    const retryTimer = window.setTimeout(() => {
+      if (
+        readRequestGenerationRef.current !== generation
+        || readRequestTargetRef.current !== targetMessageId
+        || latestVisibleMessageIdRef.current !== targetMessageId
+        || !readOnlineRef.current
+        || document.visibilityState !== 'visible'
+        || readCursorCoversMessage(messages, lastReadMessageId, targetMessageId)
+      ) return;
+      lastRequestedMessageIdRef.current = null;
+      requestVisibleMessage(targetMessageId);
+    }, READ_ACK_GRACE_MS);
+    return () => window.clearTimeout(retryTimer);
+  }, [isReadOnline, lastReadMessageId, messages, readSettlement, requestVisibleMessage]);
+
+  useEffect(() => () => {
+    resetVisibleReadRequest(true);
+  }, [resetVisibleReadRequest]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -254,8 +313,11 @@ export function MessageList({
         entries: [...visibleEntries.values()],
         documentVisibility: document.visibilityState,
       });
-      latestVisibleMessageIdRef.current = target;
-      if (target) requestVisibleMessage(target);
+      if (!target) {
+        if (latestVisibleMessageIdRef.current) resetVisibleReadRequest(true);
+        return;
+      }
+      requestVisibleMessage(target);
     };
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
@@ -276,7 +338,7 @@ export function MessageList({
       document.removeEventListener('visibilitychange', evaluate);
       observer.disconnect();
     };
-  }, [currentUserId, lastReadMessageId, messages, requestVisibleMessage]);
+  }, [currentUserId, lastReadMessageId, messages, requestVisibleMessage, resetVisibleReadRequest]);
 
   const updateLatestEdge = () => {
     const viewport = viewportRef.current;
@@ -289,9 +351,13 @@ export function MessageList({
   const loadOlder = async () => {
     const viewport = viewportRef.current;
     if (!viewport || !canLoadOlder || isLoadingOlder) return;
+    const anchorMessageId = firstKey;
+    const anchor = anchorMessageId
+      ? listRef.current?.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(anchorMessageId)}"]`)
+      : null;
     prependMeasurementRef.current = {
-      scrollHeight: viewport.scrollHeight,
-      scrollTop: viewport.scrollTop,
+      anchorMessageId,
+      anchorTop: anchor?.getBoundingClientRect().top ?? null,
       beforeFirstKey: firstKey,
       beforeLastKey: lastKey,
     };

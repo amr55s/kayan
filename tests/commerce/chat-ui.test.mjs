@@ -337,7 +337,11 @@ class ReactTestElement extends ReactTestNode {
   }
 
   getBoundingClientRect() {
-    return { x: 0, y: 0, top: 0, right: 100, bottom: 44, left: 0, width: 100, height: 44 };
+    const priorRows = this.tagName === 'LI' && this.parentNode
+      ? this.parentNode.childNodes.filter((node) => node.nodeType === 1).indexOf(this)
+      : 0;
+    const top = Math.max(0, priorRows) * 100;
+    return { x: 0, y: top, top, right: 100, bottom: top + 100, left: 0, width: 100, height: 100 };
   }
 
   get dataset() {
@@ -362,8 +366,10 @@ class ReactTestElement extends ReactTestNode {
     const matches = [];
     const visit = (node) => {
       if (node.nodeType === 1) {
+        const dataMessageMatch = selector.match(/^\[data-message-id="(.+)"\]$/);
         if (selector === '*') matches.push(node);
         else if (selector === '[data-message-id]' && node.attributes.has('data-message-id')) matches.push(node);
+        else if (dataMessageMatch && node.getAttribute('data-message-id') === dataMessageMatch[1]) matches.push(node);
         else if (/^[a-z]+$/i.test(selector) && node.tagName === selector.toUpperCase()) matches.push(node);
         node.childNodes.forEach(visit);
       }
@@ -929,7 +935,7 @@ test('HeroUI dropdown and drawer use native keyboard activation and portal focus
   });
 });
 
-test('mounted message list gates and deduplicates visible read requests across online recovery', async () => {
+test('mounted message list retries one unacknowledged online read and stops after durable cursor advance', async () => {
   const { MessageList } = await importWorkspaceTsx('components/marketplace/chat/message-list.tsx');
   const incomingOld = fixtureMessage({ id: '10000000-0000-4000-8000-000000000061' });
   const outgoing = fixtureMessage({ id: '10000000-0000-4000-8000-000000000062', senderId: '10000000-0000-4000-8000-000000000009', senderRole: 'customer' });
@@ -948,22 +954,23 @@ test('mounted message list gates and deduplicates visible read requests across o
   }
   globalThis.IntersectionObserver = FakeIntersectionObserver;
   const marked = [];
-  const failedRead = deferred();
+  const firstRead = deferred();
   let isReadOnline = false;
+  let durableLastReadMessageId = incomingOld.id;
   try {
     await withMountedReact(async ({ root, documentTarget }) => {
       const renderList = () => root.render(createElement(MessageList, {
         messages: [incomingOld, outgoing, incomingLatest],
         currentUserId: '10000000-0000-4000-8000-000000000009',
         firstUnreadMessageId: null,
-        lastReadMessageId: incomingOld.id,
+        lastReadMessageId: durableLastReadMessageId,
         isReadOnline,
         canLoadOlder: false,
         isLoadingOlder: false,
         onLoadOlder: async () => undefined,
         onVisibleIncomingMessage: async (messageId) => {
           marked.push(messageId);
-          if (marked.length === 1) await failedRead.promise;
+          if (marked.length === 1) await firstRead.promise;
         },
         onRetry: () => undefined,
         onReply: () => undefined,
@@ -985,26 +992,20 @@ test('mounted message list gates and deduplicates visible read requests across o
       await act(async () => observer.emit([{ target: onlineById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
       assert.deepEqual(marked, [incomingLatest.id], 'repeated observer entries share one in-flight request');
 
-      documentTarget.visibilityState = 'hidden';
-      await act(async () => observer.emit([{ target: onlineById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
-      assert.deepEqual(marked, [incomingLatest.id]);
-      failedRead.reject(new Error('offline during read'));
+      firstRead.resolve();
       await act(async () => {
-        try { await failedRead.promise; } catch { /* expected request failure */ }
+        await firstRead.promise;
         await flush();
       });
+      await act(async () => new Promise((resolveValue) => setTimeout(resolveValue, 150)));
+      assert.deepEqual(marked, [incomingLatest.id, incomingLatest.id], 'a resolved request without cursor advance gets one bounded retry');
 
-      isReadOnline = false;
-      await act(async () => renderList());
-      documentTarget.visibilityState = 'visible';
-      isReadOnline = true;
+      durableLastReadMessageId = incomingLatest.id;
       await act(async () => renderList());
       observer = observers.at(-1);
-      const recoveredById = new Map(observer.observed.map((element) => [element.dataset.messageId, element]));
-      await act(async () => observer.emit([{ target: recoveredById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 0.8 }]));
-      await flush();
-      assert.deepEqual(marked, [incomingLatest.id, incomingLatest.id], 'online recovery permits one bounded retry');
-      await act(async () => observer.emit([{ target: recoveredById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
+      const acknowledgedById = new Map(observer.observed.map((element) => [element.dataset.messageId, element]));
+      await act(async () => observer.emit([{ target: acknowledgedById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
+      await act(async () => new Promise((resolveValue) => setTimeout(resolveValue, 150)));
       assert.equal(marked.length, 2);
     });
   } finally {
@@ -1124,7 +1125,7 @@ test('mounted older-page transactions clear failures and preserve an anchor duri
       await mixedPage.promise;
       await flush();
     });
-    assert.equal(mixedViewport.scrollTop, 320, 'the prior first visible history position remains anchored');
+    assert.equal(mixedViewport.scrollTop, 120, 'only the retained anchor row offset affects scroll position, not appended height');
     assert.match(container.textContent, /رسائل جديدة — الانتقال إلى الأحدث/);
   });
 });
