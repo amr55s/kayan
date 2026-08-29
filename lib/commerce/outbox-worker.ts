@@ -14,6 +14,7 @@ const deletionTopics = [
   'media.finalized',
   'media.delete_requested',
   'catalog.import_file_delete_requested',
+  'chat_media.delete_requested',
 ] as const;
 
 const claimSchema = z.object({
@@ -45,6 +46,7 @@ function objectKeyFor(row: z.infer<typeof claimSchema>): string {
   if (row.topic === 'media.delete_requested') {
     return validateObjectKey(row.payload.object_key, 'media/');
   }
+  if (row.topic === 'chat_media.delete_requested') return validateObjectKey(row.payload.object_key, 'chat/');
   return validateObjectKey(row.payload.object_key);
 }
 

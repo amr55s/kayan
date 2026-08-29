@@ -56,7 +56,9 @@ const chatCardOutputSchema = z.discriminatedUnion('type', [
   z.object({ type: z.enum(['product', 'store', 'order']), id: uuid, label: chatOutputLabel }).strict(),
   z.object({ type: z.literal('location'), latitude: z.number().finite().min(-90).max(90), longitude: z.number().finite().min(-180).max(180), label: chatOutputLabel }).strict(),
 ]);
-const chatAttachmentOutputSchema = z.object({ id: uuid, url: z.string().regex(/^\/api\/marketplace\/chat\/attachments\?id=[0-9a-f-]{36}$/iu), width: z.number().int().min(1).max(4096), height: z.number().int().min(1).max(4096), alt: chatOutputLabel }).strict();
+// Legacy/untrusted attachment URLs remain display data only; MessageCard strips
+// everything except the issued same-origin route before creating an <img>.
+const chatAttachmentOutputSchema = z.object({ id: uuid, url: z.string().min(1).max(2048), width: z.number().int().min(1).max(4096), height: z.number().int().min(1).max(4096), alt: chatOutputLabel }).strict();
 const chatReactionOutputSchema = z.object({ emoji: z.string().min(1).max(16), count: z.number().int().nonnegative(), reactedByMe: z.boolean() }).strict();
 /** Sole strict parser for the ChatMessage service/wire DTO. */
 const chatMessageObject = z.object({

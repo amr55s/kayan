@@ -92,7 +92,7 @@ test('shared ChatMessage schema requires a positive integer durable revision', (
   assert.equal(sharedChatMessageSchema.safeParse(value).success, true);
   assert.equal(sharedChatMessageSchema.safeParse({ ...value, revision: 1.5 }).success, false);
   assert.equal(sharedChatMessageSchema.safeParse({ ...value, revision: Number.NaN }).success, false);
-  assert.equal(sharedChatMessageSchema.safeParse({ ...value, attachment: { id: crypto.randomUUID(), url: 'FTP://private.example/file', width: 10, height: 10, alt: 'ok' } }).success, false);
+  assert.equal(sharedChatMessageSchema.safeParse({ ...value, attachment: { id: crypto.randomUUID(), url: 'FTP://private.example/file', width: 10, height: 10, alt: 'ok' } }).success, true);
   assert.equal(sharedChatMessageSchema.safeParse({ ...value, body: '😀'.repeat(5001) }).success, false);
   assert.equal(sharedChatMessageSchema.safeParse({ ...value, reactions: [{ emoji: '💣', count: 1, reactedByMe: false }] }).success, true);
   assert.equal(sharedChatMessageSchema.safeParse({ ...value, attachment: { id: crypto.randomUUID(), url: 'https://cdn.example/image', width: 1.5, height: 10, alt: 'ok' } }).success, false);

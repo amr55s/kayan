@@ -48,8 +48,8 @@ function MessageBody({ message }: { message: ChatOptimisticMessage }) {
     return (
       <div className={styles.attachmentPlaceholder}>
         <span aria-hidden="true">▧</span>
-        <span>{message.attachment?.alt?.trim().slice(0, 160) || 'صورة مرفقة'}</span>
-        <small>تُعرض المرفقات الخاصة عبر عارض مصرح به فقط.</small>
+        <span>{message.attachment ? 'صورة مرفقة غير متاحة للعرض' : 'صورة مرفقة'}</span>
+        <small>{message.attachment ? 'تم حجب رابط مرفق غير موثوق.' : 'تُعرض المرفقات الخاصة عبر عارض مصرح به فقط.'}</small>
       </div>
     );
   }

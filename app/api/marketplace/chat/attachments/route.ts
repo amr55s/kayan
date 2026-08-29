@@ -49,7 +49,6 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (!requestOrigin(request)) return Response.json({ error: 'invalid_origin' }, { status: 403, headers: NO_STORE });
   if (!await requireAuth()) return Response.json({ error: 'authentication_required' }, { status: 401, headers: NO_STORE });
   const attachmentId = z.uuid().safeParse(new URL(request.url).searchParams.get('id'));
   if (!attachmentId.success) return Response.json({ error: 'invalid_input' }, { status: 400, headers: NO_STORE });

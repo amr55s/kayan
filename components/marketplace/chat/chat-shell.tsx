@@ -75,6 +75,8 @@ export type MarketplaceChatShellProps = {
   menuActions?: MarketplaceChatMenuActions;
   /** Monitoring staff can inspect conversations but never mutate participant chat state. */
   readOnly?: boolean;
+  /** Set by the server only after checking an active delivery assignment. */
+  canShareLocation?: boolean;
 };
 
 type SendAvailabilityInput = {
@@ -186,6 +188,7 @@ function ActiveConversation({
   initialBlocked = false,
   menuActions,
   readOnly = false,
+  canShareLocation = false,
 }: {
   page: ChatMessagePage;
   currentUserId: string;
@@ -197,6 +200,7 @@ function ActiveConversation({
   initialBlocked?: boolean;
   menuActions?: MarketplaceChatMenuActions;
   readOnly?: boolean;
+  canShareLocation?: boolean;
 }) {
   const chat = useMarketplaceChat({
     conversationId: page.conversation.id,
@@ -413,7 +417,7 @@ function ActiveConversation({
         onCancelReply={() => setReplyTo(null)}
         onSend={readOnly ? async () => null : chat.send}
         onRetry={readOnly ? async () => undefined : chat.retry}
-        allowLocationShare={conversation.kind === 'order' && conversation.status !== 'closed' && conversation.status !== 'resolved' && !readOnly}
+        allowLocationShare={canShareLocation && conversation.kind === 'order' && conversation.status === 'open' && !readOnly}
       />
 
       <Drawer.Backdrop isOpen={drawerOpen} onOpenChange={setDrawerOpen} variant="blur">
@@ -469,6 +473,7 @@ export function MarketplaceChatShell({
   isBlocked = false,
   menuActions,
   readOnly = role === 'admin',
+  canShareLocation = false,
 }: MarketplaceChatShellProps) {
   const inboxItems = Array.isArray(initialInbox?.items) ? initialInbox.items : [];
   const activePage = initialConversation?.conversation && Array.isArray(initialConversation.messages)
@@ -502,6 +507,7 @@ export function MarketplaceChatShell({
             initialBlocked={isBlocked}
             menuActions={menuActions}
             readOnly={readOnly}
+            canShareLocation={canShareLocation}
           />
         ) : (
           <ChatEmptyState state="conversationEmpty" className={styles.shellEmpty} />

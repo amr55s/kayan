@@ -155,11 +155,17 @@ begin
   if p_limit is null or p_limit not between 1 and 1000 then raise exception 'invalid_input' using errcode = '22023'; end if;
   with expired as (
     select id from public.marketplace_chat_attachments
-    where status = 'pending' and expires_at < now()
+    where (status = 'pending' or (status = 'verified' and message_id is null)) and expires_at < now()
     order by expires_at asc limit p_limit for update skip locked
   ) update public.marketplace_chat_attachments as attachment
-    set status = 'deleted', deleted_at = now(), delete_reason = 'expired_pending_cleanup'
+    set status = 'deleted', deleted_at = now(), delete_reason = 'expired_unbound_cleanup'
     from expired where attachment.id = expired.id;
+  insert into public.marketplace_outbox (event_key, topic, aggregate_type, aggregate_id, payload)
+  select 'chat_media.delete_requested:' || attachment.id::text, 'chat_media.delete_requested', 'marketplace_chat_attachment', attachment.id::text,
+    jsonb_build_object('object_key', attachment.object_key)
+  from public.marketplace_chat_attachments as attachment
+  where attachment.deleted_at >= now() - interval '1 second' and attachment.delete_reason = 'expired_unbound_cleanup'
+  on conflict (event_key) do nothing;
   get diagnostics v_count = row_count;
   return v_count;
 end; $$;
@@ -170,6 +176,7 @@ alter function public.marketplace_chat_message_json(uuid, uuid)
   rename to marketplace_chat_message_json_base_private_media;
 revoke all on function public.marketplace_chat_message_json_base_private_media(uuid, uuid)
   from public, anon, authenticated, service_role;
+revoke execute on function public.marketplace_chat_message_json_base_private_media(uuid, uuid) from public;
 create or replace function public.marketplace_chat_message_json(p_message_id uuid, p_actor_id uuid)
 returns jsonb language sql stable set search_path = '' as $$
   select public.marketplace_chat_message_json_base_private_media(p_message_id, p_actor_id)
