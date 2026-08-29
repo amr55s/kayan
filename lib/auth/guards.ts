@@ -91,7 +91,7 @@ export async function requireAdminAal2(
   if (options.capability === 'chat_monitor') {
     const { data: allowed, error: capabilityError } = await (supabase as any).rpc(
       'has_marketplace_admin_role',
-      { p_roles: ['support'] },
+      { p_roles: ['chat_monitor'] },
     );
     if (capabilityError || allowed !== true) {
       failAdminGuard('admin_access_required', options, profile);

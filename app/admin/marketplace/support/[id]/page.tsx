@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { notFound, redirect } from 'next/navigation';
 import { requireAdminAal2 } from '@/lib/auth/guards';
-import { getMyMarketplaceSupportThread } from '@/lib/commerce/operations';
+import { getConversationPage } from '@/lib/commerce/chat/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,8 @@ export default async function Page({ params }: {
 }) {
   const [{ id }] = await Promise.all([params, requireAdminAal2({ capability: 'chat_monitor', nextPath: '/admin/marketplace/chat' })]);
   if (!z.uuid().safeParse(id).success) notFound();
-  const thread = await getMyMarketplaceSupportThread(id);
-  if (!thread) notFound();
+  // The unified read RPC recognizes the durable monitor capability while the
+  // legacy reply RPC deliberately does not grant monitors authoring rights.
+  await getConversationPage({ conversationId: id, limit: 1 });
   redirect(`/admin/marketplace/chat/${id}`);
 }

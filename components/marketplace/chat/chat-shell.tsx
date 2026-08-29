@@ -143,7 +143,9 @@ function disabledComposerReason(
   conversation: ChatConversationSummary,
   blocked: boolean,
   connectionState: ChatConnectionState,
+  readOnly: boolean,
 ): string | null {
+  if (readOnly) return 'لوحة المراقبة للقراءة فقط ولا تسمح بإرسال الرسائل.';
   if (blocked) return 'تم حظر الرسائل المباشرة مع هذا المشارك.';
   if (conversation.status === 'paused') return 'المحادثة متوقفة مؤقتًا بقرار من إدارة المنصة.';
   if (conversation.status === 'closed' || conversation.status === 'resolved') return 'هذه المحادثة مغلقة ولا تقبل رسائل جديدة.';
@@ -404,7 +406,7 @@ function ActiveConversation({
         composerRef={chat.composer.ref}
         onComposerInput={chat.composer.onInput}
         onComposerBlur={chat.composer.onBlur}
-        disabledReason={canSend ? null : disabledComposerReason(conversation, blocked, connectionState)}
+        disabledReason={canSend ? null : disabledComposerReason(conversation, blocked, connectionState, readOnly)}
         replyTo={replyTo}
         failedMessage={failedMessage}
         onCancelReply={() => setReplyTo(null)}

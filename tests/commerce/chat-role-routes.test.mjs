@@ -39,8 +39,8 @@ test('legacy support routes authorize their thread before an internal chat redir
     read('app/merchant/marketplace/support/[id]/page.tsx'),
     read('app/admin/marketplace/support/[id]/page.tsx'),
   ]);
-  for (const source of routes) {
-    assert.match(source, /getMyMarketplaceSupportThread/);
+  for (const [index, source] of routes.entries()) {
+    assert.match(source, index === 2 ? /getConversationPage/ : /getMyMarketplaceSupportThread/);
     assert.match(source, /redirect\(/);
     assert.match(source, /\/chat\/\$\{id\}/);
   }
@@ -49,11 +49,21 @@ test('legacy support routes authorize their thread before an internal chat redir
 test('live role layouts mount the authenticated chat inbox navigation', async () => {
   const layouts = await Promise.all([
     read('app/account/layout.tsx'),
-    read('app/merchant/marketplace/layout.tsx'),
+    read('app/merchant/layout.tsx'),
     read('app/driver/layout.tsx'),
     read('app/admin/layout.tsx'),
   ]);
   for (const source of layouts) assert.match(source, /ChatInboxNavigation/);
+});
+
+test('monitor capability is distinct from support and legacy monitor lookup uses unified read access', async () => {
+  const [guard, legacy] = await Promise.all([
+    read('lib/auth/guards.ts'),
+    read('app/admin/marketplace/support/[id]/page.tsx'),
+  ]);
+  assert.match(guard, /p_roles: \['chat_monitor'\]/);
+  assert.match(legacy, /getConversationPage/);
+  assert.doesNotMatch(legacy, /getMyMarketplaceSupportThread/);
 });
 
 test('selected routes validate the id before their concurrent inbox and conversation loads', async () => {
