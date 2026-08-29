@@ -4,7 +4,6 @@ import { dirname, extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { act, createElement, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import postcss from 'postcss';
 import ts from 'typescript';
@@ -191,6 +190,10 @@ async function flush() {
 }
 
 class ReactTestNode {
+  static ELEMENT_NODE = 1;
+  static DOCUMENT_NODE = 9;
+  static DOCUMENT_FRAGMENT_NODE = 11;
+
   constructor(nodeType, nodeName, ownerDocument) {
     this.nodeType = nodeType;
     this.nodeName = nodeName;
@@ -221,17 +224,50 @@ class ReactTestNode {
   }
 
   addEventListener(type, listener) {
-    const listeners = this.listeners.get(type) ?? new Set();
-    listeners.add(listener);
+    const listeners = this.listeners.get(type) ?? [];
+    const options = arguments[2];
+    listeners.push({ listener, capture: options === true || options?.capture === true });
     this.listeners.set(type, listeners);
   }
 
   removeEventListener(type, listener) {
-    this.listeners.get(type)?.delete(listener);
+    const listeners = this.listeners.get(type);
+    if (listeners) this.listeners.set(type, listeners.filter((entry) => entry.listener !== listener));
+  }
+
+  dispatchEvent(event) {
+    if (!event.target) event.target = this;
+    const path = [];
+    for (let node = this; node; node = node.parentNode) path.push(node);
+    for (const node of [...path].reverse()) {
+      event.currentTarget = node;
+      for (const entry of node.listeners.get(event.type) ?? []) {
+        if (entry.capture) entry.listener.call(node, event);
+        if (event.propagationStopped) return !event.defaultPrevented;
+      }
+    }
+    for (const node of path) {
+      event.currentTarget = node;
+      for (const entry of node.listeners.get(event.type) ?? []) {
+        if (!entry.capture) entry.listener.call(node, event);
+        if (event.propagationStopped) return !event.defaultPrevented;
+      }
+    }
+    return !event.defaultPrevented;
   }
 
   contains(node) {
     return node === this || this.childNodes.some((child) => child.contains?.(node));
+  }
+
+  get parentElement() {
+    return this.parentNode?.nodeType === 1 ? this.parentNode : null;
+  }
+
+  getRootNode() {
+    let node = this;
+    while (node.parentNode) node = node.parentNode;
+    return node;
   }
 }
 
@@ -239,7 +275,10 @@ class ReactTestElement extends ReactTestNode {
   constructor(tagName, ownerDocument) {
     super(1, tagName.toUpperCase(), ownerDocument);
     this.tagName = tagName.toUpperCase();
-    this.style = {};
+    this.style = {
+      setProperty(name, value) { this[name] = String(value); },
+      removeProperty(name) { delete this[name]; },
+    };
     this.attributes = new Map();
     this.namespaceURI = 'http://www.w3.org/1999/xhtml';
     this.scrollHeight = 600;
@@ -255,6 +294,10 @@ class ReactTestElement extends ReactTestNode {
     return this.attributes.get(name) ?? null;
   }
 
+  hasAttribute(name) {
+    return this.attributes.has(name);
+  }
+
   removeAttribute(name) {
     this.attributes.delete(name);
   }
@@ -268,12 +311,33 @@ class ReactTestElement extends ReactTestNode {
     else this.attributes.delete('disabled');
   }
 
+  get value() {
+    return this._value ?? '';
+  }
+
+  set value(value) {
+    this._value = String(value);
+  }
+
+  attachEvent() {}
+
+  detachEvent() {}
+
   focus() {
     this.ownerDocument.activeElement = this;
+    this.dispatchEvent(new ReactTestEvent('focusin'));
+  }
+
+  click() {
+    if (!this.disabled) this.dispatchEvent(new ReactTestEvent('click'));
   }
 
   scrollIntoView() {
     this.scrolledIntoView = true;
+  }
+
+  getBoundingClientRect() {
+    return { x: 0, y: 0, top: 0, right: 100, bottom: 44, left: 0, width: 100, height: 44 };
   }
 
   get dataset() {
@@ -298,7 +362,8 @@ class ReactTestElement extends ReactTestNode {
     const matches = [];
     const visit = (node) => {
       if (node.nodeType === 1) {
-        if (selector === '[data-message-id]' && node.attributes.has('data-message-id')) matches.push(node);
+        if (selector === '*') matches.push(node);
+        else if (selector === '[data-message-id]' && node.attributes.has('data-message-id')) matches.push(node);
         else if (/^[a-z]+$/i.test(selector) && node.tagName === selector.toUpperCase()) matches.push(node);
         node.childNodes.forEach(visit);
       }
@@ -331,14 +396,50 @@ class ReactTestText extends ReactTestNode {
   }
 }
 
+class ReactTestEvent {
+  constructor(type, init = {}) {
+    this.type = type;
+    this.bubbles = init.bubbles ?? true;
+    this.cancelable = init.cancelable ?? true;
+    this.key = init.key;
+    this.code = init.code ?? init.key;
+    this.shiftKey = init.shiftKey ?? false;
+    this.ctrlKey = init.ctrlKey ?? false;
+    this.altKey = init.altKey ?? false;
+    this.metaKey = init.metaKey ?? false;
+    this.repeat = init.repeat ?? false;
+    this.button = init.button ?? 0;
+    this.detail = init.detail ?? 0;
+    this.defaultPrevented = false;
+    this.propagationStopped = false;
+    this.target = null;
+    this.currentTarget = null;
+  }
+
+  preventDefault() {
+    if (this.cancelable) this.defaultPrevented = true;
+  }
+
+  stopPropagation() {
+    this.propagationStopped = true;
+  }
+}
+
+class ReactTestMutationObserver {
+  observe() {}
+  disconnect() {}
+}
+
 class ReactTestDocument extends ReactTestNode {
   constructor() {
     super(9, '#document', null);
     this.defaultView = null;
     this.activeElement = null;
     this.visibilityState = 'visible';
+    this.oninput = null;
     this.documentElement = new ReactTestElement('html', this);
     this.body = new ReactTestElement('body', this);
+    this.appendChild(this.documentElement);
     this.documentElement.appendChild(this.body);
   }
 
@@ -353,23 +454,43 @@ class ReactTestDocument extends ReactTestNode {
   createTextNode(value) {
     return new ReactTestText(value, this);
   }
-}
 
-function reactProps(node) {
-  const key = Object.keys(node).find((name) => name.startsWith('__reactProps$'));
-  assert.ok(key, `React props are attached to ${node.tagName}`);
-  return node[key];
-}
-
-function reactAncestorProps(node, propName) {
-  const key = Object.keys(node).find((name) => name.startsWith('__reactFiber$'));
-  assert.ok(key, `React fiber is attached to ${node.tagName}`);
-  let fiber = node[key];
-  while (fiber) {
-    if (typeof fiber.memoizedProps?.[propName] === 'function') return fiber.memoizedProps;
-    fiber = fiber.return;
+  createTreeWalker(root, _whatToShow, filter) {
+    const nodes = [];
+    const visit = (node) => {
+      for (const child of node.childNodes ?? []) {
+        if (child.nodeType !== 1) continue;
+        const result = typeof filter === 'function' ? filter(child) : filter?.acceptNode?.(child) ?? 1;
+        if (result === 1) nodes.push(child);
+        if (result !== 2) visit(child);
+      }
+    };
+    visit(root);
+    let index = -1;
+    return {
+      currentNode: root,
+      nextNode() {
+        index += 1;
+        this.currentNode = nodes[index] ?? null;
+        return this.currentNode;
+      },
+      previousNode() {
+        index -= 1;
+        this.currentNode = nodes[index] ?? null;
+        return this.currentNode;
+      },
+      firstChild() { return this.nextNode(); },
+      lastChild() {
+        index = nodes.length - 1;
+        this.currentNode = nodes[index] ?? null;
+        return this.currentNode;
+      },
+    };
   }
-  assert.fail(`No React ancestor exposes ${propName}`);
+}
+
+function setNativeValue(element, value) {
+  Object.getOwnPropertyDescriptor(ReactTestElement.prototype, 'value').set.call(element, value);
 }
 
 async function withMountedReact(run) {
@@ -378,28 +499,76 @@ async function withMountedReact(run) {
     document: documentTarget,
     HTMLIFrameElement: ReactTestElement,
     HTMLElement: ReactTestElement,
+    Element: ReactTestElement,
+    Document: ReactTestDocument,
+    ShadowRoot: ReactTestNode,
+    HTMLButtonElement: ReactTestElement,
+    HTMLInputElement: ReactTestElement,
+    HTMLTextAreaElement: ReactTestElement,
     SVGElement: ReactTestElement,
     Node: ReactTestNode,
+    Event: ReactTestEvent,
+    KeyboardEvent: ReactTestEvent,
+    MouseEvent: ReactTestEvent,
+    PointerEvent: ReactTestEvent,
+    NodeFilter: { SHOW_ALL: -1, SHOW_ELEMENT: 1, FILTER_ACCEPT: 1, FILTER_REJECT: 2, FILTER_SKIP: 3 },
     addEventListener() {},
     removeEventListener() {},
+    requestAnimationFrame: (callback) => setTimeout(() => callback(Date.now()), 0),
+    cancelAnimationFrame: (handle) => clearTimeout(handle),
+    setTimeout,
+    clearTimeout,
+    getSelection: () => ({ anchorNode: null, anchorOffset: 0, focusNode: null, focusOffset: 0, rangeCount: 0 }),
     getComputedStyle: () => ({ getPropertyValue: () => '', direction: 'rtl' }),
   };
   documentTarget.defaultView = windowTarget;
   const container = new ReactTestElement('div', documentTarget);
   const priorWindow = globalThis.window;
   const priorDocument = globalThis.document;
+  const priorSelf = globalThis.self;
   const priorCss = globalThis.CSS;
   const priorHtmlElement = globalThis.HTMLElement;
+  const priorElement = globalThis.Element;
+  const priorDocumentClass = globalThis.Document;
+  const priorShadowRoot = globalThis.ShadowRoot;
+  const priorHtmlButtonElement = globalThis.HTMLButtonElement;
+  const priorHtmlInputElement = globalThis.HTMLInputElement;
+  const priorHtmlTextAreaElement = globalThis.HTMLTextAreaElement;
   const priorSvgElement = globalThis.SVGElement;
   const priorNode = globalThis.Node;
+  const priorEvent = globalThis.Event;
+  const priorKeyboardEvent = globalThis.KeyboardEvent;
+  const priorMouseEvent = globalThis.MouseEvent;
+  const priorPointerEvent = globalThis.PointerEvent;
+  const priorNodeFilter = globalThis.NodeFilter;
+  const priorMutationObserver = globalThis.MutationObserver;
+  const priorRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const priorCancelAnimationFrame = globalThis.cancelAnimationFrame;
   const priorAct = globalThis.IS_REACT_ACT_ENVIRONMENT;
   globalThis.window = windowTarget;
   globalThis.document = documentTarget;
+  globalThis.self = windowTarget;
   globalThis.CSS = { escape: (value) => String(value) };
   globalThis.HTMLElement = ReactTestElement;
+  globalThis.Element = ReactTestElement;
+  globalThis.Document = ReactTestDocument;
+  globalThis.ShadowRoot = ReactTestNode;
+  globalThis.HTMLButtonElement = ReactTestElement;
+  globalThis.HTMLInputElement = ReactTestElement;
+  globalThis.HTMLTextAreaElement = ReactTestElement;
   globalThis.SVGElement = ReactTestElement;
   globalThis.Node = ReactTestNode;
+  globalThis.Event = ReactTestEvent;
+  globalThis.KeyboardEvent = ReactTestEvent;
+  globalThis.MouseEvent = ReactTestEvent;
+  globalThis.PointerEvent = ReactTestEvent;
+  globalThis.NodeFilter = windowTarget.NodeFilter;
+  globalThis.MutationObserver = ReactTestMutationObserver;
+  globalThis.requestAnimationFrame = windowTarget.requestAnimationFrame;
+  globalThis.cancelAnimationFrame = windowTarget.cancelAnimationFrame;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  documentTarget.body.appendChild(container);
+  const { createRoot } = await import('react-dom/client');
   const root = createRoot(container);
   try {
     await run({ root, container, documentTarget, windowTarget });
@@ -407,18 +576,49 @@ async function withMountedReact(run) {
     await act(async () => root.unmount());
     await flush();
     await new Promise((resolveValue) => setImmediate(resolveValue));
+    documentTarget.body.removeChild(container);
     if (priorWindow === undefined) delete globalThis.window;
     else globalThis.window = priorWindow;
     if (priorDocument === undefined) delete globalThis.document;
     else globalThis.document = priorDocument;
+    if (priorSelf === undefined) delete globalThis.self;
+    else globalThis.self = priorSelf;
     if (priorCss === undefined) delete globalThis.CSS;
     else globalThis.CSS = priorCss;
     if (priorHtmlElement === undefined) delete globalThis.HTMLElement;
     else globalThis.HTMLElement = priorHtmlElement;
+    if (priorElement === undefined) delete globalThis.Element;
+    else globalThis.Element = priorElement;
+    if (priorDocumentClass === undefined) delete globalThis.Document;
+    else globalThis.Document = priorDocumentClass;
+    if (priorShadowRoot === undefined) delete globalThis.ShadowRoot;
+    else globalThis.ShadowRoot = priorShadowRoot;
+    if (priorHtmlButtonElement === undefined) delete globalThis.HTMLButtonElement;
+    else globalThis.HTMLButtonElement = priorHtmlButtonElement;
+    if (priorHtmlInputElement === undefined) delete globalThis.HTMLInputElement;
+    else globalThis.HTMLInputElement = priorHtmlInputElement;
+    if (priorHtmlTextAreaElement === undefined) delete globalThis.HTMLTextAreaElement;
+    else globalThis.HTMLTextAreaElement = priorHtmlTextAreaElement;
     if (priorSvgElement === undefined) delete globalThis.SVGElement;
     else globalThis.SVGElement = priorSvgElement;
     if (priorNode === undefined) delete globalThis.Node;
     else globalThis.Node = priorNode;
+    if (priorEvent === undefined) delete globalThis.Event;
+    else globalThis.Event = priorEvent;
+    if (priorKeyboardEvent === undefined) delete globalThis.KeyboardEvent;
+    else globalThis.KeyboardEvent = priorKeyboardEvent;
+    if (priorMouseEvent === undefined) delete globalThis.MouseEvent;
+    else globalThis.MouseEvent = priorMouseEvent;
+    if (priorPointerEvent === undefined) delete globalThis.PointerEvent;
+    else globalThis.PointerEvent = priorPointerEvent;
+    if (priorNodeFilter === undefined) delete globalThis.NodeFilter;
+    else globalThis.NodeFilter = priorNodeFilter;
+    if (priorMutationObserver === undefined) delete globalThis.MutationObserver;
+    else globalThis.MutationObserver = priorMutationObserver;
+    if (priorRequestAnimationFrame === undefined) delete globalThis.requestAnimationFrame;
+    else globalThis.requestAnimationFrame = priorRequestAnimationFrame;
+    if (priorCancelAnimationFrame === undefined) delete globalThis.cancelAnimationFrame;
+    else globalThis.cancelAnimationFrame = priorCancelAnimationFrame;
     if (priorAct === undefined) delete globalThis.IS_REACT_ACT_ENVIRONMENT;
     else globalThis.IS_REACT_ACT_ENVIRONMENT = priorAct;
   }
@@ -509,6 +709,13 @@ test('chat decision helpers bound search, sending, previews, and scrolling', asy
   assert.equal(list.classifyOlderPageChange({ beforeFirstKey: 'b', beforeLastKey: 'z', afterFirstKey: 'a', afterLastKey: 'z' }), 'prepend');
   assert.equal(list.classifyOlderPageChange({ beforeFirstKey: 'b', beforeLastKey: 'z', afterFirstKey: 'b', afterLastKey: 'z' }), 'unchanged');
   assert.equal(list.classifyOlderPageChange({ beforeFirstKey: 'b', beforeLastKey: 'z', afterFirstKey: 'b', afterLastKey: 'zz' }), 'nonprepend');
+  assert.equal(list.classifyOlderPageChange({
+    beforeFirstKey: 'b',
+    beforeLastKey: 'z',
+    afterFirstKey: 'a',
+    afterLastKey: 'zz',
+    afterMessageKeys: ['a', 'b', 'z', 'zz'],
+  }), 'prepend', 'an older prepend is still a prepend when realtime also appends a latest message');
 
   assert.deepEqual(
     await shell.runMarketplaceChatMenuAction(async () => { throw new Error('private provider failure'); }),
@@ -628,19 +835,20 @@ test('mounted composer disables editing while the submitted snapshot is pending 
     const textarea = container.querySelector('textarea');
     const form = container.querySelector('form');
     assert.ok(textarea && form);
-    await act(async () => reactProps(textarea).onChange({ target: { value: 'رسالة أثناء الطلب' } }));
-    let submitPromise;
-    act(() => {
-      submitPromise = reactProps(form).onSubmit({ preventDefault() {} });
+    await act(async () => {
+      setNativeValue(textarea, 'رسالة أثناء الطلب');
+      textarea.dispatchEvent(new ReactTestEvent('input'));
+      textarea.dispatchEvent(new ReactTestEvent('change'));
     });
+    await act(async () => form.dispatchEvent(new ReactTestEvent('submit')));
     await flush();
     assert.equal(sent.length, 1);
     assert.equal(sent[0].body, 'رسالة أثناء الطلب');
     assert.equal(textarea.disabled, true);
-    assert.equal(reactProps(textarea).disabled, true);
     await act(async () => {
       pendingSend.resolve('10000000-0000-4000-8000-000000000090');
-      await submitPromise;
+      await pendingSend.promise;
+      await flush();
     });
   });
 
@@ -667,7 +875,61 @@ test('mounted composer disables editing while the submitted snapshot is pending 
   assert.doesNotMatch(failedHtml, /aria-live="assertive"/);
 });
 
-test('mounted message list advances read only for visible incoming content in a visible document', async () => {
+test('HeroUI dropdown and drawer use native keyboard activation and portal focus', async () => {
+  const { MarketplaceChatShell } = await importWorkspaceTsx('components/marketplace/chat/chat-shell.tsx');
+  const conversation = fixtureConversation();
+  const pressKey = async (element, key) => {
+    element.dispatchEvent(new ReactTestEvent('keydown', { key }));
+    element.dispatchEvent(new ReactTestEvent('keyup', { key }));
+    if (key === 'Enter' && element.tagName === 'BUTTON') element.click();
+    await flush();
+    await new Promise((resolveValue) => setTimeout(resolveValue, 20));
+  };
+  await withMountedReact(async ({ root, container, documentTarget }) => {
+    await act(async () => root.render(createElement(MarketplaceChatShell, {
+      initialInbox: { items: [conversation], nextCursor: null },
+      initialConversation: {
+        conversation,
+        messages: [fixtureMessage()],
+        nextCursor: null,
+        lastReadMessageId: null,
+      },
+      currentUserId: '10000000-0000-4000-8000-000000000009',
+      role: 'customer',
+      basePath: '/account/chat',
+      counterpartyUserId: '10000000-0000-4000-8000-000000000002',
+      menuActions: {
+        searchMessages: async () => ({ messages: [], nextCursor: null }),
+        setMuted: async () => ({ status: 'sent' }),
+        reportConversation: async () => ({ status: 'sent' }),
+        setBlocked: async () => ({ status: 'sent', blocked: true, orderSupportAvailable: true, safeCopy: '' }),
+      },
+    })));
+    const actions = container.querySelectorAll('button').find((node) => node.textContent.trim() === 'إجراءات');
+    assert.ok(actions);
+    await act(async () => actions.focus());
+    assert.equal(documentTarget.activeElement, actions);
+    await act(async () => pressKey(actions, 'Enter'));
+    const menu = documentTarget.body.querySelectorAll('*').find((node) => node.getAttribute('role') === 'menu');
+    assert.ok(menu, `Enter opens the documented Dropdown menu; roles=${documentTarget.body.querySelectorAll('*').map((node) => node.getAttribute('role')).filter(Boolean).join(',')}; text=${documentTarget.body.textContent}`);
+    const firstMenuItem = menu.querySelectorAll('*').find((node) => node.getAttribute('role') === 'menuitem' && node.getAttribute('tabindex') === '0');
+    assert.ok(firstMenuItem, 'the open menu exposes one roving keyboard focus target');
+    await act(async () => firstMenuItem.focus());
+    assert.equal(documentTarget.activeElement, firstMenuItem);
+
+    await act(async () => pressKey(firstMenuItem, 'Enter'));
+    const dialog = documentTarget.body.querySelectorAll('*').find((node) => node.getAttribute('role') === 'dialog');
+    assert.ok(dialog, 'activating the search item opens the Drawer dialog');
+    const searchInput = dialog.querySelector('input');
+    assert.ok(searchInput);
+    await act(async () => searchInput.focus());
+    assert.ok(dialog.contains(documentTarget.activeElement), 'Drawer accepts focus inside its focus scope');
+    await act(async () => pressKey(documentTarget.activeElement, 'Tab'));
+    assert.ok(dialog.contains(documentTarget.activeElement), 'Tab remains inside the Drawer focus scope');
+  });
+});
+
+test('mounted message list gates and deduplicates visible read requests across online recovery', async () => {
   const { MessageList } = await importWorkspaceTsx('components/marketplace/chat/message-list.tsx');
   const incomingOld = fixtureMessage({ id: '10000000-0000-4000-8000-000000000061' });
   const outgoing = fixtureMessage({ id: '10000000-0000-4000-8000-000000000062', senderId: '10000000-0000-4000-8000-000000000009', senderRole: 'customer' });
@@ -686,36 +948,64 @@ test('mounted message list advances read only for visible incoming content in a 
   }
   globalThis.IntersectionObserver = FakeIntersectionObserver;
   const marked = [];
+  const failedRead = deferred();
+  let isReadOnline = false;
   try {
     await withMountedReact(async ({ root, documentTarget }) => {
-      await act(async () => root.render(createElement(MessageList, {
+      const renderList = () => root.render(createElement(MessageList, {
         messages: [incomingOld, outgoing, incomingLatest],
         currentUserId: '10000000-0000-4000-8000-000000000009',
         firstUnreadMessageId: null,
         lastReadMessageId: incomingOld.id,
+        isReadOnline,
         canLoadOlder: false,
         isLoadingOlder: false,
         onLoadOlder: async () => undefined,
-        onVisibleIncomingMessage: (messageId) => marked.push(messageId),
+        onVisibleIncomingMessage: async (messageId) => {
+          marked.push(messageId);
+          if (marked.length === 1) await failedRead.promise;
+        },
         onRetry: () => undefined,
         onReply: () => undefined,
         onReact: () => undefined,
-      })));
+      }));
+      await act(async () => renderList());
       await flush();
       assert.equal(observers.length, 1);
-      const observer = observers[0];
+      let observer = observers.at(-1);
       const byId = new Map(observer.observed.map((element) => [element.dataset.messageId, element]));
-      documentTarget.visibilityState = 'hidden';
       await act(async () => observer.emit([{ target: byId.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
-      assert.deepEqual(marked, []);
-      documentTarget.visibilityState = 'visible';
-      await act(async () => observer.emit([
-        { target: byId.get(incomingLatest.id), isIntersecting: false, intersectionRatio: 0 },
-        { target: byId.get(incomingOld.id), isIntersecting: true, intersectionRatio: 1 },
-      ]));
-      assert.deepEqual(marked, []);
-      await act(async () => observer.emit([{ target: byId.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 0.8 }]));
+      assert.deepEqual(marked, [], 'offline intersections do not advance the read cursor');
+
+      isReadOnline = true;
+      await act(async () => renderList());
+      observer = observers.at(-1);
+      const onlineById = new Map(observer.observed.map((element) => [element.dataset.messageId, element]));
+      await act(async () => observer.emit([{ target: onlineById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
+      await act(async () => observer.emit([{ target: onlineById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
+      assert.deepEqual(marked, [incomingLatest.id], 'repeated observer entries share one in-flight request');
+
+      documentTarget.visibilityState = 'hidden';
+      await act(async () => observer.emit([{ target: onlineById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
       assert.deepEqual(marked, [incomingLatest.id]);
+      failedRead.reject(new Error('offline during read'));
+      await act(async () => {
+        try { await failedRead.promise; } catch { /* expected request failure */ }
+        await flush();
+      });
+
+      isReadOnline = false;
+      await act(async () => renderList());
+      documentTarget.visibilityState = 'visible';
+      isReadOnline = true;
+      await act(async () => renderList());
+      observer = observers.at(-1);
+      const recoveredById = new Map(observer.observed.map((element) => [element.dataset.messageId, element]));
+      await act(async () => observer.emit([{ target: recoveredById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 0.8 }]));
+      await flush();
+      assert.deepEqual(marked, [incomingLatest.id, incomingLatest.id], 'online recovery permits one bounded retry');
+      await act(async () => observer.emit([{ target: recoveredById.get(incomingLatest.id), isIntersecting: true, intersectionRatio: 1 }]));
+      assert.equal(marked.length, 2);
     });
   } finally {
     if (priorObserver === undefined) delete globalThis.IntersectionObserver;
@@ -723,7 +1013,7 @@ test('mounted message list advances read only for visible incoming content in a 
   }
 });
 
-test('mounted empty and rejected older-page requests clear prepend bookkeeping before a later append', async () => {
+test('mounted older-page transactions clear failures and preserve an anchor during a concurrent append', async () => {
   const { MessageList } = await importWorkspaceTsx('components/marketplace/chat/message-list.tsx');
   const initial = fixtureMessage({ id: '10000000-0000-4000-8000-000000000071' });
   const appended = fixtureMessage({ id: '10000000-0000-4000-8000-000000000072' });
@@ -740,6 +1030,7 @@ test('mounted empty and rejected older-page requests clear prepend bookkeeping b
         currentUserId: '10000000-0000-4000-8000-000000000009',
         firstUnreadMessageId: null,
         lastReadMessageId: null,
+        isReadOnline: false,
         canLoadOlder: true,
         isLoadingOlder: loading,
         onLoadOlder: async () => {
@@ -759,14 +1050,14 @@ test('mounted empty and rejected older-page requests clear prepend bookkeeping b
 
     await withMountedReact(async ({ root, container }) => {
       await act(async () => root.render(createElement(Harness)));
-      const viewport = container.querySelectorAll('div').find((node) => reactProps(node).className === 'messageViewport');
+      const viewport = container.querySelectorAll('div').find((node) => node.getAttribute('class') === 'messageViewport');
       const loadButton = container.querySelectorAll('button').find((node) => node.textContent.includes('تحميل رسائل أقدم'));
       assert.ok(viewport && loadButton);
       viewport.scrollHeight = 700;
       viewport.clientHeight = 300;
       viewport.scrollTop = 0;
-      await act(async () => reactProps(viewport).onScroll());
-      await act(async () => reactAncestorProps(loadButton, 'onPress').onPress());
+      await act(async () => viewport.dispatchEvent(new ReactTestEvent('scroll')));
+      await act(async () => loadButton.click());
       await act(async () => {
         if (rejectRequest) older.reject(new Error('page unavailable'));
         else older.resolve();
@@ -784,6 +1075,58 @@ test('mounted empty and rejected older-page requests clear prepend bookkeeping b
 
   await assertSettlementClearsPrepend(false);
   await assertSettlementClearsPrepend(true);
+
+  const olderMessage = fixtureMessage({
+    id: '10000000-0000-4000-8000-000000000070',
+    createdAt: '2026-08-28T10:00:00.000Z',
+  });
+  const mixedPage = deferred();
+  let mixedViewport;
+  function MixedHarness() {
+    const [messages, setMessages] = useState([initial]);
+    const [loading, setLoading] = useState(false);
+    return createElement(MessageList, {
+      messages,
+      currentUserId: '10000000-0000-4000-8000-000000000009',
+      firstUnreadMessageId: null,
+      lastReadMessageId: null,
+      isReadOnline: false,
+      canLoadOlder: true,
+      isLoadingOlder: loading,
+      onLoadOlder: async () => {
+        setLoading(true);
+        try {
+          await mixedPage.promise;
+          mixedViewport.scrollHeight = 1000;
+          setMessages([olderMessage, initial, appended]);
+        } finally {
+          setLoading(false);
+        }
+      },
+      onVisibleIncomingMessage: () => undefined,
+      onRetry: () => undefined,
+      onReply: () => undefined,
+      onReact: () => undefined,
+    });
+  }
+  await withMountedReact(async ({ root, container }) => {
+    await act(async () => root.render(createElement(MixedHarness)));
+    mixedViewport = container.querySelectorAll('div').find((node) => node.getAttribute('class') === 'messageViewport');
+    const loadButton = container.querySelectorAll('button').find((node) => node.textContent.includes('تحميل رسائل أقدم'));
+    assert.ok(mixedViewport && loadButton);
+    mixedViewport.scrollHeight = 700;
+    mixedViewport.clientHeight = 300;
+    mixedViewport.scrollTop = 20;
+    await act(async () => mixedViewport.dispatchEvent(new ReactTestEvent('scroll')));
+    await act(async () => loadButton.click());
+    await act(async () => {
+      mixedPage.resolve();
+      await mixedPage.promise;
+      await flush();
+    });
+    assert.equal(mixedViewport.scrollTop, 320, 'the prior first visible history position remains anchored');
+    assert.match(container.textContent, /رسائل جديدة — الانتقال إلى الأحدث/);
+  });
 });
 
 test('chat CSS provides responsive two-surface layout, logical RTL sizing, safe area, focus, and reduced motion', () => {

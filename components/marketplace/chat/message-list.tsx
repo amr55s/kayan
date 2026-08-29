@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@heroui/react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChatReactionInput } from '@/lib/commerce/chat/contracts';
 import type { ChatMessageDeliveryStatus } from '@/lib/commerce/chat/presentation';
 import type { ChatOptimisticMessage } from '@/lib/commerce/chat/reconcile';
@@ -57,12 +57,16 @@ export function classifyOlderPageChange(input: {
   beforeLastKey: string | null;
   afterFirstKey: string | null;
   afterLastKey: string | null;
+  afterMessageKeys?: readonly string[];
 }): 'prepend' | 'unchanged' | 'nonprepend' {
   if (input.afterFirstKey === input.beforeFirstKey && input.afterLastKey === input.beforeLastKey) return 'unchanged';
   if (
     input.beforeFirstKey !== null
     && input.afterFirstKey !== input.beforeFirstKey
-    && input.afterLastKey === input.beforeLastKey
+    && (
+      input.afterLastKey === input.beforeLastKey
+      || input.afterMessageKeys?.includes(input.beforeFirstKey)
+    )
   ) return 'prepend';
   return 'nonprepend';
 }
@@ -72,11 +76,12 @@ export type MessageListProps = {
   currentUserId: string;
   firstUnreadMessageId?: string | null;
   lastReadMessageId: string | null;
+  isReadOnline: boolean;
   canLoadOlder: boolean;
   isLoadingOlder: boolean;
   deliveryStatusByMessageId?: Readonly<Record<string, Exclude<ChatMessageDeliveryStatus, 'sending' | 'failed'> | undefined>>;
   onLoadOlder: () => Promise<void>;
-  onVisibleIncomingMessage: (messageId: string) => void;
+  onVisibleIncomingMessage: (messageId: string) => Promise<void> | void;
   onRetry: (clientMessageId: string) => void;
   onReply: (message: ChatOptimisticMessage) => void;
   onReact: (input: ChatReactionInput) => void;
@@ -94,6 +99,7 @@ export function MessageList({
   currentUserId,
   firstUnreadMessageId = null,
   lastReadMessageId,
+  isReadOnline,
   canLoadOlder,
   isLoadingOlder,
   deliveryStatusByMessageId = {},
@@ -112,9 +118,43 @@ export function MessageList({
   const previousLoadingOlderRef = useRef(isLoadingOlder);
   const [olderLoadSettlement, setOlderLoadSettlement] = useState(0);
   const previousOlderLoadSettlementRef = useRef(olderLoadSettlement);
+  const readOnlineRef = useRef(isReadOnline);
+  const wasReadOnlineRef = useRef(isReadOnline);
+  const onVisibleIncomingMessageRef = useRef(onVisibleIncomingMessage);
+  const latestVisibleMessageIdRef = useRef<string | null>(null);
+  const lastRequestedMessageIdRef = useRef<string | null>(null);
+  const inFlightMessageIdRef = useRef<string | null>(null);
+  const queuedMessageIdRef = useRef<string | null>(null);
   const [hasUnseenNewest, setHasUnseenNewest] = useState(false);
   const lastKey = messages.at(-1)?.id ?? null;
   const firstKey = messages.at(0)?.id ?? null;
+  readOnlineRef.current = isReadOnline;
+  onVisibleIncomingMessageRef.current = onVisibleIncomingMessage;
+
+  const requestVisibleMessage = useCallback(function requestVisibleMessage(messageId: string): void {
+    latestVisibleMessageIdRef.current = messageId;
+    if (!readOnlineRef.current || document.visibilityState !== 'visible') return;
+    const inFlightMessageId = inFlightMessageIdRef.current;
+    if (inFlightMessageId) {
+      if (inFlightMessageId !== messageId) queuedMessageIdRef.current = messageId;
+      return;
+    }
+    if (lastRequestedMessageIdRef.current === messageId) return;
+    lastRequestedMessageIdRef.current = messageId;
+    inFlightMessageIdRef.current = messageId;
+    void Promise.resolve(onVisibleIncomingMessageRef.current(messageId))
+      .catch(() => undefined)
+      .finally(() => {
+        if (inFlightMessageIdRef.current === messageId) inFlightMessageIdRef.current = null;
+        const queuedMessageId = queuedMessageIdRef.current;
+        queuedMessageIdRef.current = null;
+        if (
+          queuedMessageId
+          && readOnlineRef.current
+          && queuedMessageId !== lastRequestedMessageIdRef.current
+        ) requestVisibleMessage(queuedMessageId);
+      });
+  }, []);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -132,11 +172,21 @@ export function MessageList({
         beforeLastKey: prepend.beforeLastKey,
         afterFirstKey: firstKey,
         afterLastKey: lastKey,
+        afterMessageKeys: messages.map((message) => message.id),
       });
+      const historyPrepended = change === 'prepend';
       if (change === 'prepend') {
         viewport.scrollTop = prepend.scrollTop + (viewport.scrollHeight - prepend.scrollHeight);
       }
       prependMeasurementRef.current = null;
+      if (previousLastKeyRef.current !== null && lastKey && lastKey !== previousLastKeyRef.current) {
+        if (shouldFollowNewest({ wasAtLatest: wasAtLatestRef.current, prepending: historyPrepended })) {
+          list.lastElementChild?.scrollIntoView({ block: 'end' });
+          setHasUnseenNewest(false);
+        } else {
+          setHasUnseenNewest(true);
+        }
+      }
       previousLastKeyRef.current = lastKey;
       return;
     }
@@ -162,7 +212,34 @@ export function MessageList({
       }
       previousLastKeyRef.current = lastKey;
     }
-  }, [firstKey, firstUnreadMessageId, isLoadingOlder, lastKey, olderLoadSettlement]);
+  }, [firstKey, firstUnreadMessageId, isLoadingOlder, lastKey, messages, olderLoadSettlement]);
+
+  useEffect(() => {
+    const wasOnline = wasReadOnlineRef.current;
+    wasReadOnlineRef.current = isReadOnline;
+    if (!isReadOnline) {
+      queuedMessageIdRef.current = null;
+      return;
+    }
+    if (!wasOnline) {
+      lastRequestedMessageIdRef.current = null;
+      const latestVisibleMessageId = latestVisibleMessageIdRef.current;
+      if (latestVisibleMessageId && document.visibilityState === 'visible') {
+        requestVisibleMessage(latestVisibleMessageId);
+      }
+    }
+  }, [isReadOnline, requestVisibleMessage]);
+
+  useEffect(() => {
+    const latestVisibleMessageId = latestVisibleMessageIdRef.current;
+    if (!latestVisibleMessageId || !lastReadMessageId) return;
+    const visibleIndex = messages.findIndex((message) => message.id === latestVisibleMessageId);
+    const readIndex = messages.findIndex((message) => message.id === lastReadMessageId);
+    if (visibleIndex >= 0 && readIndex >= visibleIndex) {
+      latestVisibleMessageIdRef.current = null;
+      queuedMessageIdRef.current = null;
+    }
+  }, [lastReadMessageId, messages]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -177,7 +254,8 @@ export function MessageList({
         entries: [...visibleEntries.values()],
         documentVisibility: document.visibilityState,
       });
-      if (target) onVisibleIncomingMessage(target);
+      latestVisibleMessageIdRef.current = target;
+      if (target) requestVisibleMessage(target);
     };
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
@@ -198,7 +276,7 @@ export function MessageList({
       document.removeEventListener('visibilitychange', evaluate);
       observer.disconnect();
     };
-  }, [currentUserId, lastReadMessageId, messages, onVisibleIncomingMessage]);
+  }, [currentUserId, lastReadMessageId, messages, requestVisibleMessage]);
 
   const updateLatestEdge = () => {
     const viewport = viewportRef.current;

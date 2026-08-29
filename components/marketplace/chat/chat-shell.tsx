@@ -2,7 +2,7 @@
 
 import { Button, Drawer, Dropdown, Label } from '@heroui/react';
 import Link from 'next/link';
-import { cloneElement, useMemo, useState, type FormEvent, type ReactElement } from 'react';
+import { cloneElement, useCallback, useMemo, useState, type FormEvent, type ReactElement } from 'react';
 import type {
   ChatActionState,
   ChatConversationPage,
@@ -212,7 +212,11 @@ function ActiveConversation({
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const conversation = page.conversation;
-  const { connectionState, lastReadMessageId, messages } = chat;
+  const { connectionState, lastReadMessageId, markRead, messages } = chat;
+  const handleVisibleIncomingMessage = useCallback(
+    (messageId: string) => markRead(messageId),
+    [markRead],
+  );
   const canSend = canSendMarketplaceChatMessage({
     status: conversation.status,
     blocked,
@@ -373,11 +377,12 @@ function ActiveConversation({
           currentUserId={currentUserId}
           firstUnreadMessageId={unreadId}
           lastReadMessageId={lastReadMessageId}
+          isReadOnline={connectionState === 'online'}
           canLoadOlder={chat.canLoadOlder}
           isLoadingOlder={chat.isLoadingOlder}
           deliveryStatusByMessageId={resolvedDeliveryStatuses}
           onLoadOlder={chat.loadOlder}
-          onVisibleIncomingMessage={(messageId) => void chat.markRead(messageId)}
+          onVisibleIncomingMessage={handleVisibleIncomingMessage}
           onRetry={(clientMessageId) => void chat.retry(clientMessageId)}
           onReply={setReplyTo}
           onReact={(input) => void chat.react(input)}
