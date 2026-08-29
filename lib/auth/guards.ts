@@ -89,7 +89,7 @@ export async function requireAdminAal2(
   }
 
   if (options.capability === 'chat_monitor') {
-    const { data: allowed, error: capabilityError } = await (supabase as any).rpc(
+    const { data: allowed, error: capabilityError } = await supabase.rpc(
       'has_marketplace_admin_role',
       { p_roles: ['chat_monitor'] },
     );

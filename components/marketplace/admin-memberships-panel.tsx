@@ -10,6 +10,7 @@ const roleOptions: Array<{ value: MarketplaceAdminRole; label: string; descripti
   { value: 'support', label: 'الدعم', description: 'محادثات الدعم فقط.' },
   { value: 'finance', label: 'المالية', description: 'التحصيلات والتسويات وكشوف العمولات.' },
   { value: 'catalog_reviewer', label: 'مراجع الكتالوج', description: 'مراجعة المتاجر والمنتجات والتعديلات المنشورة.' },
+  { value: 'chat_monitor', label: 'مراقب المحادثات', description: 'قراءة محادثات السوق للمراجعة دون إرسال أو تعديل.' },
 ];
 
 type FormAction = (form: FormData) => void | Promise<void>;

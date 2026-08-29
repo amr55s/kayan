@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { notFound, redirect } from 'next/navigation';
 import { requireAdminAal2 } from '@/lib/auth/guards';
-import { getConversationPage } from '@/lib/commerce/chat/service';
+import { ChatServiceError, getConversationPage } from '@/lib/commerce/chat/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +12,12 @@ export default async function Page({ params }: {
   if (!z.uuid().safeParse(id).success) notFound();
   // The unified read RPC recognizes the durable monitor capability while the
   // legacy reply RPC deliberately does not grant monitors authoring rights.
-  await getConversationPage({ conversationId: id, limit: 1 });
+  try {
+    const page = await getConversationPage({ conversationId: id, limit: 1 });
+    if (page.conversation.kind !== 'support') notFound();
+  } catch (error) {
+    if (error instanceof ChatServiceError && ['not_found', 'authentication_required'].includes(error.code)) notFound();
+    throw error;
+  }
   redirect(`/admin/marketplace/chat/${id}`);
 }

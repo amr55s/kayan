@@ -6,7 +6,7 @@ import { requireAdminAal2, type RequireAdminAal2Options } from '@/lib/auth/guard
 import { createClient } from '@/lib/supabase/server';
 
 export const marketplaceAdminRoles = [
-  'super_admin', 'operations', 'support', 'finance', 'catalog_reviewer',
+  'super_admin', 'operations', 'support', 'finance', 'catalog_reviewer', 'chat_monitor',
 ] as const;
 export type MarketplaceAdminRole = (typeof marketplaceAdminRoles)[number];
 
@@ -16,7 +16,7 @@ const membershipSchema = z.object({
   display_name: z.string().min(2).max(100),
   phone: z.string().min(1).max(32),
   profile_active: z.boolean(),
-  roles: z.array(roleSchema).max(5),
+  roles: z.array(roleSchema).max(6),
   membership_active: z.boolean(),
   version: z.coerce.number().int().nonnegative(),
   updated_at: z.string().min(16).max(64).nullable(),
@@ -46,7 +46,7 @@ async function roleRpc<T>(name: string, params: Record<string, unknown> | undefi
 
 export async function getMyMarketplaceAdminRoles(): Promise<MarketplaceAdminRole[]> {
   await requireAdminAal2({ failureMode: 'throw' });
-  return roleRpc('get_my_marketplace_admin_roles', undefined, z.array(roleSchema).max(5));
+  return roleRpc('get_my_marketplace_admin_roles', undefined, z.array(roleSchema).max(6));
 }
 
 export async function requireMarketplaceAdminRole(

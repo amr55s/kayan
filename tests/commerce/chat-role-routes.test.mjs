@@ -57,13 +57,20 @@ test('live role layouts mount the authenticated chat inbox navigation', async ()
 });
 
 test('monitor capability is distinct from support and legacy monitor lookup uses unified read access', async () => {
-  const [guard, legacy] = await Promise.all([
+  const [guard, legacy, types, memberships] = await Promise.all([
     read('lib/auth/guards.ts'),
     read('app/admin/marketplace/support/[id]/page.tsx'),
+    read('lib/supabase/database.types.ts'),
+    read('lib/admin/marketplace-memberships.ts'),
   ]);
   assert.match(guard, /p_roles: \['chat_monitor'\]/);
+  assert.doesNotMatch(guard, /\(supabase as any\)\.rpc/);
   assert.match(legacy, /getConversationPage/);
   assert.doesNotMatch(legacy, /getMyMarketplaceSupportThread/);
+  assert.match(legacy, /conversation\.kind !== 'support'/);
+  assert.match(legacy, /ChatServiceError/);
+  assert.match(types, /"chat_monitor"/);
+  assert.match(memberships, /'chat_monitor'/);
 });
 
 test('selected routes validate the id before their concurrent inbox and conversation loads', async () => {

@@ -8797,6 +8797,7 @@ export type Database = {
         | "support"
         | "finance"
         | "catalog_reviewer"
+        | "chat_monitor"
       marketplace_branch_status: "active" | "inactive"
       marketplace_cart_status: "active" | "converted" | "abandoned" | "merged"
       marketplace_coupon_funding: "merchant" | "platform"
@@ -9023,6 +9024,7 @@ export const Constants = {
         "support",
         "finance",
         "catalog_reviewer",
+        "chat_monitor",
       ],
       marketplace_branch_status: ["active", "inactive"],
       marketplace_cart_status: ["active", "converted", "abandoned", "merged"],
