@@ -95,9 +95,9 @@ export type MessageListProps = {
   deliveryStatusByMessageId?: Readonly<Record<string, Exclude<ChatMessageDeliveryStatus, 'sending' | 'failed'> | undefined>>;
   onLoadOlder: () => Promise<void>;
   onVisibleIncomingMessage: (messageId: string) => Promise<void> | void;
-  onRetry: (clientMessageId: string) => void;
-  onReply: (message: ChatOptimisticMessage) => void;
-  onReact: (input: ChatReactionInput) => void;
+  onRetry?: (clientMessageId: string) => void;
+  onReply?: (message: ChatOptimisticMessage) => void;
+  onReact?: (input: ChatReactionInput) => void;
 };
 
 type PrependMeasurement = {

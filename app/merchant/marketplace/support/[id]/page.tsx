@@ -1,21 +1,16 @@
-import { notFound } from 'next/navigation';
-import { SupportThreadView } from '@/components/commerce-operations/support-thread';
+import { z } from 'zod';
+import { notFound, redirect } from 'next/navigation';
 import { requireProfile } from '@/lib/auth/guards';
-import { getMyMarketplaceSupportThread, type MarketplaceSupportMessageCursor } from '@/lib/commerce/operations';
+import { getMyMarketplaceSupportThread } from '@/lib/commerce/operations';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page({ params, searchParams }: {
+export default async function Page({ params }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireProfile(['merchant']);
-  const [{ id }, query] = await Promise.all([params, searchParams]);
-  const cursor: MarketplaceSupportMessageCursor | null =
-    typeof query.before === 'string' && typeof query.message === 'string'
-      ? { createdAt: query.before, id: query.message }
-      : null;
-  const thread = await getMyMarketplaceSupportThread(id, { cursor });
+  const [{ id }] = await Promise.all([params, requireProfile(['merchant'])]);
+  if (!z.uuid().safeParse(id).success) notFound();
+  const thread = await getMyMarketplaceSupportThread(id);
   if (!thread) notFound();
-  return <SupportThreadView thread={thread} returnTo={`/merchant/marketplace/support/${id}`} viewingHistory={Boolean(cursor)} />;
+  redirect(`/merchant/marketplace/chat/${id}`);
 }

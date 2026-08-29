@@ -1,34 +1,23 @@
+import { z } from 'zod';
 import { notFound, redirect } from 'next/navigation';
-import { SupportThreadView } from '@/components/commerce-operations/support-thread';
-import {
-  getMyMarketplaceSupportThread,
-  MarketplaceOperationsError,
-  type MarketplaceSupportMessageCursor,
-} from '@/lib/commerce/operations';
+import { getMyMarketplaceSupportThread, MarketplaceOperationsError } from '@/lib/commerce/operations';
 
 export const dynamic = 'force-dynamic';
 
-function supportCursor(params: Record<string, string | string[] | undefined>): MarketplaceSupportMessageCursor | null {
-  return typeof params.before === 'string' && typeof params.message === 'string'
-    ? { createdAt: params.before, id: params.message }
-    : null;
-}
-
-export default async function Page({ params, searchParams }: {
+/** Legacy URL compatibility: authorize the old thread before entering unified chat. */
+export default async function Page({ params }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ id }, query] = await Promise.all([params, searchParams]);
-  const cursor = supportCursor(query);
-  let thread;
+  const { id } = await params;
+  if (!z.uuid().safeParse(id).success) notFound();
   try {
-    thread = await getMyMarketplaceSupportThread(id, { cursor });
+    const thread = await getMyMarketplaceSupportThread(id);
+    if (!thread) notFound();
   } catch (error) {
     if (error instanceof MarketplaceOperationsError && error.code === 'authentication_required') {
-      redirect('/signin?next=%2Faccount%2Forders');
+      redirect(`/signin?next=${encodeURIComponent(`/account/support/${id}`)}`);
     }
     throw error;
   }
-  if (!thread) notFound();
-  return <><span id="main-content" tabIndex={-1} /><SupportThreadView thread={thread} returnTo={`/account/support/${id}`} viewingHistory={Boolean(cursor)} /></>;
+  redirect(`/account/chat/${id}`);
 }

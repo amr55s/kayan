@@ -73,6 +73,8 @@ export type MarketplaceChatShellProps = {
   isMuted?: boolean;
   isBlocked?: boolean;
   menuActions?: MarketplaceChatMenuActions;
+  /** Monitoring staff can inspect conversations but never mutate participant chat state. */
+  readOnly?: boolean;
 };
 
 type SendAvailabilityInput = {
@@ -181,6 +183,7 @@ function ActiveConversation({
   initialMuted = false,
   initialBlocked = false,
   menuActions,
+  readOnly = false,
 }: {
   page: ChatMessagePage;
   currentUserId: string;
@@ -191,6 +194,7 @@ function ActiveConversation({
   initialMuted?: boolean;
   initialBlocked?: boolean;
   menuActions?: MarketplaceChatMenuActions;
+  readOnly?: boolean;
 }) {
   const chat = useMarketplaceChat({
     conversationId: page.conversation.id,
@@ -217,7 +221,7 @@ function ActiveConversation({
     (messageId: string) => markRead(messageId),
     [markRead],
   );
-  const canSend = canSendMarketplaceChatMessage({
+  const canSend = !readOnly && canSendMarketplaceChatMessage({
     status: conversation.status,
     blocked,
     connectionState,
@@ -355,6 +359,8 @@ function ActiveConversation({
         </Dropdown>
       </header>
 
+      {readOnly ? <p role="status" className={styles.actionAnnouncement}>لوحة المراقبة للقراءة فقط؛ لا يمكن إرسال رسائل أو تعديل المشاركين.</p> : null}
+
       <PoliteConnectionNotice state={connectionState} />
       <div className={styles.actionAnnouncement}>
         {actionError || actionMessage}
@@ -383,9 +389,9 @@ function ActiveConversation({
           deliveryStatusByMessageId={resolvedDeliveryStatuses}
           onLoadOlder={chat.loadOlder}
           onVisibleIncomingMessage={handleVisibleIncomingMessage}
-          onRetry={(clientMessageId) => void chat.retry(clientMessageId)}
-          onReply={setReplyTo}
-          onReact={(input) => void chat.react(input)}
+          onRetry={readOnly ? undefined : (clientMessageId) => void chat.retry(clientMessageId)}
+          onReply={readOnly ? undefined : setReplyTo}
+          onReact={readOnly ? undefined : (input) => void chat.react(input)}
         />
       )}
 
@@ -402,8 +408,8 @@ function ActiveConversation({
         replyTo={replyTo}
         failedMessage={failedMessage}
         onCancelReply={() => setReplyTo(null)}
-        onSend={chat.send}
-        onRetry={chat.retry}
+        onSend={readOnly ? async () => null : chat.send}
+        onRetry={readOnly ? async () => undefined : chat.retry}
       />
 
       <Drawer.Backdrop isOpen={drawerOpen} onOpenChange={setDrawerOpen} variant="blur">
@@ -458,6 +464,7 @@ export function MarketplaceChatShell({
   isMuted = false,
   isBlocked = false,
   menuActions,
+  readOnly = role === 'admin',
 }: MarketplaceChatShellProps) {
   const inboxItems = Array.isArray(initialInbox?.items) ? initialInbox.items : [];
   const activePage = initialConversation?.conversation && Array.isArray(initialConversation.messages)
@@ -490,6 +497,7 @@ export function MarketplaceChatShell({
             initialMuted={isMuted}
             initialBlocked={isBlocked}
             menuActions={menuActions}
+            readOnly={readOnly}
           />
         ) : (
           <ChatEmptyState state="conversationEmpty" className={styles.shellEmpty} />

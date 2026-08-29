@@ -39,6 +39,8 @@ export type AdminAal2FailureMode = 'redirect' | 'throw';
 export interface RequireAdminAal2Options {
   failureMode?: AdminAal2FailureMode;
   nextPath?: string;
+  /** A durable marketplace-admin membership capability, never user metadata. */
+  capability?: 'chat_monitor';
 }
 
 function safeAdminNextPath(value?: string): string {
@@ -84,6 +86,16 @@ export async function requireAdminAal2(
   const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (error || data.currentLevel !== 'aal2') {
     failAdminGuard('admin_mfa_required', options, profile);
+  }
+
+  if (options.capability === 'chat_monitor') {
+    const { data: allowed, error: capabilityError } = await (supabase as any).rpc(
+      'has_marketplace_admin_role',
+      { p_roles: ['support'] },
+    );
+    if (capabilityError || allowed !== true) {
+      failAdminGuard('admin_access_required', options, profile);
+    }
   }
 
   return profile;

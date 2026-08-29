@@ -1,21 +1,16 @@
-import { notFound } from 'next/navigation';
-import { SupportThreadView } from '@/components/commerce-operations/support-thread';
-import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
-import { getMyMarketplaceSupportThread, type MarketplaceSupportMessageCursor } from '@/lib/commerce/operations';
+import { z } from 'zod';
+import { notFound, redirect } from 'next/navigation';
+import { requireAdminAal2 } from '@/lib/auth/guards';
+import { getMyMarketplaceSupportThread } from '@/lib/commerce/operations';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page({ params, searchParams }: {
+export default async function Page({ params }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [{ id }, query] = await Promise.all([params, searchParams]);
-  await requireMarketplaceAdminRole(['support'], { nextPath: `/admin/marketplace/support/${id}` });
-  const cursor: MarketplaceSupportMessageCursor | null =
-    typeof query.before === 'string' && typeof query.message === 'string'
-      ? { createdAt: query.before, id: query.message }
-      : null;
-  const thread = await getMyMarketplaceSupportThread(id, { cursor });
+  const [{ id }] = await Promise.all([params, requireAdminAal2({ capability: 'chat_monitor', nextPath: '/admin/marketplace/chat' })]);
+  if (!z.uuid().safeParse(id).success) notFound();
+  const thread = await getMyMarketplaceSupportThread(id);
   if (!thread) notFound();
-  return <><span id="main-content" tabIndex={-1} /><SupportThreadView thread={thread} returnTo={`/admin/marketplace/support/${id}`} viewingHistory={Boolean(cursor)} /></>;
+  redirect(`/admin/marketplace/chat/${id}`);
 }
