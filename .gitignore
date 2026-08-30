@@ -23,3 +23,5 @@ skills-lock.json
 .playwright-cli/
 .lighthouseci/
 .worktrees/
+# heroui-agents-md
+.heroui-docs/

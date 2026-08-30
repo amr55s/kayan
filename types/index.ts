@@ -12,7 +12,26 @@ export type CategoryType =
   | 'veggies'
   | 'pharmacy'
   | 'crafts'
-  | 'services';
+  | 'services'
+  | 'real_estate';
+
+import type {
+  ListingFormProfileKey,
+  ListingProfileConfig,
+  RealEstateDetailsDraft,
+  RealEstateFurnishing,
+  RealEstateOfferType,
+  RealEstatePropertyType,
+} from '@/lib/listings/config';
+
+export type {
+  ListingFormProfileKey,
+  ListingProfileConfig,
+  RealEstateDetailsDraft,
+  RealEstateFurnishing,
+  RealEstateOfferType,
+  RealEstatePropertyType,
+};
 
 export interface CategoryOption {
   id: CategoryType;
@@ -96,6 +115,7 @@ export interface Place {
   recommend_count?: number;
   view_count?: number;
   coupons?: StoreCoupon[];
+  real_estate_details?: RealEstateDetailsDraft | null;
   created_at: string;
 }
 

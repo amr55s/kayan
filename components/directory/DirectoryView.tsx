@@ -234,7 +234,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 كل اللي تحتاجه في ديرتك، في مكان واحد.
               </h1>
               <p className="mt-1.5 text-xs font-medium leading-5 text-zinc-300 sm:mt-3 sm:max-w-xl sm:text-base sm:leading-8">
-                مطاعم ومحلات وصيدليات وخدمات وكباتن توصيل.
+                مطاعم ومحلات وصيدليات وخدمات وعقارات وكباتن توصيل.
               </p>
               <div className="mt-4 hidden flex-wrap gap-2 text-xs font-bold text-zinc-300 sm:flex">
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">بيانات واضحة</span>
@@ -258,8 +258,8 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 isClearable
                 size="lg"
                 radius="lg"
-                placeholder="دور على مكان أو خدمة…"
-                aria-label="البحث في الأماكن والخدمات"
+                placeholder="دور على مكان أو خدمة أو عقار…"
+                aria-label="البحث في الأماكن والخدمات والعقارات"
                 name="directorySearch"
                 autoComplete="off"
                 value={searchQuery}
@@ -275,7 +275,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                 }}
               />
               <div className="mt-3 hidden items-center justify-between gap-3 sm:flex">
-                <p className="text-xs font-semibold text-zinc-400">اكتب الاسم، نوع الخدمة، أو رقم الهاتف.</p>
+                <p className="text-xs font-semibold text-zinc-400">اكتب الاسم، نوع الخدمة، العقار، أو رقم الهاتف.</p>
                 <Button
                   onClick={() => {
                     trackSiteEvent('feedback_open', {

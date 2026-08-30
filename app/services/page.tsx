@@ -28,6 +28,7 @@ const categories = [
   ['pharmacy', 'صيدليات'],
   ['crafts', 'حرف'],
   ['services', 'خدمات'],
+  ['real_estate', 'عقارات'],
 ] as const;
 const allowedCategories = new Set(categories.map(([value]) => value));
 

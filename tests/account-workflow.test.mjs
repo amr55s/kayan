@@ -112,7 +112,8 @@ test('selected category text keeps high contrast', () => {
     categoryBar,
     /isSelected[\s\S]{0,180}\? 'border-zinc-950 bg-zinc-950 text-white shadow-\[/,
   );
-  assert.match(categoryBar, /grid-cols-4/);
+  assert.match(categoryBar, /grid-cols-3/);
+  assert.match(categoryBar, /sm:grid-cols-9/);
   assert.match(categoryBar, /h-16/);
   assert.match(categoryBar, /sm:h-\[116px\]/);
   assert.match(categoryBar, /aria-pressed=\{isSelected\}/);

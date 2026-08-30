@@ -18,7 +18,7 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({
 }) => {
   return (
     <div className="dir-rtl w-full max-w-full">
-      <div className="grid grid-cols-4 gap-1.5 px-1 sm:grid-cols-8 sm:gap-3">
+      <div className="grid grid-cols-3 gap-1.5 px-1 min-[540px]:grid-cols-5 sm:grid-cols-9 sm:gap-2">
         {CATEGORIES.filter((cat) => cat.id !== 'all').map((cat: CategoryItem) => {
           const Icon = cat.icon;
           const isSelected = selectedCategory === cat.id;

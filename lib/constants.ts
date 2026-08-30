@@ -8,6 +8,7 @@ import {
   Building2,
   LayoutGrid,
   Store,
+  Building,
 } from 'lucide-react';
 
 export interface CategoryItem {
@@ -79,8 +80,15 @@ export const CATEGORIES: CategoryItem[] = [
   {
     id: 'services',
     label: 'خدمات ومكاتب',
-    subtitle: 'طباعة، عقارات، مكتبات',
+    subtitle: 'طباعة، مكتبات، خدمات',
     icon: Building2,
     emoji: '🏢',
+  },
+  {
+    id: 'real_estate',
+    label: 'عقارات',
+    subtitle: 'إيجار وتمليك',
+    icon: Building,
+    emoji: '🏠',
   },
 ];

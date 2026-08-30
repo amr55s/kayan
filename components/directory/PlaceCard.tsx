@@ -30,6 +30,12 @@ import {
   formatWhatsAppUrl,
   getCategoryLabel,
 } from '@/lib/utils';
+import {
+  formatEgpPrice,
+  getRealEstateDetails,
+  getRealEstateOfferTypeLabel,
+  getRealEstatePropertyTypeLabel,
+} from '@/lib/listings/config';
 import { SITE_NAME_AR } from '@/lib/brand';
 import { ShareButton } from './ShareButton';
 import { UpvoteButton } from './UpvoteButton';
@@ -65,6 +71,9 @@ export function PlaceCard({
     ? place.images.filter((image): image is string => Boolean(image))
     : [];
 
+  const isRealEstate = place.category === 'real_estate';
+  const realEstateDetails = getRealEstateDetails(place);
+
   async function copyWithStatus(
     value: string,
     setter: (copied: boolean) => void,
@@ -85,6 +94,25 @@ export function PlaceCard({
             <Chip className="h-6 border border-zinc-200/60 bg-zinc-100 px-2 text-[11px] font-medium text-zinc-600">
               {getCategoryLabel(place.category)}
             </Chip>
+
+            {isRealEstate && realEstateDetails?.offerType && (
+              <Chip
+                className={`h-6 px-2 text-[10px] font-black ${
+                  realEstateDetails.offerType === 'rent'
+                    ? 'border border-blue-200 bg-blue-50 text-blue-800'
+                    : 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+                }`}
+              >
+                {getRealEstateOfferTypeLabel(realEstateDetails.offerType)}
+              </Chip>
+            )}
+
+            {isRealEstate && realEstateDetails?.propertyType && (
+              <Chip className="h-6 border border-zinc-200 bg-white px-2 text-[10px] font-bold text-zinc-700">
+                {getRealEstatePropertyTypeLabel(realEstateDetails.propertyType)}
+              </Chip>
+            )}
+
             {place.is_featured && (
               <Chip className="h-6 border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] text-[10px] font-black text-[var(--dairtak-orange-deep)]">
                 <Star className="me-1 size-3 fill-current" aria-hidden="true" />
@@ -144,6 +172,26 @@ export function PlaceCard({
             {place.title}
           </Link>
         </h2>
+
+        {/* Real Estate Decision Specs & Price Banner */}
+        {isRealEstate && realEstateDetails?.priceEgp && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="rounded-lg bg-zinc-950 px-2 py-0.5 text-xs font-black text-white">
+              {formatEgpPrice(realEstateDetails.priceEgp, realEstateDetails.offerType)}
+            </span>
+            {realEstateDetails.rooms && (
+              <span className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-bold text-zinc-700">
+                {realEstateDetails.rooms} {Number(realEstateDetails.rooms) === 1 ? 'غرفة' : Number(realEstateDetails.rooms) === 2 ? 'غرفتان' : 'غرف'}
+              </span>
+            )}
+            {realEstateDetails.areaSqm && (
+              <span className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-bold text-zinc-700">
+                {realEstateDetails.areaSqm} م²
+              </span>
+            )}
+          </div>
+        )}
+
         <span
           className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500"
           aria-label={`${place.view_count ?? 0} مشاهدة للمكان`}
@@ -189,7 +237,7 @@ export function PlaceCard({
       )}
 
       <CardBody className="space-y-2 p-3 pt-2 sm:px-3.5">
-        <CouponOffer place={place} />
+        {!isRealEstate && <CouponOffer place={place} />}
 
         {place.description && (
           <div className={place.category === 'stores'
@@ -208,7 +256,7 @@ export function PlaceCard({
           </div>
         )}
 
-        {place.instapay_vfcash && (
+        {!isRealEstate && place.instapay_vfcash && (
           <div className="flex items-center justify-between gap-2 rounded-xl border border-zinc-200/60 bg-zinc-50 p-2 text-xs">
             <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-zinc-800">
               <CreditCard className="size-3.5 shrink-0 text-zinc-600" aria-hidden="true" />
@@ -255,7 +303,9 @@ export function PlaceCard({
           as="a"
           href={formatWhatsAppUrl(
             place.whatsapp || place.phone,
-            `مرحباً، استفسار عبر ${SITE_NAME_AR} عن: ${place.title}`,
+            isRealEstate
+              ? `مرحباً، استفسار عبر ${SITE_NAME_AR} بخصوص عقار: ${place.title}`
+              : `مرحباً، استفسار عبر ${SITE_NAME_AR} عن: ${place.title}`,
           )}
           target="_blank"
           rel="noopener noreferrer"
