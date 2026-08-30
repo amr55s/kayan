@@ -15,27 +15,27 @@
 }
 
 .connectionNotice[data-state="connecting"] {
-  background-color: var(--heroui-warning-50, #fffbeb);
-  color: var(--heroui-warning-800, #92400e);
-  border: 1px solid var(--heroui-warning-200, #fde68a);
+  background-color: var(--warning-soft);
+  color: var(--warning-soft-foreground);
+  border: 1px solid var(--warning);
 }
 
 .connectionNotice[data-state="recovering"] {
-  background-color: var(--heroui-primary-50, #eff6ff);
-  color: var(--heroui-primary-800, #1e40af);
-  border: 1px solid var(--heroui-primary-200, #bfdbfe);
+  background-color: var(--accent-soft);
+  color: var(--accent-soft-foreground);
+  border: 1px solid var(--accent);
 }
 
 .connectionNotice[data-state="offline"] {
-  background-color: var(--heroui-danger-50, #fef2f2);
-  color: var(--heroui-danger-800, #991b1b);
-  border: 1px solid var(--heroui-danger-200, #fecaca);
+  background-color: var(--danger-soft);
+  color: var(--danger-soft-foreground);
+  border: 1px solid var(--danger);
 }
 
 .connectionNotice[data-state="error"] {
-  background-color: var(--heroui-danger-50, #fef2f2);
-  color: var(--heroui-danger-900, #7f1d1d);
-  border: 1px solid var(--heroui-danger-300, #fca5a5);
+  background-color: var(--danger-soft);
+  color: var(--danger-soft-foreground);
+  border: 1px solid var(--danger);
 }
 
 .noticeContent {
@@ -80,7 +80,7 @@
 }
 
 .retryButton:focus-visible {
-  outline: 2px solid var(--heroui-focus, #006fee);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -104,22 +104,22 @@
   inline-size: 3.5rem;
   block-size: 3.5rem;
   border-radius: 9999px;
-  background-color: var(--heroui-default-100, #f4f4f5);
-  color: var(--heroui-default-500, #71717a);
+  background-color: var(--default);
+  color: var(--muted);
   margin-block-end: 0.25rem;
 }
 
 .emptyStateTitle {
   font-size: 1.125rem;
   font-weight: 700;
-  color: var(--heroui-foreground, #18181b);
+  color: var(--foreground);
   margin: 0;
 }
 
 .emptyStateDescription {
   font-size: 0.875rem;
   line-height: 1.375rem;
-  color: var(--heroui-default-500, #71717a);
+  color: var(--muted);
   max-inline-size: 24rem;
   margin: 0;
 }
@@ -136,8 +136,8 @@
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  background-color: var(--heroui-primary, #006fee);
-  color: var(--heroui-primary-foreground, #ffffff);
+  background-color: var(--accent);
+  color: var(--accent-foreground);
   border: none;
   cursor: pointer;
   touch-action: manipulation;
@@ -149,7 +149,7 @@
 }
 
 .emptyStateAction:focus-visible {
-  outline: 2px solid var(--heroui-focus, #006fee);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -167,20 +167,20 @@
 }
 
 .composerStatus[data-status="sending"] {
-  background-color: var(--heroui-default-100, #f4f4f5);
-  color: var(--heroui-default-600, #52525b);
+  background-color: var(--default);
+  color: var(--default-foreground);
 }
 
 .composerStatus[data-status="retrying"] {
-  background-color: var(--heroui-warning-50, #fffbeb);
-  color: var(--heroui-warning-700, #b45309);
-  border: 1px solid var(--heroui-warning-200, #fde68a);
+  background-color: var(--warning-soft);
+  color: var(--warning-soft-foreground);
+  border: 1px solid var(--warning);
 }
 
 .composerStatus[data-status="failed"] {
-  background-color: var(--heroui-danger-50, #fef2f2);
-  color: var(--heroui-danger-700, #b91c1c);
-  border: 1px solid var(--heroui-danger-200, #fecaca);
+  background-color: var(--danger-soft);
+  color: var(--danger-soft-foreground);
+  border: 1px solid var(--danger);
 }
 
 .spinnerIcon {

@@ -46,14 +46,14 @@ test('legacy support routes authorize their thread before an internal chat redir
   }
 });
 
-test('live role layouts mount the authenticated chat inbox navigation', async () => {
+test('live chat layouts mount the canonical authenticated marketplace shell', async () => {
   const layouts = await Promise.all([
-    read('app/account/layout.tsx'),
-    read('app/merchant/layout.tsx'),
-    read('app/driver/layout.tsx'),
-    read('app/admin/layout.tsx'),
+    read('app/account/chat/layout.tsx'),
+    read('components/marketplace/merchant/merchant-marketplace-shell.tsx'),
+    read('app/driver/marketplace/chat/layout.tsx'),
+    read('app/admin/marketplace/chat/layout.tsx'),
   ]);
-  for (const source of layouts) assert.match(source, /ChatInboxNavigation/);
+  for (const source of layouts) assert.match(source, /AuthenticatedMarketplaceShell/);
 });
 
 test('monitor capability is distinct from support and legacy monitor lookup uses unified read access', async () => {

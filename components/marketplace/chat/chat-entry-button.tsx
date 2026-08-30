@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@heroui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect } from 'react';
@@ -73,14 +74,16 @@ export function ChatEntryButton({
       ) : (
         <input type="hidden" name="orderId" value={intent.orderId} />
       )}
-      <button
+      <Button
         type="submit"
-        disabled={isPending}
-        aria-disabled={isPending}
+        isPending={isPending}
+        isDisabled={isPending}
+        variant="secondary"
+        fullWidth
         className={styles.secondaryButton}
       >
         {isPending ? 'جارٍ فتح المحادثة…' : entry.mode === 'recovery' ? 'إعادة محاولة فتح المحادثة' : label}
-      </button>
+      </Button>
       {entry.message ? (
         <p role="status" className="m-0 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-bold leading-6 text-amber-950">
           {entry.message}

@@ -24,7 +24,9 @@ test('ChatConnectionNotice: defines all 5 states, accessibility live regions, an
 
   // Verify retry action
   assert.match(code, /aria-label="إعادة محاولة الاتصال بالمحادثة"/);
-  assert.match(code, /onClick=\{onRetry\}/);
+  assert.match(code, /onPress=\{onRetry\}/);
+  assert.match(code, /<Button/);
+  assert.doesNotMatch(code, /<button/);
 });
 
 test('ChatEmptyState: supports inboxEmpty, conversationEmpty, searchEmpty, blocked, and paused with Arabic copy', () => {
@@ -48,6 +50,9 @@ test('ChatEmptyState: supports inboxEmpty, conversationEmpty, searchEmpty, block
   assert.match(code, /role="region"/);
   assert.match(code, /aria-label=\{displayTitle\}/);
   assert.match(code, /aria-hidden="true"/);
+  assert.match(code, /<Button/);
+  assert.match(code, /<Link/);
+  assert.doesNotMatch(code, /<button|<a\s/);
 });
 
 test('ChatComposerStatus: supports idle, sending, failed, and retrying with live regions and retry action', () => {
@@ -68,7 +73,9 @@ test('ChatComposerStatus: supports idle, sending, failed, and retrying with live
 
   // Verify retry button on failure
   assert.match(code, /aria-label="إعادة إرسال الرسالة الفاشلة"/);
-  assert.match(code, /onClick=\{onRetry\}/);
+  assert.match(code, /onPress=\{onRetry\}/);
+  assert.match(code, /<Button/);
+  assert.doesNotMatch(code, /<button/);
 });
 
 test('Styles: enforces CSS logical properties, 44px mobile touch targets, and reduced-motion rules', () => {

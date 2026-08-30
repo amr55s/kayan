@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Drawer, Dropdown, Label } from '@heroui/react';
+import { Button, Drawer, Dropdown, Label, SearchField } from '@heroui/react';
 import Link from 'next/link';
 import { cloneElement, useCallback, useMemo, useState, type FormEvent, type ReactElement } from 'react';
 import type {
@@ -429,18 +429,28 @@ function ActiveConversation({
             </Drawer.Header>
             <Drawer.Body>
               <form onSubmit={search} className={styles.searchForm}>
-                <Label htmlFor="chat-search">عبارة البحث</Label>
-                <input
-                  id="chat-search"
-                  type="search"
+                <SearchField
                   value={searchQuery}
-                  minLength={1}
-                  maxLength={200}
-                  required
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  className={styles.searchInput}
-                  autoComplete="off"
-                />
+                  onChange={setSearchQuery}
+                  isDisabled={searchPending || !menuActions}
+                  fullWidth
+                  variant="secondary"
+                  className={styles.searchField}
+                >
+                  <Label htmlFor="chat-search">عبارة البحث</Label>
+                  <SearchField.Group>
+                    <SearchField.SearchIcon />
+                    <SearchField.Input
+                      id="chat-search"
+                      minLength={1}
+                      maxLength={200}
+                      required
+                      autoComplete="off"
+                      className={styles.searchInput}
+                    />
+                    <SearchField.ClearButton />
+                  </SearchField.Group>
+                </SearchField>
                 <Button type="submit" isPending={searchPending} isDisabled={searchPending || !menuActions}>
                   بحث آمن
                 </Button>
@@ -480,7 +490,7 @@ export function MarketplaceChatShell({
     ? initialConversation
     : null;
   return (
-    <main
+    <div
       className={styles.shell}
       data-has-conversation={Boolean(activePage)}
       dir="rtl"
@@ -513,6 +523,6 @@ export function MarketplaceChatShell({
           <ChatEmptyState state="conversationEmpty" className={styles.shellEmpty} />
         )}
       </section>
-    </main>
+    </div>
   );
 }

@@ -1,4 +1,5 @@
 ﻿import type { ReactElement, ReactNode } from 'react';
+import { Button, Link } from '@heroui/react';
 import {
   MessageSquareOff,
   MessageCircle,
@@ -93,21 +94,21 @@ export function ChatEmptyState({
 
       {action ? (
         action.href ? (
-          <a
+          <Link
             href={action.href}
             className={styles.emptyStateAction}
-            onClick={action.onClick}
+            onPress={action.onClick}
           >
             {action.label}
-          </a>
+          </Link>
         ) : (
-          <button
+          <Button
             type="button"
-            onClick={action.onClick}
+            onPress={action.onClick}
             className={styles.emptyStateAction}
           >
             {action.label}
-          </button>
+          </Button>
         )
       ) : null}
     </div>

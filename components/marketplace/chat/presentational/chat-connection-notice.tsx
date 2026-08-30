@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react';
+import { Button } from '@heroui/react';
 import { WifiOff, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import styles from './chat-presentational.module.css';
 
@@ -56,15 +57,16 @@ export function ChatConnectionNotice({
       </div>
 
       {onRetry && isError ? (
-        <button
+        <Button
           type="button"
-          onClick={onRetry}
+          variant="ghost"
+          onPress={onRetry}
           className={styles.retryButton}
           aria-label="إعادة محاولة الاتصال بالمحادثة"
         >
           <RefreshCw size={14} aria-hidden="true" />
           <span>إعادة المحاولة</span>
-        </button>
+        </Button>
       ) : null}
     </div>
   );

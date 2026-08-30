@@ -881,6 +881,44 @@ test('mounted composer disables editing while the submitted snapshot is pending 
   assert.doesNotMatch(failedHtml, /aria-live="assertive"/);
 });
 
+test('HeroUI presentational chat actions keep native button and link behavior', async () => {
+  const [{ ChatConnectionNotice }, { ChatEmptyState }, { ChatComposerStatus }] = await Promise.all([
+    importWorkspaceTsx('components/marketplace/chat/presentational/chat-connection-notice.tsx'),
+    importWorkspaceTsx('components/marketplace/chat/presentational/chat-empty-state.tsx'),
+    importWorkspaceTsx('components/marketplace/chat/presentational/chat-composer-status.tsx'),
+  ]);
+  let connectionRetries = 0;
+  let sendRetries = 0;
+  let emptyActions = 0;
+
+  await withMountedReact(async ({ root, container }) => {
+    await act(async () => root.render(createElement('div', null,
+      createElement(ChatConnectionNotice, { state: 'offline', onRetry: () => { connectionRetries += 1; } }),
+      createElement(ChatComposerStatus, { status: 'failed', onRetry: () => { sendRetries += 1; } }),
+      createElement(ChatEmptyState, {
+        state: 'inboxEmpty',
+        action: { label: 'ابدأ الآن', onClick: () => { emptyActions += 1; } },
+      }),
+      createElement(ChatEmptyState, {
+        state: 'searchEmpty',
+        action: { label: 'العودة للمتجر', href: '/marketplace' },
+      }),
+    )));
+
+    const buttons = container.querySelectorAll('button');
+    assert.equal(buttons.length, 3);
+    assert.ok(buttons.every((button) => button.getAttribute('type') === 'button'));
+    await act(async () => buttons.forEach((button) => button.click()));
+    assert.deepEqual({ connectionRetries, sendRetries, emptyActions }, {
+      connectionRetries: 1,
+      sendRetries: 1,
+      emptyActions: 1,
+    });
+    const link = container.querySelector('a');
+    assert.equal(link?.getAttribute('href'), '/marketplace');
+  });
+});
+
 test('HeroUI dropdown and drawer use native keyboard activation and portal focus', async () => {
   const { MarketplaceChatShell } = await importWorkspaceTsx('components/marketplace/chat/chat-shell.tsx');
   const conversation = fixtureConversation();
@@ -928,6 +966,10 @@ test('HeroUI dropdown and drawer use native keyboard activation and portal focus
     assert.ok(dialog, 'activating the search item opens the Drawer dialog');
     const searchInput = dialog.querySelector('input');
     assert.ok(searchInput);
+    assert.equal(searchInput.type, 'search');
+    assert.equal(searchInput.getAttribute('id'), 'chat-search');
+    const searchLabel = dialog.querySelectorAll('label').find((node) => node.textContent.includes('عبارة البحث'));
+    assert.equal(searchLabel?.getAttribute('for'), 'chat-search');
     await act(async () => searchInput.focus());
     assert.ok(dialog.contains(documentTarget.activeElement), 'Drawer accepts focus inside its focus scope');
     await act(async () => pressKey(documentTarget.activeElement, 'Tab'));

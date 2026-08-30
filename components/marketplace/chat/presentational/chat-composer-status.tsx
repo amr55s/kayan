@@ -1,4 +1,5 @@
 ﻿import type { ReactElement } from 'react';
+import { Button } from '@heroui/react';
 import { AlertCircle, Loader2, RotateCcw } from 'lucide-react';
 import styles from './chat-presentational.module.css';
 
@@ -54,15 +55,16 @@ export function ChatComposerStatus({
       </div>
 
       {isFailed && onRetry ? (
-        <button
+        <Button
           type="button"
-          onClick={onRetry}
+          variant="ghost"
+          onPress={onRetry}
           className={styles.retryButton}
           aria-label="إعادة إرسال الرسالة الفاشلة"
         >
           <RotateCcw size={14} aria-hidden="true" />
           <span>إعادة المحاولة</span>
-        </button>
+        </Button>
       ) : null}
     </div>
   );
