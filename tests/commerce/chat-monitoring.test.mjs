@@ -8,6 +8,7 @@ const migrationPath = new URL(`../../supabase/migrations/${migrationName}`, impo
 const riskPath = new URL('../../lib/commerce/chat/risk.ts', import.meta.url);
 const monitorPath = new URL('../../components/marketplace/chat/admin-monitor.tsx', import.meta.url);
 const monitorOpenPath = new URL('../../components/marketplace/chat/monitor-open-audit.tsx', import.meta.url);
+const monitorRoutePath = new URL('../../app/admin/marketplace/chat/[id]/page.tsx', import.meta.url);
 const guardPath = new URL('../../lib/auth/guards.ts', import.meta.url);
 
 const source = (path) => readFileSync(path, 'utf8');
@@ -29,6 +30,7 @@ test('monitoring RPCs audit bounded reads/actions and retain an append-only audi
   assert.match(migration, /marketplace_chat_monitor_open_once/u);
   assert.match(migration, /revoke update, delete on public\.marketplace_chat_audit from public, anon, authenticated/u);
   assert.match(migration, /action in \('open', 'search', 'export', 'moderate'\)/u);
+  for (const filter of ['role','storeId','orderId','driverId','unread','report','risk','status','from','to']) assert.match(migration, new RegExp(`'${filter}'`, 'u'));
 });
 
 test('reports are participant scoped, original messages remain immutable, and signals never suspend', () => {
@@ -46,6 +48,8 @@ test('risk classifier emits only deterministic rule ids/counts, never message bo
     assert.match(risk, new RegExp(`'${type}'`, 'u'));
   }
   assert.match(risk, /phone_detected|external_link_detected|off_platform_payment_phrase/u);
+  assert.match(risk, /normalized === 'dairtak\.com' \|\| normalized\.endsWith\('\.dairtak\.com'\)/u);
+  assert.doesNotMatch(risk, /hostname\.endsWith\('dairtak\.com'\)/u);
   assert.doesNotMatch(risk, /console\.(?:log|info|warn|error)\([^)]*(?:body|message)/u);
 });
 
@@ -60,8 +64,7 @@ test('admin monitor uses documented HeroUI controls and requires a moderation re
 });
 
 test('monitor opens use a browser-session id and the deduplicating audit RPC', () => {
-  const openAudit = source(monitorOpenPath);
-  assert.match(openAudit, /sessionStorage\.getItem\(MONITOR_SESSION_KEY\)/u);
-  assert.match(openAudit, /record_marketplace_chat_monitor_open/u);
-  assert.doesNotMatch(openAudit, /console\./u);
+  const route = source(monitorRoutePath);
+  assert.match(route, /getMarketplaceChatAsMonitor/u);
+  assert.doesNotMatch(route, /MonitorOpenAudit|\bgetConversationPage\b/u);
 });

@@ -100,26 +100,39 @@ begin
 end;
 $$;
 
-create or replace function public.record_marketplace_chat_monitor_open(p_thread_id uuid, p_monitor_session_id uuid)
+create or replace function public.record_marketplace_chat_monitor_open(p_thread_id uuid, p_monitor_session_id uuid default null)
 returns boolean language plpgsql security definer set search_path = '' as $$
+declare v_session_id uuid;
 begin
-  if p_monitor_session_id is null then raise exception 'invalid_monitor_session' using errcode = '22023'; end if;
-  perform public.record_marketplace_chat_monitor_audit('open', p_thread_id, p_monitor_session_id);
+  begin v_session_id := coalesce(p_monitor_session_id, nullif((select auth.jwt() ->> 'session_id'), '')::uuid); exception when invalid_text_representation then raise exception 'invalid_monitor_session' using errcode = '22023'; end;
+  if v_session_id is null then raise exception 'invalid_monitor_session' using errcode = '22023'; end if;
+  perform public.record_marketplace_chat_monitor_audit('open', p_thread_id, v_session_id);
   return true;
 end;
 $$;
 
 create or replace function public.list_marketplace_chat_monitor_queue(
   p_status text default null, p_has_report boolean default null, p_has_risk boolean default null,
-  p_limit integer default 30, p_monitor_session_id uuid default null
+  p_limit integer default 30, p_monitor_session_id uuid default null, p_filters jsonb default '{}'::jsonb
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 begin
   perform public.require_marketplace_chat_monitor();
   if p_limit not between 1 and 100 or (p_status is not null and p_status not in ('open','waiting_customer','waiting_support','resolved','closed','paused')) then
     raise exception 'invalid_monitor_queue' using errcode = '22023';
   end if;
+  if jsonb_typeof(coalesce(p_filters, '{}'::jsonb)) <> 'object'
+    or exists (select 1 from jsonb_object_keys(coalesce(p_filters, '{}'::jsonb)) key where key not in ('role','storeId','orderId','driverId','unread','report','risk','status','from','to'))
+    or (p_filters ? 'role' and p_filters ->> 'role' not in ('customer','merchant','driver','admin'))
+    or (p_filters ? 'status' and p_filters ->> 'status' not in ('open','waiting_customer','waiting_support','resolved','closed','paused'))
+    or (p_filters ? 'unread' and p_filters ->> 'unread' not in ('true','false'))
+    or (p_filters ? 'report' and p_filters ->> 'report' not in ('true','false'))
+    or (p_filters ? 'risk' and p_filters ->> 'risk' not in ('true','false'))
+    or exists (select 1 from jsonb_each_text(coalesce(p_filters, '{}'::jsonb)) item where item.key in ('storeId','orderId','driverId') and item.value !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+    or exists (select 1 from jsonb_each_text(coalesce(p_filters, '{}'::jsonb)) item where item.key in ('from','to') and item.value !~ '^\\d{4}-\\d{2}-\\d{2}T') then
+    raise exception 'invalid_monitor_filters' using errcode = '22023';
+  end if;
   perform public.record_marketplace_chat_monitor_audit('search', (select id from public.support_threads order by last_message_at desc limit 1), p_monitor_session_id, null,
-    jsonb_build_object('status', p_status, 'has_report', p_has_report, 'has_risk', p_has_risk, 'limit', p_limit));
+    jsonb_build_object('status', p_status, 'has_report', p_has_report, 'has_risk', p_has_risk, 'limit', p_limit, 'filters', p_filters));
   return coalesce((select jsonb_agg(jsonb_build_object(
     'id', thread.id, 'public_code', thread.public_code, 'subject', thread.subject, 'status', thread.status,
     'last_message_at', thread.last_message_at,
@@ -128,13 +141,21 @@ begin
   ) order by thread.last_message_at desc)
   from (select * from public.support_threads thread where
     (p_status is null or thread.status::text = p_status)
+    and (not (p_filters ? 'status') or thread.status::text = p_filters ->> 'status')
+    and (not (p_filters ? 'storeId') or thread.store_id = (p_filters ->> 'storeId')::uuid)
+    and (not (p_filters ? 'orderId') or thread.order_id = (p_filters ->> 'orderId')::uuid)
+    and (not (p_filters ? 'driverId') or exists (select 1 from public.marketplace_chat_participants participant where participant.thread_id = thread.id and participant.user_id = (p_filters ->> 'driverId')::uuid and participant.participant_role = 'driver' and participant.removed_at is null))
+    and (not (p_filters ? 'role') or exists (select 1 from public.marketplace_chat_participants participant where participant.thread_id = thread.id and participant.participant_role::text = p_filters ->> 'role' and participant.removed_at is null))
+    and (not (p_filters ? 'unread') or (p_filters ->> 'unread')::boolean = exists (select 1 from public.support_messages message where message.thread_id = thread.id and message.created_at > coalesce((select max(audit.created_at) from public.marketplace_chat_audit audit where audit.thread_id = thread.id and audit.actor_user_id = (select auth.uid()) and audit.action = 'open'), '-infinity'::timestamptz)))
+    and (not (p_filters ? 'from') or thread.last_message_at >= (p_filters ->> 'from')::timestamptz)
+    and (not (p_filters ? 'to') or thread.last_message_at <= (p_filters ->> 'to')::timestamptz)
     and (p_has_report is null or p_has_report = exists (select 1 from public.marketplace_chat_reports report where report.thread_id = thread.id and report.status = 'open'))
     and (p_has_risk is null or p_has_risk = exists (select 1 from public.marketplace_chat_risk_flags flag where flag.thread_id = thread.id))
     order by thread.last_message_at desc limit p_limit) thread), '[]'::jsonb);
 end;
 $$;
 
-create or replace function public.get_marketplace_chat_as_monitor(p_thread_id uuid, p_monitor_session_id uuid)
+create or replace function public.get_marketplace_chat_as_monitor(p_thread_id uuid, p_monitor_session_id uuid default null)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 begin
   perform public.require_marketplace_chat_monitor();
@@ -153,7 +174,7 @@ begin
   perform public.require_marketplace_chat_monitor();
   -- Exports contain queue metadata only; message bodies stay inside the audited
   -- monitor reader and never enter analytics or broad exports.
-  v_result := public.list_marketplace_chat_monitor_queue(p_status, p_has_report, p_has_risk, p_limit, p_monitor_session_id);
+  v_result := public.list_marketplace_chat_monitor_queue(p_status, p_has_report, p_has_risk, p_limit, p_monitor_session_id, '{}'::jsonb);
   perform public.record_marketplace_chat_monitor_audit('export', null, p_monitor_session_id, null,
     jsonb_build_object('status', p_status, 'has_report', p_has_report, 'has_risk', p_has_risk, 'limit', p_limit));
   return v_result;
@@ -200,13 +221,13 @@ $$;
 revoke all on function public.require_marketplace_chat_monitor() from public, anon, authenticated;
 revoke all on function public.record_marketplace_chat_monitor_audit(text, uuid, uuid, text, jsonb) from public, anon, authenticated;
 revoke all on function public.record_marketplace_chat_monitor_open(uuid, uuid) from public, anon, authenticated;
-revoke all on function public.list_marketplace_chat_monitor_queue(text, boolean, boolean, integer, uuid) from public, anon, authenticated;
+revoke all on function public.list_marketplace_chat_monitor_queue(text, boolean, boolean, integer, uuid, jsonb) from public, anon, authenticated;
 revoke all on function public.get_marketplace_chat_as_monitor(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.export_marketplace_chat_monitor_queue(text, boolean, boolean, integer, uuid) from public, anon, authenticated;
 revoke all on function public.report_my_marketplace_chat_message(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.moderate_marketplace_chat(uuid, text, text, uuid) from public, anon, authenticated;
 grant execute on function public.record_marketplace_chat_monitor_open(uuid, uuid) to authenticated;
-grant execute on function public.list_marketplace_chat_monitor_queue(text, boolean, boolean, integer, uuid) to authenticated;
+grant execute on function public.list_marketplace_chat_monitor_queue(text, boolean, boolean, integer, uuid, jsonb) to authenticated;
 grant execute on function public.get_marketplace_chat_as_monitor(uuid, uuid) to authenticated;
 grant execute on function public.export_marketplace_chat_monitor_queue(text, boolean, boolean, integer, uuid) to authenticated;
 grant execute on function public.report_my_marketplace_chat_message(uuid, uuid, text) to authenticated;

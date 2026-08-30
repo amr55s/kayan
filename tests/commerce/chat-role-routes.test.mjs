@@ -16,10 +16,12 @@ test('chat inbox routes protect every durable role before loading chat data', as
   assert.match(merchant, /requireProfile\(\['merchant'\]\)/);
   assert.match(driver, /requireProfile\(\['driver'\]\)/);
   assert.match(admin, /requireAdminAal2\(\{ capability: 'chat_monitor'/);
-  for (const source of [customer, merchant, driver, admin]) {
+  for (const source of [customer, merchant, driver]) {
     assert.match(source, /listConversations/);
     assert.match(source, /MarketplaceChatShell/);
   }
+  assert.match(admin, /listChatMonitorQueue/);
+  assert.match(admin, /MarketplaceChatAdminMonitor/);
 });
 
 test('admin monitor is capability-gated and intentionally read-only', async () => {
@@ -80,11 +82,12 @@ test('selected routes validate the id before their concurrent inbox and conversa
     read('app/driver/marketplace/chat/[id]/page.tsx'),
     read('app/admin/marketplace/chat/[id]/page.tsx'),
   ]);
-  for (const source of routes) {
+  for (const source of routes.slice(0, 3)) {
     assert.match(source, /z\.uuid\(\)\.safeParse/);
     assert.match(source, /Promise\.all\(/);
     assert.match(source, /getConversationPage/);
   }
+  assert.match(routes[3], /getMarketplaceChatAsMonitor/);
 });
 
 test('contextual entry stays in-app and preserves an allowlisted local return route', async () => {

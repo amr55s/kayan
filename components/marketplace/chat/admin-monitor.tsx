@@ -35,6 +35,16 @@ export function MarketplaceChatAdminMonitor({
     <aside className="rounded-[var(--dairtak-radius-card)] border border-[var(--dairtak-border)] bg-[var(--dairtak-surface)] p-3 shadow-sm">
       <h2 className="px-2 text-base font-bold text-[var(--dairtak-foreground)]">طابور المراجعة</h2>
       <p className="px-2 pb-3 text-sm text-[var(--dairtak-muted)]">قراءة ومراجعة موثقة فقط.</p>
+      <form method="get" className="grid grid-cols-2 gap-2 px-2 pb-3" aria-label="فلاتر طابور المراجعة">
+        <label className="text-xs">الدور<select name="role" className="mt-1 w-full rounded border p-1"><option value="">الكل</option><option value="customer">عميل</option><option value="merchant">تاجر</option><option value="driver">سائق</option><option value="admin">مسؤول</option></select></label>
+        <label className="text-xs">الحالة<select name="status" className="mt-1 w-full rounded border p-1"><option value="">الكل</option><option value="open">مفتوحة</option><option value="paused">موقوفة</option><option value="closed">مغلقة</option></select></label>
+        <label className="text-xs">المتجر<input name="storeId" inputMode="text" className="mt-1 w-full rounded border p-1" /></label>
+        <label className="text-xs">الطلب<input name="orderId" inputMode="text" className="mt-1 w-full rounded border p-1" /></label>
+        <label className="text-xs">السائق<input name="driverId" inputMode="text" className="mt-1 w-full rounded border p-1" /></label>
+        <label className="text-xs">من<input name="from" type="datetime-local" className="mt-1 w-full rounded border p-1" /></label>
+        <label className="text-xs">إلى<input name="to" type="datetime-local" className="mt-1 w-full rounded border p-1" /></label>
+        <Button type="submit" size="sm" variant="secondary">تطبيق الفلاتر</Button>
+      </form>
       <ul className="space-y-2" aria-label="المحادثات التي تحتاج مراجعة">
         {items.map((item) => <li key={item.id} className="rounded-xl border border-[var(--dairtak-border)] p-3">
           <Link href={`/admin/marketplace/chat/${item.id}`} className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--dairtak-accent)]">

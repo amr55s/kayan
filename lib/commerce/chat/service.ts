@@ -86,6 +86,11 @@ export type ChatMonitorQueueItem = {
   id: string; public_code: string; subject: string; status: string; last_message_at: string;
   report_count: number; risk_count: number;
 };
+export type ChatMonitorFilters = Partial<{
+  role: 'customer' | 'merchant' | 'driver' | 'admin'; storeId: string; orderId: string; driverId: string;
+  unread: boolean; report: boolean; risk: boolean;
+  status: ChatConversationSummary['status']; from: string; to: string;
+}>;
 
 const uuid = z.uuid();
 const timestamp = z.iso.datetime({ offset: true });
@@ -296,6 +301,18 @@ export async function getConversationPage(input: GetConversationPageInput): Prom
   return parseRpcResult(chatMessagePageSchema, data);
 }
 
+/** An audited monitor-only read.  The database derives the authenticated
+ * Supabase session id and records the open before returning message bodies. */
+export async function getMarketplaceChatAsMonitor(input: GetConversationPageInput): Promise<ChatMessagePage> {
+  const parsedInput = parseServiceInput(getConversationPageInputSchema, input);
+  const supabase = await authenticatedChatClient();
+  // @ts-expect-error Task 10 RPC is locally committed before generated types refresh.
+  const data = await resolveChatRpc(supabase.rpc('get_marketplace_chat_as_monitor', {
+    p_thread_id: parsedInput.conversationId, p_monitor_session_id: null,
+  }));
+  return parseRpcResult(chatMessagePageSchema, data);
+}
+
 export async function canShareConversationLocation(conversationId: string): Promise<boolean> {
   const parsed = uuid.safeParse(conversationId);
   if (!parsed.success) return false;
@@ -313,11 +330,14 @@ const chatMonitorQueueItemSchema: z.ZodType<ChatMonitorQueueItem> = z.object({
 
 /** This is intentionally separate from participant inboxes: monitor access is
  * re-authorized by the RPC with AAL2 + chat_monitor on every request. */
-export async function listChatMonitorQueue(): Promise<ChatMonitorQueueItem[]> {
+export async function listChatMonitorQueue(filters: ChatMonitorFilters = {}): Promise<ChatMonitorQueueItem[]> {
+  const filterSchema = z.object({ role: z.enum(['customer', 'merchant', 'driver', 'admin']).optional(), storeId: uuid.optional(), orderId: uuid.optional(), driverId: uuid.optional(), unread: z.boolean().optional(), report: z.boolean().optional(), risk: z.boolean().optional(), status: z.enum(['open','waiting_customer','waiting_support','resolved','closed','paused']).optional(), from: timestamp.optional(), to: timestamp.optional() }).strict();
+  const parsedFilters = filterSchema.safeParse(filters);
+  if (!parsedFilters.success) throw new ChatServiceError('invalid_input');
   const supabase = await authenticatedChatClient();
   // @ts-expect-error Task 10 RPC is committed locally before generated types refresh.
   const data = await resolveChatRpc(supabase.rpc('list_marketplace_chat_monitor_queue', {
-    p_status: null, p_has_report: null, p_has_risk: null, p_limit: 50, p_monitor_session_id: null,
+    p_status: null, p_has_report: null, p_has_risk: null, p_limit: 50, p_monitor_session_id: null, p_filters: parsedFilters.data,
   }));
   const parsed = z.array(chatMonitorQueueItemSchema).max(100).safeParse(data);
   if (!parsed.success) throw new ChatServiceError('service_unavailable');
