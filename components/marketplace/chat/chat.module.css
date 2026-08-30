@@ -123,7 +123,7 @@
 .menuButton:focus-visible,
 .loadOlderButton:focus-visible,
 .newMessagesButton:focus-visible,
-[data-focus-visible='true'] {
+.shell :global([data-focus-visible='true']) {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
