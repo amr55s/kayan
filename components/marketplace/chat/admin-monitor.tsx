@@ -1,8 +1,9 @@
 'use client';
 
-import { Alert, Button, Drawer, Label, TextArea, useOverlayState } from '@heroui/react';
+import { Alert, Button, Drawer, Input, Label, ListBox, Select, TextArea, TextField, useOverlayState } from '@heroui/react';
 import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
+import type { ChatMonitorFilters } from '@/lib/commerce/chat/service';
 
 export type MonitorQueueItem = {
   id: string;
@@ -14,12 +15,76 @@ export type MonitorQueueItem = {
   risk_count: number;
 };
 
+type MonitorSelectOption = { id: string; label: string };
+
+const ROLE_OPTIONS: readonly MonitorSelectOption[] = [
+  { id: 'customer', label: 'عميل' },
+  { id: 'merchant', label: 'تاجر' },
+  { id: 'driver', label: 'سائق' },
+  { id: 'admin', label: 'مسؤول' },
+];
+
+const STATUS_OPTIONS: readonly MonitorSelectOption[] = [
+  { id: 'open', label: 'مفتوحة' },
+  { id: 'waiting_customer', label: 'بانتظار العميل' },
+  { id: 'waiting_support', label: 'بانتظار المراجعة' },
+  { id: 'resolved', label: 'محلولة' },
+  { id: 'closed', label: 'مغلقة' },
+  { id: 'paused', label: 'موقوفة' },
+];
+
+const BOOLEAN_OPTIONS: readonly MonitorSelectOption[] = [
+  { id: 'true', label: 'نعم' },
+  { id: 'false', label: 'لا' },
+];
+
+function MonitorSelect({
+  name,
+  label,
+  value,
+  options,
+}: {
+  name: string;
+  label: string;
+  value: string | boolean | undefined;
+  options: readonly MonitorSelectOption[];
+}) {
+  const selectedValue = value === undefined ? null : String(value);
+  return <Select name={name} defaultValue={selectedValue} placeholder="الكل" variant="secondary" fullWidth>
+    <Label className="text-xs text-[var(--dairtak-foreground)]">{label}</Label>
+    <Select.Trigger className="mt-1 min-h-9 w-full rounded-lg border-[var(--dairtak-border)] bg-[var(--dairtak-surface)] px-2 text-start text-sm">
+      <Select.Value />
+      <Select.Indicator />
+    </Select.Trigger>
+    <Select.Popover className="z-[110] rounded-xl border border-[var(--dairtak-border)] bg-[var(--dairtak-surface)] p-1 shadow-xl">
+      <ListBox aria-label={label}>
+        {options.map((option) => <ListBox.Item key={option.id} id={option.id} textValue={option.label} className="rounded-lg px-3 py-2 data-[focused]:bg-[var(--dairtak-surface-muted)] data-[selected]:font-semibold">
+          {option.label}
+        </ListBox.Item>)}
+      </ListBox>
+    </Select.Popover>
+  </Select>;
+}
+
+function MonitorIdField({ name, label, value }: { name: string; label: string; value: string | undefined }) {
+  return <TextField fullWidth>
+    <Label className="text-xs text-[var(--dairtak-foreground)]">{label}</Label>
+    <Input name={name} defaultValue={value} inputMode="text" autoComplete="off" variant="secondary" className="mt-1 min-h-9 w-full rounded-lg border-[var(--dairtak-border)] bg-[var(--dairtak-surface)] px-2 text-sm" />
+  </TextField>;
+}
+
+function toDateTimeLocal(value: string | undefined): string | undefined {
+  return value ? value.slice(0, 16) : undefined;
+}
+
 export function MarketplaceChatAdminMonitor({
   items,
   moderate,
+  filters = {},
 }: {
   items: readonly MonitorQueueItem[];
   moderate: (formData: FormData) => Promise<void>;
+  filters?: ChatMonitorFilters;
 }) {
   const drawer = useOverlayState({ defaultOpen: false });
   const [selected, setSelected] = useState<MonitorQueueItem | null>(null);
@@ -36,13 +101,16 @@ export function MarketplaceChatAdminMonitor({
       <h2 className="px-2 text-base font-bold text-[var(--dairtak-foreground)]">طابور المراجعة</h2>
       <p className="px-2 pb-3 text-sm text-[var(--dairtak-muted)]">قراءة ومراجعة موثقة فقط.</p>
       <form method="get" className="grid grid-cols-2 gap-2 px-2 pb-3" aria-label="فلاتر طابور المراجعة">
-        <label className="text-xs">الدور<select name="role" className="mt-1 w-full rounded border p-1"><option value="">الكل</option><option value="customer">عميل</option><option value="merchant">تاجر</option><option value="driver">سائق</option><option value="admin">مسؤول</option></select></label>
-        <label className="text-xs">الحالة<select name="status" className="mt-1 w-full rounded border p-1"><option value="">الكل</option><option value="open">مفتوحة</option><option value="paused">موقوفة</option><option value="closed">مغلقة</option></select></label>
-        <label className="text-xs">المتجر<input name="storeId" inputMode="text" className="mt-1 w-full rounded border p-1" /></label>
-        <label className="text-xs">الطلب<input name="orderId" inputMode="text" className="mt-1 w-full rounded border p-1" /></label>
-        <label className="text-xs">السائق<input name="driverId" inputMode="text" className="mt-1 w-full rounded border p-1" /></label>
-        <label className="text-xs">من<input name="from" type="datetime-local" className="mt-1 w-full rounded border p-1" /></label>
-        <label className="text-xs">إلى<input name="to" type="datetime-local" className="mt-1 w-full rounded border p-1" /></label>
+        <MonitorSelect name="role" label="الدور" value={filters.role} options={ROLE_OPTIONS} />
+        <MonitorSelect name="status" label="الحالة" value={filters.status} options={STATUS_OPTIONS} />
+        <MonitorIdField name="storeId" label="المتجر" value={filters.storeId} />
+        <MonitorIdField name="orderId" label="الطلب" value={filters.orderId} />
+        <MonitorIdField name="driverId" label="السائق" value={filters.driverId} />
+        <MonitorSelect name="unread" label="غير مقروء" value={filters.unread} options={BOOLEAN_OPTIONS} />
+        <MonitorSelect name="report" label="بلاغ" value={filters.report} options={BOOLEAN_OPTIONS} />
+        <MonitorSelect name="risk" label="إشارة خطر" value={filters.risk} options={BOOLEAN_OPTIONS} />
+        <TextField fullWidth><Label className="text-xs text-[var(--dairtak-foreground)]">من</Label><Input name="from" type="datetime-local" defaultValue={toDateTimeLocal(filters.from)} variant="secondary" className="mt-1 min-h-9 w-full rounded-lg border-[var(--dairtak-border)] bg-[var(--dairtak-surface)] px-2 text-sm" /></TextField>
+        <TextField fullWidth><Label className="text-xs text-[var(--dairtak-foreground)]">إلى</Label><Input name="to" type="datetime-local" defaultValue={toDateTimeLocal(filters.to)} variant="secondary" className="mt-1 min-h-9 w-full rounded-lg border-[var(--dairtak-border)] bg-[var(--dairtak-surface)] px-2 text-sm" /></TextField>
         <Button type="submit" size="sm" variant="secondary">تطبيق الفلاتر</Button>
       </form>
       <ul className="space-y-2" aria-label="المحادثات التي تحتاج مراجعة">

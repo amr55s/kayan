@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import test from 'node:test';
+import { parseMonitorSearchFilters } from '../../lib/commerce/chat/monitor-filters.ts';
 
 const migrationName = readdirSync(new URL('../../supabase/migrations/', import.meta.url))
   .find((name) => name.endsWith('_marketplace_chat_monitoring_notifications.sql'));
@@ -9,6 +10,7 @@ const riskPath = new URL('../../lib/commerce/chat/risk.ts', import.meta.url);
 const monitorPath = new URL('../../components/marketplace/chat/admin-monitor.tsx', import.meta.url);
 const monitorOpenPath = new URL('../../components/marketplace/chat/monitor-open-audit.tsx', import.meta.url);
 const monitorRoutePath = new URL('../../app/admin/marketplace/chat/[id]/page.tsx', import.meta.url);
+const monitorIndexPath = new URL('../../app/admin/marketplace/chat/page.tsx', import.meta.url);
 const guardPath = new URL('../../lib/auth/guards.ts', import.meta.url);
 
 const source = (path) => readFileSync(path, 'utf8');
@@ -56,11 +58,46 @@ test('risk classifier emits only deterministic rule ids/counts, never message bo
 test('admin monitor uses documented HeroUI controls and requires a moderation reason', () => {
   const monitor = source(monitorPath);
   assert.match(monitor, /from '@heroui\/react'/u);
+  assert.match(monitor, /\bSelect\b/u);
+  assert.match(monitor, /\bListBox\b/u);
+  assert.match(monitor, /\bTextField\b/u);
   assert.match(monitor, /<TextArea/u);
   assert.match(monitor, /<Label/u);
   assert.match(monitor, /minLength=\{5\}/u);
   assert.match(monitor, /maxLength=\{500\}/u);
   assert.match(monitor, /<Drawer/u);
+  for (const name of ['unread', 'report', 'risk']) {
+    assert.match(monitor, new RegExp(`<MonitorSelect name="${name}"`, 'u'));
+  }
+  assert.doesNotMatch(monitor, /<select\b/u);
+  assert.doesNotMatch(monitor, /<input(?!\s+type="hidden")\b/u);
+});
+
+test('monitor query filters isolate invalid values and canonicalize valid times', () => {
+  const page = source(monitorIndexPath);
+  assert.match(page, /parseMonitorSearchFilters/u);
+  assert.match(page, /listChatMonitorQueue\(filters\)/u);
+  assert.match(page, /filters=\{filters\}/u);
+
+  const id = crypto.randomUUID();
+  const parsed = parseMonitorSearchFilters({
+    role: 'merchant',
+    status: 'invalid',
+    storeId: id,
+    orderId: 'not-a-uuid',
+    unread: 'true',
+    report: 'false',
+    risk: 'not-a-boolean',
+    from: '2026-08-30T10:00:00+03:00',
+    to: 'invalid-time',
+  });
+  assert.deepEqual(parsed, {
+    role: 'merchant', storeId: id, unread: true, report: false,
+    from: '2026-08-30T07:00:00.000Z',
+  });
+  assert.deepEqual(parseMonitorSearchFilters({
+    from: '2026-08-30T12:00:00.000Z', to: '2026-08-30T10:00:00.000Z', risk: 'true',
+  }), { from: '2026-08-30T12:00:00.000Z', risk: true });
 });
 
 test('monitor opens use a browser-session id and the deduplicating audit RPC', () => {
