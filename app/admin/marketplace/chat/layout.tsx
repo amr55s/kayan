@@ -8,4 +8,3 @@ export default function AdminChatLayout({ children }: { children: ReactNode }) {
     </AuthenticatedMarketplaceShell>
   );
 }
-

@@ -1,9 +1,29 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import postcss from 'postcss';
 
 const root = new URL('../..', import.meta.url);
 const read = (path) => readFile(new URL(path, root), 'utf8');
+
+function themeTokens(css) {
+  const tokens = new Map();
+  postcss.parse(css).walkRules((rule) => {
+    if (rule.selector !== '.shell') return;
+    rule.walkDecls(/^--/, (declaration) => tokens.set(declaration.prop, declaration.value));
+  });
+  return tokens;
+}
+
+function contrastRatio(foreground, background) {
+  const luminance = (hex) => {
+    const channels = hex.slice(1).match(/.{2}/g).map((value) => Number.parseInt(value, 16) / 255);
+    const linear = channels.map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  };
+  const values = [luminance(foreground), luminance(background)].sort((left, right) => right - left);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
 
 test('every chat role is mounted by the shared canonical DAIRTAK marketplace wrapper', async () => {
   const [wrapper, merchantShell, customer, driver, admin] = await Promise.all([
@@ -53,6 +73,29 @@ test('canonical shell publishes HeroUI v3 semantic DAIRTAK tokens and chat consu
   assert.match(presentationalCss, /var\(--accent\)/);
   assert.match(presentationalCss, /var\(--focus\)/);
   assert.doesNotMatch(presentationalCss, /#006fee|#eff6ff|#1e40af|#bfdbfe/i);
+});
+
+test('presentational semantic tokens are defined in theme scope with readable state contrast', async () => {
+  const [marketplaceCss, presentationalCss] = await Promise.all([
+    read('components/marketplace/marketplace.module.css'),
+    read('components/marketplace/chat/presentational/chat-presentational.module.css'),
+  ]);
+  const tokens = themeTokens(marketplaceCss);
+  const consumed = new Set([...presentationalCss.matchAll(/var\((--[a-z-]+)\)/g)].map((match) => match[1]));
+  for (const token of consumed) assert.ok(tokens.has(token), `${token} is defined by the canonical shell`);
+
+  for (const [background, foreground] of [
+    ['--accent', '--accent-foreground'],
+    ['--accent-soft', '--accent-soft-foreground'],
+    ['--default', '--default-foreground'],
+    ['--warning', '--warning-foreground'],
+    ['--warning-soft', '--warning-soft-foreground'],
+    ['--danger', '--danger-foreground'],
+    ['--danger-soft', '--danger-soft-foreground'],
+  ]) {
+    const ratio = contrastRatio(tokens.get(foreground), tokens.get(background));
+    assert.ok(ratio >= 4.5, `${foreground} on ${background} has ${ratio.toFixed(2)}:1 contrast`);
+  }
 });
 
 test('chat search and visible actions use documented HeroUI v3 primitives', async () => {

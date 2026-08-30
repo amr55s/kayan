@@ -8,4 +8,3 @@ export default function CustomerChatLayout({ children }: { children: ReactNode }
     </AuthenticatedMarketplaceShell>
   );
 }
-

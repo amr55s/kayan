@@ -8,4 +8,3 @@ export default function DriverChatLayout({ children }: { children: ReactNode }) 
     </AuthenticatedMarketplaceShell>
   );
 }
-

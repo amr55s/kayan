@@ -1,6 +1,18 @@
 .shell {
   --accent: #f97316;
   --accent-foreground: #18181b;
+  --accent-soft: #fff1e7;
+  --accent-soft-foreground: #7c2d12;
+  --default: #f4f4f5;
+  --default-foreground: #18181b;
+  --warning: #f59e0b;
+  --warning-foreground: #18181b;
+  --warning-soft: #fffbeb;
+  --warning-soft-foreground: #78350f;
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --danger-soft: #fef2f2;
+  --danger-soft-foreground: #7f1d1d;
   --focus: #c2410c;
   --link: #9a3412;
   --background: #f5f5f5;
