@@ -21,6 +21,7 @@ const LISTING_CATEGORY_IDS = [
   'pharmacy',
   'crafts',
   'services',
+  'real_estate',
 ] as const;
 
 const CATEGORY_ALIASES: Record<string, (typeof LISTING_CATEGORY_IDS)[number]> = {
@@ -112,6 +113,39 @@ export const merchantPlaceSchema = z.object({
   existingImages: z.array(z.url()).max(12).default([]),
 });
 
+const realEstateOfferTypeSchema = z.enum(['rent', 'sale']);
+const realEstatePropertyTypeSchema = z.enum([
+  'apartment', 'villa', 'house', 'shop', 'office', 'land', 'other',
+]);
+const realEstateFurnishingSchema = z.enum([
+  'furnished', 'semi_furnished', 'unfurnished',
+]);
+const wholeNumber = (minimum: number, maximum: number, message: string) => z
+  .union([z.string(), z.number()])
+  .transform((value) => String(value).trim())
+  .refine((value) => /^\d+$/.test(value), message)
+  .transform((value) => Number(value))
+  .refine((value) => value >= minimum && value <= maximum, message);
+
+export const realEstateDetailsSchema = z.object({
+  offerType: realEstateOfferTypeSchema,
+  propertyType: realEstatePropertyTypeSchema,
+  priceEgp: wholeNumber(1, 999_999_999, 'أدخل سعراً صحيحاً بالجنيه المصري.'),
+  rooms: wholeNumber(1, 50, 'عدد الغرف يجب أن يكون بين 1 و50.').optional().nullable(),
+  bathrooms: wholeNumber(1, 20, 'عدد الحمامات يجب أن يكون بين 1 و20.').optional().nullable(),
+  areaSqm: wholeNumber(1, 100_000, 'المساحة يجب أن تكون بين 1 و100000 م².').optional().nullable(),
+  floor: wholeNumber(0, 100, 'الدور يجب أن يكون بين 0 و100.').optional().nullable(),
+  furnishing: realEstateFurnishingSchema.optional().nullable().or(z.literal('')),
+}).superRefine((value, context) => {
+  if (['apartment', 'villa', 'house', 'other'].includes(value.propertyType) && !value.rooms) {
+    context.addIssue({
+      code: 'custom',
+      path: ['rooms'],
+      message: 'عدد الغرف مطلوب للوحدات السكنية.',
+    });
+  }
+});
+
 export const driverPublicProfileSchema = z.object({
   displayName: z.string().trim().min(2).max(100),
   contactPhone: egyptianPhone,
@@ -140,6 +174,7 @@ export const accountRequestSchema = z
     placeTelegramUrl: telegramUrlSchema,
     placeAddress: z.string().trim().max(500).optional().nullable(),
     placeMapUrl: mapUrlSchema,
+    realEstateDetails: realEstateDetailsSchema.optional().nullable(),
   })
   .superRefine((value, context) => {
     if (value.kind === 'driver') return;
@@ -166,6 +201,35 @@ export const accountRequestSchema = z
         code: 'custom',
         path: ['placeTitle'],
         message: 'اكتب اسم الخدمة واختر التصنيف.',
+      });
+    }
+    if (value.placeCategory === 'real_estate') {
+      if (value.placeMode !== 'new' || !value.realEstateDetails) {
+        context.addIssue({
+          code: 'custom',
+          path: ['realEstateDetails'],
+          message: 'بيانات العقار مطلوبة قبل إرسال الطلب.',
+        });
+      }
+      if (value.placePayment || value.placeWhatsappGroupUrl || value.placeTelegramUrl) {
+        context.addIssue({
+          code: 'custom',
+          path: ['placeCategory'],
+          message: 'بيانات الدفع وروابط المجتمعات غير متاحة لإعلانات العقارات.',
+        });
+      }
+      if (!value.placeAddress?.trim() || !value.placeDescription?.trim()) {
+        context.addIssue({
+          code: 'custom',
+          path: ['placeAddress'],
+          message: 'العنوان ووصف العقار مطلوبان.',
+        });
+      }
+    } else if (value.realEstateDetails) {
+      context.addIssue({
+        code: 'custom',
+        path: ['realEstateDetails'],
+        message: 'بيانات العقار لا تنطبق على هذا التصنيف.',
       });
     }
   });

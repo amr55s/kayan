@@ -23,6 +23,7 @@ import {
 import {
   claimLegacyPlaceUploads,
   enqueueMediaDeletion,
+  parseLegacyUploadToken,
   splitLegacyPlaceImageReferences,
 } from '@/lib/media/legacy';
 import {
@@ -354,13 +355,23 @@ export async function submitAccountRequest(
   let createdAuthUser = false;
   try {
     const data = accountRequestSchema.parse(input);
-    const uploadedImages = validateListingImageUrls(imageUrls, 3);
+    const imageLimit = data.placeCategory === 'real_estate' ? 7 : 3;
+    const pendingImages = splitLegacyPlaceImageReferences(imageUrls, imageLimit);
+    const uploadedImages = pendingImages.urls;
     if (
       data.kind === 'merchant'
       && data.placeMode === 'new'
-      && uploadedImages.length === 0
+      && imageUrls.length === 0
     ) {
       throw new Error('أضف صورة واحدة على الأقل للمكان أو المنيو قبل إرسال الطلب.');
+    }
+    if (data.placeCategory === 'real_estate') {
+      if (imageUrls.length < 5 || imageUrls.length > 7) {
+        throw new Error('يجب رفع من 5 إلى 7 صور للعقار.');
+      }
+      if (pendingImages.urls.length || pendingImages.uploadIds.length !== imageUrls.length) {
+        throw new Error('صور العقار يجب أن تكون مرفوعة من حساب صاحب الطلب.');
+      }
     }
 
     const admin = createAdminClient();
@@ -482,6 +493,27 @@ export async function submitAccountRequest(
       createdAuthUser = true;
     }
 
+    if (data.placeCategory === 'real_estate') {
+      const uploadIds = imageUrls.map((value) => parseLegacyUploadToken(value));
+      const validUploadIds = uploadIds.filter((id): id is string => id !== null);
+      if (!authUserId || validUploadIds.length !== uploadIds.length) {
+        throw new Error('صور العقار غير صالحة. أعد رفع الصور قبل إرسال الطلب.');
+      }
+      const { data: ownedUploads, error: ownedUploadsError } = await (admin as any)
+        .from('legacy_media_uploads')
+        .select('id')
+        .in('id', validUploadIds)
+        .eq('owner_id', authUserId)
+        .eq('purpose', 'place')
+        .eq('folder', 'requests')
+        .eq('status', 'ready')
+        .is('merchant_id', null)
+        .gt('expires_at', new Date().toISOString());
+      if (ownedUploadsError || (ownedUploads ?? []).length !== validUploadIds.length) {
+        throw new Error('بعض صور العقار غير جاهزة أو لا تخص هذا الحساب. أعد رفعها ثم حاول.');
+      }
+    }
+
     const { data: request, error: requestError } = await (admin as any)
       .from('account_requests')
       .insert({
@@ -533,7 +565,24 @@ export async function submitAccountRequest(
           data.kind === 'merchant' && data.placeMode === 'new'
             ? data.placeMapUrl
             : null,
-        place_images: uploadedImages,
+        place_images: data.placeCategory === 'real_estate'
+          ? imageUrls
+          : uploadedImages,
+        real_estate_details:
+          data.kind === 'merchant'
+          && data.placeMode === 'new'
+          && data.placeCategory === 'real_estate'
+            ? {
+                offer_type: data.realEstateDetails?.offerType,
+                property_type: data.realEstateDetails?.propertyType,
+                price_egp: data.realEstateDetails?.priceEgp,
+                rooms: data.realEstateDetails?.rooms ?? null,
+                bathrooms: data.realEstateDetails?.bathrooms ?? null,
+                area_sqm: data.realEstateDetails?.areaSqm ?? null,
+                floor: data.realEstateDetails?.floor ?? null,
+                furnishing: data.realEstateDetails?.furnishing || null,
+              }
+            : null,
         status: 'pending',
       })
       .select('id')

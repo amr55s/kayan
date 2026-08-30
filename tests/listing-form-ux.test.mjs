@@ -61,8 +61,8 @@ test('AddListingModal isolates real estate payload and respects backend boundary
   assert.match(modalSource, /propertyType: realEstateDraft\.propertyType/);
   assert.match(modalSource, /priceEgp: realEstateDraft\.priceEgp/);
 
-  // Backend stage boundary comment
-  assert.match(modalSource, /TODO \(Database\/Backend Migration Stage\)/);
+  // The approved request forwards the typed payload to the server boundary.
+  assert.match(modalSource, /realEstateDetails: realEstatePayload/);
 
   // Omission of payment & community links for real estate
   assert.match(modalSource, /profile\.features\.hasPayment/);

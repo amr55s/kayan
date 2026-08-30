@@ -360,5 +360,7 @@ test('new places wait for verified images and retry only failed files', () => {
   );
   assert.match(publicSubmit, /إعادة محاولة الصور الفاشلة فقط/);
   assert.match(adminActions, /pendingImages\.uploadIds\.length[\s\S]*أضف صورة واحدة على الأقل/);
-  assert.match(accountActions, /data\.placeMode === 'new'[\s\S]*uploadedImages\.length === 0/);
+  assert.match(accountActions, /data\.placeMode === 'new'[\s\S]*imageUrls\.length === 0/);
+  assert.match(accountActions, /parseLegacyUploadToken/);
+  assert.match(accountActions, /real_estate[\s\S]*legacy_media_uploads/);
 });

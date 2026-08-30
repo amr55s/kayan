@@ -2,6 +2,7 @@ import { createPublicClient } from './public';
 import { createAdminClient } from './admin';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 import type { Driver, Place, StoreCoupon } from '@/types';
+import type { RealEstateDetailsDraft } from '@/lib/listings/config';
 
 type QueryOutcome<T> =
   | { status: 'fulfilled'; value: T }
@@ -118,7 +119,7 @@ async function fetchPlaces(): Promise<Place[]> {
   let result: any = await withTimeout(
     supabase
       .from('places')
-      .select('*, store_coupons(*)')
+      .select('*, store_coupons(*), place_real_estate(*)')
       .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false }),
   );
@@ -136,14 +137,34 @@ async function fetchPlaces(): Promise<Place[]> {
   }
 
   if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []).map((row: Place & { store_coupons?: StoreCoupon[] }) => {
-    const { store_coupons: coupons, ...place } = row;
+  return (result.data ?? []).map((row: Place & {
+    store_coupons?: StoreCoupon[];
+    place_real_estate?: Array<{
+      area_sqm: number | null; bathrooms: number | null; floor: number | null;
+      furnishing: string | null; offer_type: string; price_egp: number;
+      property_type: string; rooms: number | null;
+    }>;
+  }) => {
+    const { store_coupons: coupons, place_real_estate: realEstateRows, ...place } = row;
+    const realEstate = realEstateRows?.[0];
     return {
       ...place,
       coupons: (coupons ?? []).sort((left, right) =>
         Number(right.is_featured) - Number(left.is_featured)
         || left.display_order - right.display_order,
       ),
+      real_estate_details: realEstate
+        ? {
+            offerType: realEstate.offer_type,
+            propertyType: realEstate.property_type,
+            priceEgp: String(realEstate.price_egp),
+            rooms: realEstate.rooms === null ? '' : String(realEstate.rooms),
+            bathrooms: realEstate.bathrooms === null ? '' : String(realEstate.bathrooms),
+            areaSqm: realEstate.area_sqm === null ? '' : String(realEstate.area_sqm),
+            floor: realEstate.floor === null ? '' : String(realEstate.floor),
+            furnishing: realEstate.furnishing ?? '',
+          } as RealEstateDetailsDraft
+        : null,
     } as Place;
   });
 }

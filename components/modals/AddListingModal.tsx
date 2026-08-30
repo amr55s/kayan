@@ -302,8 +302,6 @@ export function AddListingModal({
           }
         : null;
 
-      // TODO (Database/Backend Migration Stage): Update submitAccountRequest to accept realEstatePayload
-      // and support 5-7 images boundary once the server migration is deployed.
       const result = await submitAccountRequest(
         {
           kind: 'merchant',
@@ -328,6 +326,7 @@ export function AddListingModal({
           placeTelegramUrl: mode === 'new' && profile.features.hasCommunityLinks ? (telegramUrl || null) : null,
           placeAddress: mode === 'new' ? address.trim() : null,
           placeMapUrl: mode === 'new' ? (mapUrl || null) : null,
+          realEstateDetails: realEstatePayload,
         },
         nextUploadedUrls,
       );
