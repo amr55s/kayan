@@ -1,11 +1,13 @@
-import { MarketplaceChatShell } from '@/components/marketplace/chat/chat-shell';
+import { MarketplaceChatAdminMonitor } from '@/components/marketplace/chat/admin-monitor';
 import { requireAdminAal2 } from '@/lib/auth/guards';
-import { listConversations } from '@/lib/commerce/chat/service';
+import { listChatMonitorQueue } from '@/lib/commerce/chat/service';
+import { moderateMarketplaceChatAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminChatPage() {
   const profile = await requireAdminAal2({ capability: 'chat_monitor', nextPath: '/admin/marketplace/chat' });
-  const inbox = await listConversations({ limit: 30 });
-  return <MarketplaceChatShell initialInbox={inbox} initialConversation={null} currentUserId={profile.id} role="admin" basePath="/admin/marketplace/chat" />;
+  void profile;
+  const queue = await listChatMonitorQueue();
+  return <MarketplaceChatAdminMonitor items={queue} moderate={moderateMarketplaceChatAction} />;
 }

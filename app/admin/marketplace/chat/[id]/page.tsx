@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { notFound } from 'next/navigation';
 import { MarketplaceChatShell } from '@/components/marketplace/chat/chat-shell';
+import { MonitorOpenAudit } from '@/components/marketplace/chat/monitor-open-audit';
 import { requireAdminAal2 } from '@/lib/auth/guards';
 import { getConversationPage, listConversations } from '@/lib/commerce/chat/service';
 
@@ -11,5 +12,5 @@ export default async function AdminChatConversationPage({ params }: { params: Pr
   const conversationId = z.uuid().safeParse(id);
   if (!conversationId.success) notFound();
   const [inbox, conversation] = await Promise.all([listConversations({ limit: 30 }), getConversationPage({ conversationId: conversationId.data, limit: 50 })]);
-  return <MarketplaceChatShell initialInbox={inbox} initialConversation={conversation} currentUserId={profile.id} role="admin" basePath="/admin/marketplace/chat" readOnly />;
+  return <><MonitorOpenAudit conversationId={conversationId.data} /><MarketplaceChatShell initialInbox={inbox} initialConversation={conversation} currentUserId={profile.id} role="admin" basePath="/admin/marketplace/chat" readOnly /></>;
 }

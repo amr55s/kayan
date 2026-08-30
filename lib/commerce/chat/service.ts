@@ -82,6 +82,11 @@ export type ChatBlockResult = {
   safeCopy: string;
 };
 
+export type ChatMonitorQueueItem = {
+  id: string; public_code: string; subject: string; status: string; last_message_at: string;
+  report_count: number; risk_count: number;
+};
+
 const uuid = z.uuid();
 const timestamp = z.iso.datetime({ offset: true });
 const chatCursorSchema = z.object({ createdAt: timestamp, id: uuid }).strict();
@@ -299,6 +304,24 @@ export async function canShareConversationLocation(conversationId: string): Prom
   const { data, error } = await supabase.rpc('can_share_my_marketplace_chat_location', { p_thread_id: parsed.data });
   if (error || typeof data !== 'boolean') return false;
   return data;
+}
+
+const chatMonitorQueueItemSchema: z.ZodType<ChatMonitorQueueItem> = z.object({
+  id: uuid, public_code: z.string(), subject: z.string(), status: z.string(), last_message_at: timestamp,
+  report_count: z.number().int().nonnegative(), risk_count: z.number().int().nonnegative(),
+}).strict();
+
+/** This is intentionally separate from participant inboxes: monitor access is
+ * re-authorized by the RPC with AAL2 + chat_monitor on every request. */
+export async function listChatMonitorQueue(): Promise<ChatMonitorQueueItem[]> {
+  const supabase = await authenticatedChatClient();
+  // @ts-expect-error Task 10 RPC is committed locally before generated types refresh.
+  const data = await resolveChatRpc(supabase.rpc('list_marketplace_chat_monitor_queue', {
+    p_status: null, p_has_report: null, p_has_risk: null, p_limit: 50, p_monitor_session_id: null,
+  }));
+  const parsed = z.array(chatMonitorQueueItemSchema).max(100).safeParse(data);
+  if (!parsed.success) throw new ChatServiceError('service_unavailable');
+  return parsed.data;
 }
 
 export async function searchConversationMessages(input: ChatSearchInput): Promise<ChatMessageSearchPage> {
