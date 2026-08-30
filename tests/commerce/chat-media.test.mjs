@@ -47,6 +47,8 @@ test('migration keeps attachment metadata RPC-only and participant-scoped', () =
   assert.match(sql, /finalize_marketplace_chat_attachment_from_server/u);
   assert.match(sql, /expire_marketplace_chat_attachments/u);
   assert.match(sql, /chat_media\.delete_requested/u);
+  assert.match(sql, /on conflict \(event_key\) do nothing/u);
+  assert.match(sql, /revoke execute on function public\.marketplace_chat_message_json\(uuid, uuid\) from public/u);
   assert.match(sql, /verified' and message_id is null/u);
   assert.match(sql, /revoke all on function public\.marketplace_chat_message_json_base_private_media/u);
   assert.doesNotMatch(sql, /grant execute on function public\.complete_my_marketplace_chat_attachment[^\n]*to authenticated/u);
@@ -77,4 +79,5 @@ test('only issued same-origin attachment paths enter message DTOs and maintenanc
   assert.match(maintenance, /chatMediaExpired/u);
   const worker = read(new URL('../../lib/commerce/outbox-worker.ts', import.meta.url));
   assert.match(worker, /chat_media\.delete_requested/u);
+  assert.match(worker, /fail_marketplace_outbox/u);
 });

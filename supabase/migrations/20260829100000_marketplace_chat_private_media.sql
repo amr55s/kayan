@@ -114,6 +114,9 @@ begin
     raise exception 'not_found' using errcode = 'P0002'; end if;
   if v_attachment.status = 'pending' then
     update public.marketplace_chat_attachments set status = 'deleted', deleted_at = now(), delete_reason = left(coalesce(p_reason, 'client_cancelled'), 80) where id = p_attachment_id;
+    insert into public.marketplace_outbox (event_key, topic, aggregate_type, aggregate_id, payload)
+    values ('chat_media.delete_requested:' || v_attachment.id::text, 'chat_media.delete_requested', 'marketplace_chat_attachment', v_attachment.id::text,
+      jsonb_build_object('object_key', v_attachment.object_key)) on conflict (event_key) do nothing;
   end if;
 end; $$;
 
@@ -138,6 +141,9 @@ begin
      or p_actual_byte_size is distinct from v_attachment.expected_byte_size
      or p_actual_sha256 is distinct from v_attachment.expected_sha256 then
     update public.marketplace_chat_attachments set status = 'quarantined', quarantined_at = now(), deleted_at = now(), delete_reason = 'server_validation_failed' where id = p_attachment_id;
+    insert into public.marketplace_outbox (event_key, topic, aggregate_type, aggregate_id, payload)
+    values ('chat_media.delete_requested:' || v_attachment.id::text, 'chat_media.delete_requested', 'marketplace_chat_attachment', v_attachment.id::text,
+      jsonb_build_object('object_key', v_attachment.object_key)) on conflict (event_key) do nothing;
     raise exception 'invalid_input' using errcode = '22023';
   end if;
   update public.marketplace_chat_attachments set status = 'verified', width = p_width, height = p_height,
@@ -177,6 +183,7 @@ alter function public.marketplace_chat_message_json(uuid, uuid)
 revoke all on function public.marketplace_chat_message_json_base_private_media(uuid, uuid)
   from public, anon, authenticated, service_role;
 revoke execute on function public.marketplace_chat_message_json_base_private_media(uuid, uuid) from public;
+revoke execute on function public.marketplace_chat_message_json(uuid, uuid) from public;
 create or replace function public.marketplace_chat_message_json(p_message_id uuid, p_actor_id uuid)
 returns jsonb language sql stable set search_path = '' as $$
   select public.marketplace_chat_message_json_base_private_media(p_message_id, p_actor_id)
@@ -212,6 +219,18 @@ begin
   return public.marketplace_chat_message_json((v_message ->> 'id')::uuid, v_actor_id);
 end; $$;
 
+create or replace function public.can_share_my_marketplace_chat_location(p_thread_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select public.can_send_marketplace_chat_thread(p_thread_id)
+    and exists (
+      select 1 from public.support_threads as thread
+      join public.marketplace_delivery_assignments as assignment on assignment.order_id = thread.order_id
+      where thread.id = p_thread_id and thread.conversation_kind = 'order'
+        and thread.status = 'open' and thread.paused_at is null
+        and assignment.status in ('assigned', 'picked_up', 'issue')
+    );
+$$;
+
 revoke all on function public.create_my_marketplace_chat_attachment(uuid, uuid, text, text, integer, text) from public, anon, authenticated, service_role;
 revoke all on function public.get_my_marketplace_chat_attachment(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.complete_my_marketplace_chat_attachment(uuid, integer, integer, text, integer, text) from public, anon, authenticated, service_role;
@@ -219,11 +238,13 @@ revoke all on function public.discard_my_marketplace_chat_attachment(uuid, text)
 revoke all on function public.finalize_marketplace_chat_attachment_from_server(uuid, integer, integer, text, integer, text) from public, anon, authenticated;
 revoke all on function public.expire_marketplace_chat_attachments(integer) from public, anon, authenticated;
 revoke all on function public.send_my_marketplace_chat_image(uuid, uuid, uuid, uuid) from public, anon, authenticated, service_role;
+revoke all on function public.can_share_my_marketplace_chat_location(uuid) from public, anon, authenticated, service_role;
 grant execute on function public.create_my_marketplace_chat_attachment(uuid, uuid, text, text, integer, text) to authenticated;
 grant execute on function public.get_my_marketplace_chat_attachment(uuid) to authenticated;
 grant execute on function public.discard_my_marketplace_chat_attachment(uuid, text) to authenticated;
 grant execute on function public.finalize_marketplace_chat_attachment_from_server(uuid, integer, integer, text, integer, text) to service_role;
 grant execute on function public.expire_marketplace_chat_attachments(integer) to service_role;
 grant execute on function public.send_my_marketplace_chat_image(uuid, uuid, uuid, uuid) to authenticated;
+grant execute on function public.can_share_my_marketplace_chat_location(uuid) to authenticated;
 
 commit;

@@ -291,6 +291,16 @@ export async function getConversationPage(input: GetConversationPageInput): Prom
   return parseRpcResult(chatMessagePageSchema, data);
 }
 
+export async function canShareConversationLocation(conversationId: string): Promise<boolean> {
+  const parsed = uuid.safeParse(conversationId);
+  if (!parsed.success) return false;
+  const supabase = await authenticatedChatClient();
+  // @ts-expect-error locally committed Task 9 RPC is not generated until Staging apply.
+  const { data, error } = await supabase.rpc('can_share_my_marketplace_chat_location', { p_thread_id: parsed.data });
+  if (error || typeof data !== 'boolean') return false;
+  return data;
+}
+
 export async function searchConversationMessages(input: ChatSearchInput): Promise<ChatMessageSearchPage> {
   const parsedInput = parseServiceInput(chatSearchSchema, input);
   const supabase = await authenticatedChatClient();
