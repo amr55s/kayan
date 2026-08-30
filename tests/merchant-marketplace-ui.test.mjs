@@ -8,12 +8,16 @@ test('merchant marketplace is role-protected and linked without replacing the le
   const layout = read('app/merchant/marketplace/layout.tsx');
   const legacy = read('app/merchant/page.tsx');
   const shell = read('components/marketplace/merchant/merchant-marketplace-shell.tsx');
+  const sharedShell = read('components/marketplace/authenticated-marketplace-shell.tsx');
+  const marketplaceShell = read('components/marketplace/marketplace-shell.tsx');
+  const productList = read('components/marketplace/merchant/product-list.tsx');
   assert.match(layout, /requireProfile\(\['merchant'\]\)/);
   assert.match(legacy, /MerchantOrderWorkspace/);
-  for (const href of ['/merchant/marketplace/new', '/merchant/marketplace/excel', '/merchant/marketplace/orders']) {
-    assert.match(shell, new RegExp(href));
-  }
-  assert.match(shell, /id="main-content"/);
+  assert.match(sharedShell, /\/merchant\/marketplace\/new/);
+  assert.match(sharedShell, /\/merchant\/marketplace\/excel/);
+  assert.match(sharedShell, /\/merchant\/marketplace\/orders/);
+  assert.match(productList, /\/merchant\/marketplace\/new/);
+  assert.match(marketplaceShell, /id="main-content"/);
 });
 
 test('product editor exposes manual product, variant, inventory and media contracts', () => {
