@@ -57,10 +57,12 @@ test('Excel panel renders validation, apply, export, history and failure states'
   assert.match(page, /processMerchantWorkbookAction/);
 });
 
-test('merchant catalog styling stays flat and external-contact free', () => {
+test('merchant catalog uses the main identity and stays external-contact free', () => {
   const styles = read('components/marketplace/merchant/merchant-marketplace.module.css');
   assert.doesNotMatch(styles, /(?:linear|radial|conic)-gradient/i);
-  assert.doesNotMatch(styles, /border-radius:\s*(?:999|[2-9]\d)px/i);
+  assert.match(styles, /border-radius: var\(--dairtak-card-radius\)/);
+  assert.match(styles, /box-shadow: var\(--dairtak-card-shadow\)/);
+  assert.doesNotMatch(styles, /#f97316/i);
   for (const file of [
     'components/marketplace/merchant/product-list.tsx',
     'components/marketplace/merchant/product-editor.tsx',

@@ -1,3 +1,4 @@
+import { DairtakLink } from '@/components/ui/dairtak-link';
 import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
 import { Chip } from '@heroui/react/chip';
@@ -102,11 +103,9 @@ export function MarketplaceProductCard({
             </Button>
           </form>
         ) : (
-          <Link href={productHref}>
-            <Button className={styles.secondaryButton}>
+          <DairtakLink href={productHref} className={styles.secondaryButton}>
               عرض التفاصيل
-            </Button>
-          </Link>
+            </DairtakLink>
         )}
       </Card.Footer>
     </Card.Root>

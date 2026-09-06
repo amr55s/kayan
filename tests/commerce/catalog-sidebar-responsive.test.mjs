@@ -107,7 +107,7 @@ test('marketplace CSS enforces responsive sidebar layout and logical properties'
   const css = read('components/marketplace/marketplace.module.css');
 
   // Desktop grid layout
-  assert.match(css, /\.catalogLayout\s*\{[\s\S]*grid-template-columns:\s*minmax\(14rem,\s*17\.5rem\)\s+1fr/);
+  assert.match(css, /\.catalogLayout\s*\{[\s\S]*grid-template-columns:\s*minmax\(14rem,\s*17\.5rem\)\s+minmax\(0,\s*1fr\)/);
   assert.match(css, /\.catalogSidebar\s*\{[\s\S]*position:\s*sticky/);
   assert.match(css, /\.catalogSidebar\s*\{[\s\S]*inset-block-start:\s*5rem/);
   assert.match(css, /\.catalogSidebar\s*\{[\s\S]*overscroll-behavior:\s*contain/);

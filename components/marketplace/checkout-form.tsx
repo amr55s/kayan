@@ -1,11 +1,12 @@
 'use client';
 
+import { DairtakLink } from '@/components/ui/dairtak-link';
+
 import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
 import { Input } from '@heroui/react/input';
 import { Label } from '@heroui/react/label';
 import { TextArea } from '@heroui/react/textarea';
-import Link from 'next/link';
 import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
@@ -356,11 +357,9 @@ function MarketplaceCheckoutLogin() {
             helper="سنستعيد سلتك ثم نرجعك إلى صفحة إتمام الطلب نفسها. يمكنك إعادة المحاولة بأمان إذا أغلقت نافذة Google."
           />
         </div>
-        <Link href="/marketplace/cart">
-          <Button.Root className={styles.secondaryButton}>
+        <DairtakLink href="/marketplace/cart" className={styles.secondaryButton}>
             العودة إلى السلة
-          </Button.Root>
-        </Link>
+          </DairtakLink>
       </Card.Content>
     </Card.Root>
   );

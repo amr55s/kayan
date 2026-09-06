@@ -132,6 +132,30 @@ values
 on conflict (store_id, user_id) do update
 set role = excluded.role, is_active = true;
 
+-- Fixtures inserted after the one-time migration backfill need the same
+-- independently approved activity records as real approved accounts.
+insert into public.activity_workspaces(activity_kind, name, status, merchant_id, store_id)
+select 'store', name, 'approved', merchant_id, id from public.stores
+where id in ('40000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000002');
+insert into public.activity_memberships(workspace_id, user_id, role)
+select workspace.id, member.user_id,
+  case when member.role::text = 'owner' then 'owner' else 'member' end
+from public.activity_workspaces workspace
+join public.store_memberships member on member.store_id = workspace.store_id
+where workspace.store_id in ('40000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000002');
+insert into public.driver_profiles(profile_id)
+select id from public.profiles where id in (
+  '10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000010'
+);
+insert into public.activity_workspaces(activity_kind, name, status, driver_profile_id)
+select 'driver', display_name, 'approved', id from public.profiles where id in (
+  '10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000010'
+);
+insert into public.activity_memberships(workspace_id, user_id, role)
+select id, driver_profile_id, 'owner' from public.activity_workspaces where driver_profile_id in (
+  '10000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000010'
+);
+
 insert into public.carts (id, customer_id)
 values (
   '50000000-0000-0000-0000-000000000001',
@@ -145,6 +169,17 @@ values (
   'chat_contract_zone', 'منطقة الاختبار', 'Cairo'
 )
 on conflict (id) do nothing;
+
+-- The real checkout trigger requires an eligible branch delivery configuration.
+-- Keep chat fixtures valid under the same rule instead of bypassing that trigger.
+insert into public.branch_delivery_zones (
+  branch_id, zone_id, delivery_mode, fee, minimum_order,
+  estimated_minutes_min, estimated_minutes_max
+)
+select id, '60000000-0000-0000-0000-000000000001', 'platform', 100, 0, 30, 60
+from public.store_branches
+where store_id = '40000000-0000-0000-0000-000000000001' and is_default
+on conflict (branch_id, zone_id, delivery_mode) do nothing;
 
 insert into public.order_groups (
   id, customer_id, cart_id, address_snapshot, subtotal,
@@ -1204,5 +1239,5 @@ select extensions.ok(
   'reverse escalation excludes its blocked support-capable customer'
 );
 
-select * from extensions.finish();
+select * from extensions.finish(true);
 rollback;

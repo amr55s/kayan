@@ -10,10 +10,51 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      account_activity_reviews: {
+        Row: {
+          created_at: string
+          from_status: string | null
+          id: number
+          reason: string | null
+          request_id: string
+          reviewed_by: string | null
+          to_status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_status?: string | null
+          id?: never
+          reason?: string | null
+          request_id: string
+          reviewed_by?: string | null
+          to_status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_status?: string | null
+          id?: never
+          reason?: string | null
+          request_id?: string
+          reviewed_by?: string | null
+          to_status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_activity_reviews_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "account_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_request_rate_limits: {
         Row: {
           attempts: number
@@ -37,6 +78,7 @@ export type Database = {
       }
       account_requests: {
         Row: {
+          activity_kind: Database["public"]["Enums"]["activity_kind"]
           auth_user_id: string
           created_at: string
           display_name: string
@@ -56,6 +98,7 @@ export type Database = {
           place_title: string | null
           place_whatsapp: string | null
           place_whatsapp_group_url: string | null
+          real_estate_details: Json | null
           rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
@@ -63,8 +106,10 @@ export type Database = {
           updated_at: string
           vehicle_type: string | null
           whatsapp: string | null
+          workspace_id: string | null
         }
         Insert: {
+          activity_kind: Database["public"]["Enums"]["activity_kind"]
           auth_user_id: string
           created_at?: string
           display_name: string
@@ -84,6 +129,7 @@ export type Database = {
           place_title?: string | null
           place_whatsapp?: string | null
           place_whatsapp_group_url?: string | null
+          real_estate_details?: Json | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -91,8 +137,10 @@ export type Database = {
           updated_at?: string
           vehicle_type?: string | null
           whatsapp?: string | null
+          workspace_id?: string | null
         }
         Update: {
+          activity_kind?: Database["public"]["Enums"]["activity_kind"]
           auth_user_id?: string
           created_at?: string
           display_name?: string
@@ -112,6 +160,7 @@ export type Database = {
           place_title?: string | null
           place_whatsapp?: string | null
           place_whatsapp_group_url?: string | null
+          real_estate_details?: Json | null
           rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
@@ -119,6 +168,7 @@ export type Database = {
           updated_at?: string
           vehicle_type?: string | null
           whatsapp?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -140,6 +190,106 @@ export type Database = {
             columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "activity_workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_memberships: {
+        Row: {
+          created_at: string
+          is_active: boolean
+          role: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          is_active?: boolean
+          role: string
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          is_active?: boolean
+          role?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_memberships_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "activity_workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_workspaces: {
+        Row: {
+          activity_kind: Database["public"]["Enums"]["activity_kind"]
+          created_at: string
+          driver_profile_id: string | null
+          id: string
+          merchant_id: string | null
+          name: string
+          status: Database["public"]["Enums"]["activity_workspace_status"]
+          store_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activity_kind: Database["public"]["Enums"]["activity_kind"]
+          created_at?: string
+          driver_profile_id?: string | null
+          id?: string
+          merchant_id?: string | null
+          name: string
+          status?: Database["public"]["Enums"]["activity_workspace_status"]
+          store_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activity_kind?: Database["public"]["Enums"]["activity_kind"]
+          created_at?: string
+          driver_profile_id?: string | null
+          id?: string
+          merchant_id?: string | null
+          name?: string
+          status?: Database["public"]["Enums"]["activity_workspace_status"]
+          store_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_workspaces_driver_profile_id_fkey"
+            columns: ["driver_profile_id"]
+            isOneToOne: false
+            referencedRelation: "driver_profiles"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "activity_workspaces_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_workspaces_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
@@ -2605,6 +2755,448 @@ export type Database = {
           },
         ]
       }
+      marketplace_chat_attachments: {
+        Row: {
+          actual_byte_size: number | null
+          actual_content_type: string | null
+          actual_sha256: string | null
+          bucket: string
+          created_at: string
+          delete_reason: string | null
+          deleted_at: string | null
+          expected_byte_size: number
+          expected_content_type: string
+          expected_sha256: string
+          expires_at: string
+          height: number | null
+          id: string
+          message_id: string | null
+          object_key: string
+          owner_id: string
+          quarantined_at: string | null
+          status: string
+          thread_id: string
+          verified_at: string | null
+          width: number | null
+        }
+        Insert: {
+          actual_byte_size?: number | null
+          actual_content_type?: string | null
+          actual_sha256?: string | null
+          bucket: string
+          created_at?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          expected_byte_size: number
+          expected_content_type: string
+          expected_sha256: string
+          expires_at?: string
+          height?: number | null
+          id: string
+          message_id?: string | null
+          object_key: string
+          owner_id: string
+          quarantined_at?: string | null
+          status?: string
+          thread_id: string
+          verified_at?: string | null
+          width?: number | null
+        }
+        Update: {
+          actual_byte_size?: number | null
+          actual_content_type?: string | null
+          actual_sha256?: string | null
+          bucket?: string
+          created_at?: string
+          delete_reason?: string | null
+          deleted_at?: string | null
+          expected_byte_size?: number
+          expected_content_type?: string
+          expected_sha256?: string
+          expires_at?: string
+          height?: number | null
+          id?: string
+          message_id?: string | null
+          object_key?: string
+          owner_id?: string
+          quarantined_at?: string | null
+          status?: string
+          thread_id?: string
+          verified_at?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: true
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_chat_attachments_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_audit: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          id: number
+          metadata: Json
+          monitor_session_id: string | null
+          reason: string | null
+          thread_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          id?: never
+          metadata?: Json
+          monitor_session_id?: string | null
+          reason?: string | null
+          thread_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          id?: never
+          metadata?: Json
+          monitor_session_id?: string | null
+          reason?: string | null
+          thread_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_audit_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_block_escalations: {
+        Row: {
+          blocked_user_id: string
+          blocker_user_id: string
+          created_at: string
+          escalation_thread_id: string
+          source_thread_id: string
+        }
+        Insert: {
+          blocked_user_id: string
+          blocker_user_id: string
+          created_at?: string
+          escalation_thread_id: string
+          source_thread_id: string
+        }
+        Update: {
+          blocked_user_id?: string
+          blocker_user_id?: string
+          created_at?: string
+          escalation_thread_id?: string
+          source_thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_block_escalations_escalation_thread_id_fkey"
+            columns: ["escalation_thread_id"]
+            isOneToOne: true
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_chat_block_escalations_source_thread_id_fkey"
+            columns: ["source_thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_blocks: {
+        Row: {
+          blocked_at: string
+          blocked_user_id: string
+          blocker_user_id: string
+          thread_id: string
+        }
+        Insert: {
+          blocked_at?: string
+          blocked_user_id: string
+          blocker_user_id: string
+          thread_id: string
+        }
+        Update: {
+          blocked_at?: string
+          blocked_user_id?: string
+          blocker_user_id?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_blocks_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_legal_holds: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          reason: string
+          released_at: string | null
+          released_by: string | null
+          thread_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          reason: string
+          released_at?: string | null
+          released_by?: string | null
+          thread_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          reason?: string
+          released_at?: string | null
+          released_by?: string | null
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_legal_holds_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: true
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_moderation_actions: {
+        Row: {
+          action: string
+          actor_user_id: string
+          created_at: string
+          id: string
+          reason: string
+          thread_id: string
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          created_at?: string
+          id?: string
+          reason: string
+          thread_id: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_moderation_actions_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_participants: {
+        Row: {
+          counterparty_blocked_at: string | null
+          joined_at: string
+          last_read_message_id: string | null
+          muted_until: string | null
+          participant_role: string
+          removed_at: string | null
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          counterparty_blocked_at?: string | null
+          joined_at?: string
+          last_read_message_id?: string | null
+          muted_until?: string | null
+          participant_role: string
+          removed_at?: string | null
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          counterparty_blocked_at?: string | null
+          joined_at?: string
+          last_read_message_id?: string | null
+          muted_until?: string | null
+          participant_role?: string
+          removed_at?: string | null
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_participants_last_read_fk"
+            columns: ["last_read_message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_chat_participants_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_reactions: {
+        Row: {
+          created_at: string
+          emoji: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          emoji: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_reactions_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_reports: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string | null
+          reason: string
+          reporter_user_id: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          thread_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          reason: string
+          reporter_user_id: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          thread_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string | null
+          reason?: string
+          reporter_user_id?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_reports_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_chat_reports_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_chat_risk_flags: {
+        Row: {
+          created_at: string
+          evidence: Json
+          id: number
+          message_id: string | null
+          rule_id: string
+          score: number
+          thread_id: string
+        }
+        Insert: {
+          created_at?: string
+          evidence: Json
+          id?: never
+          message_id?: string | null
+          rule_id: string
+          score: number
+          thread_id: string
+        }
+        Update: {
+          created_at?: string
+          evidence?: Json
+          id?: never
+          message_id?: string | null
+          rule_id?: string
+          score?: number
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_chat_risk_flags_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_chat_risk_flags_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "support_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketplace_coupon_categories: {
         Row: {
           category_id: string
@@ -3872,6 +4464,214 @@ export type Database = {
           },
         ]
       }
+      onboarding_draft_media: {
+        Row: {
+          asset_id: string
+          draft_id: string
+          position: number
+        }
+        Insert: {
+          asset_id: string
+          draft_id: string
+          position: number
+        }
+        Update: {
+          asset_id?: string
+          draft_id?: string
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_draft_media_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: true
+            referencedRelation: "onboarding_media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_draft_media_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_drafts: {
+        Row: {
+          activity_kind: Database["public"]["Enums"]["activity_kind"]
+          created_at: string
+          data: Json
+          id: string
+          materialized_product_id: string | null
+          request_id: string | null
+          status: string
+          step: number
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          activity_kind: Database["public"]["Enums"]["activity_kind"]
+          created_at?: string
+          data?: Json
+          id?: string
+          materialized_product_id?: string | null
+          request_id?: string | null
+          status?: string
+          step?: number
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          activity_kind?: Database["public"]["Enums"]["activity_kind"]
+          created_at?: string
+          data?: Json
+          id?: string
+          materialized_product_id?: string | null
+          request_id?: string | null
+          status?: string
+          step?: number
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_drafts_materialized_product_id_fkey"
+            columns: ["materialized_product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_drafts_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: true
+            referencedRelation: "account_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_media_assets: {
+        Row: {
+          bucket: string
+          byte_size: number
+          content_type: string
+          created_at: string
+          draft_id: string
+          height: number
+          id: string
+          object_key: string
+          owner_id: string
+          sha256: string
+          width: number
+        }
+        Insert: {
+          bucket: string
+          byte_size: number
+          content_type: string
+          created_at?: string
+          draft_id: string
+          height: number
+          id?: string
+          object_key: string
+          owner_id: string
+          sha256: string
+          width: number
+        }
+        Update: {
+          bucket?: string
+          byte_size?: number
+          content_type?: string
+          created_at?: string
+          draft_id?: string
+          height?: number
+          id?: string
+          object_key?: string
+          owner_id?: string
+          sha256?: string
+          width?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_media_assets_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_media_assets_draft_id_owner_id_fkey"
+            columns: ["draft_id", "owner_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_drafts"
+            referencedColumns: ["id", "user_id"]
+          },
+        ]
+      }
+      onboarding_publication_jobs: {
+        Row: {
+          attempts: number
+          branch_id: string
+          created_at: string
+          draft_id: string
+          id: string
+          lease_token: string | null
+          lease_until: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attempts?: number
+          branch_id: string
+          created_at?: string
+          draft_id: string
+          id?: string
+          lease_token?: string | null
+          lease_until?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attempts?: number
+          branch_id?: string
+          created_at?: string
+          draft_id?: string
+          id?: string
+          lease_token?: string | null
+          lease_until?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_publication_jobs_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "merchant_branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_publication_jobs_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: true
+            referencedRelation: "onboarding_drafts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_publication_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "activity_workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_events: {
         Row: {
           actor_id: string | null
@@ -4119,6 +4919,56 @@ export type Database = {
           whatsapp_group_url?: string | null
         }
         Relationships: []
+      }
+      place_real_estate: {
+        Row: {
+          area_sqm: number | null
+          bathrooms: number | null
+          created_at: string
+          floor: number | null
+          furnishing: string | null
+          offer_type: string
+          place_id: string
+          price_egp: number
+          property_type: string
+          rooms: number | null
+          updated_at: string
+        }
+        Insert: {
+          area_sqm?: number | null
+          bathrooms?: number | null
+          created_at?: string
+          floor?: number | null
+          furnishing?: string | null
+          offer_type: string
+          place_id: string
+          price_egp: number
+          property_type: string
+          rooms?: number | null
+          updated_at?: string
+        }
+        Update: {
+          area_sqm?: number | null
+          bathrooms?: number | null
+          created_at?: string
+          floor?: number | null
+          furnishing?: string | null
+          offer_type?: string
+          place_id?: string
+          price_egp?: number
+          property_type?: string
+          rooms?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "place_real_estate_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: true
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       place_upvote_receipts: {
         Row: {
@@ -5455,33 +6305,61 @@ export type Database = {
       }
       support_messages: {
         Row: {
-          body: string
+          body: string | null
+          card_data: Json | null
+          client_message_id: string | null
           created_at: string
+          deleted_at: string | null
+          deleted_body: string | null
           id: string
+          message_kind: string
+          reply_to_id: string | null
           revision: number
+          search_document: unknown
           sender_kind: string
           sender_user_id: string | null
           thread_id: string
         }
         Insert: {
-          body: string
+          body?: string | null
+          card_data?: Json | null
+          client_message_id?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_body?: string | null
           id?: string
+          message_kind?: string
+          reply_to_id?: string | null
           revision?: number
+          search_document?: unknown
           sender_kind: string
           sender_user_id?: string | null
           thread_id: string
         }
         Update: {
-          body?: string
+          body?: string | null
+          card_data?: Json | null
+          client_message_id?: string | null
           created_at?: string
+          deleted_at?: string | null
+          deleted_body?: string | null
           id?: string
+          message_kind?: string
+          reply_to_id?: string | null
           revision?: number
+          search_document?: unknown
           sender_kind?: string
           sender_user_id?: string | null
           thread_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "support_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "support_messages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "support_messages_thread_id_fkey"
             columns: ["thread_id"]
@@ -5520,12 +6398,15 @@ export type Database = {
       support_threads: {
         Row: {
           assigned_admin_id: string | null
+          conversation_kind: string
           created_at: string
           created_by_user_id: string | null
           customer_id: string | null
           id: string
           last_message_at: string
           order_id: string | null
+          paused_at: string | null
+          paused_by: string | null
           public_code: string
           resolved_at: string | null
           retention_redacted_at: string | null
@@ -5536,12 +6417,15 @@ export type Database = {
         }
         Insert: {
           assigned_admin_id?: string | null
+          conversation_kind?: string
           created_at?: string
           created_by_user_id?: string | null
           customer_id?: string | null
           id?: string
           last_message_at?: string
           order_id?: string | null
+          paused_at?: string | null
+          paused_by?: string | null
           public_code?: string
           resolved_at?: string | null
           retention_redacted_at?: string | null
@@ -5552,12 +6436,15 @@ export type Database = {
         }
         Update: {
           assigned_admin_id?: string | null
+          conversation_kind?: string
           created_at?: string
           created_by_user_id?: string | null
           customer_id?: string | null
           id?: string
           last_message_at?: string
           order_id?: string | null
+          paused_at?: string | null
+          paused_by?: string | null
           public_code?: string
           resolved_at?: string | null
           retention_redacted_at?: string | null
@@ -5693,77 +6580,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      block_my_marketplace_chat_counterparty: {
-        Args: {
-          p_blocked: boolean
-          p_counterparty_id: string
-          p_thread_id: string
-        }
-        Returns: Json
-      }
-      delete_my_marketplace_chat_message: {
-        Args: { p_message_id: string }
-        Returns: Json
-      }
-      get_my_marketplace_conversation_page: {
-        Args: {
-          p_before_created_at?: string | null
-          p_before_id?: string | null
-          p_limit?: number
-          p_thread_id: string
-        }
-        Returns: Json
-      }
-      list_my_marketplace_conversations: {
-        Args: {
-          p_before_created_at?: string | null
-          p_before_id?: string | null
-          p_kind?: string | null
-          p_limit?: number
-        }
-        Returns: Json
-      }
-      open_my_marketplace_conversation: {
-        Args: {
-          p_kind: string
-          p_order_id: string | null
-          p_store_id: string | null
-        }
-        Returns: Json
-      }
-      react_to_my_marketplace_chat_message: {
-        Args: { p_active: boolean; p_emoji: string; p_message_id: string }
-        Returns: Json
-      }
-      search_my_marketplace_chat_messages: {
-        Args: {
-          p_before_created_at?: string | null
-          p_before_id?: string | null
-          p_limit?: number
-          p_query: string
-          p_thread_id: string
-        }
-        Returns: Json
-      }
-      send_my_marketplace_chat_message: {
-        Args: {
-          p_body: string | null
-          p_card_data: Json | null
-          p_client_message_id: string
-          p_kind: string
-          p_reply_to_id: string | null
-          p_thread_id: string
-        }
-        Returns: Json
-      }
-      set_my_marketplace_chat_preferences: {
-        Args: { p_muted_until: string | null; p_thread_id: string }
-        Returns: Json
-      }
-      set_my_marketplace_chat_read_cursor: {
-        Args: { p_message_id: string; p_thread_id: string }
-        Returns: Json
-      }
       activate_marketplace_admin_capability: {
         Args: {
           p_roles: Database["public"]["Enums"]["marketplace_admin_role"][]
@@ -5835,6 +6651,10 @@ export type Database = {
         Returns: undefined
       }
       approve_account_request: {
+        Args: { p_request_id: string }
+        Returns: string
+      }
+      approve_account_request_legacy_20260830: {
         Args: { p_request_id: string }
         Returns: string
       }
@@ -5995,6 +6815,18 @@ export type Database = {
         }
         Returns: Json
       }
+      block_my_marketplace_chat_counterparty: {
+        Args: {
+          p_blocked: boolean
+          p_counterparty_id: string
+          p_thread_id: string
+        }
+        Returns: Json
+      }
+      can_access_marketplace_chat_thread: {
+        Args: { p_thread_id: string }
+        Returns: boolean
+      }
       can_access_marketplace_support_thread: {
         Args: { p_thread_id: string }
         Returns: boolean
@@ -6005,6 +6837,14 @@ export type Database = {
       can_manage_store: { Args: { p_store_id: string }; Returns: boolean }
       can_read_marketplace_order: {
         Args: { p_customer_id: string; p_order_id: string; p_store_id: string }
+        Returns: boolean
+      }
+      can_send_marketplace_chat_thread: {
+        Args: { p_thread_id: string }
+        Returns: boolean
+      }
+      can_share_my_marketplace_chat_location: {
+        Args: { p_thread_id: string }
         Returns: boolean
       }
       catalog_image_worker_configured: { Args: never; Returns: boolean }
@@ -6149,6 +6989,7 @@ export type Database = {
           upload_id: string
         }[]
       }
+      claim_onboarding_publication_job: { Args: never; Returns: Json }
       close_my_marketplace_support_thread: {
         Args: { p_thread_id: string }
         Returns: Json
@@ -6207,6 +7048,17 @@ export type Database = {
       complete_marketplace_push_job: {
         Args: { p_id: number; p_worker_id: string }
         Returns: boolean
+      }
+      complete_my_marketplace_chat_attachment: {
+        Args: {
+          p_actual_byte_size: number
+          p_actual_content_type: string
+          p_actual_sha256: string
+          p_attachment_id: string
+          p_height: number
+          p_width: number
+        }
+        Returns: Json
       }
       configure_marketplace_worker_vault: {
         Args: { p_base_url: string; p_cron_secret: string }
@@ -6359,6 +7211,17 @@ export type Database = {
         }
         Returns: Json
       }
+      create_my_marketplace_chat_attachment: {
+        Args: {
+          p_attachment_id: string
+          p_byte_size: number
+          p_content_type: string
+          p_object_key: string
+          p_sha256: string
+          p_thread_id: string
+        }
+        Returns: undefined
+      }
       create_my_marketplace_product: {
         Args: {
           p_idempotency_key: string
@@ -6395,8 +7258,8 @@ export type Database = {
       create_my_marketplace_support_thread: {
         Args: {
           p_message: string
-          p_order_id: string | null
-          p_store_id: string | null
+          p_order_id: string
+          p_store_id: string
           p_subject: string
         }
         Returns: Json
@@ -6404,8 +7267,8 @@ export type Database = {
       create_my_marketplace_support_thread_base_180000: {
         Args: {
           p_message: string
-          p_order_id: string | null
-          p_store_id: string | null
+          p_order_id: string
+          p_store_id: string
           p_subject: string
         }
         Returns: Json
@@ -6476,6 +7339,10 @@ export type Database = {
         Args: { p_address_id: string }
         Returns: boolean
       }
+      delete_my_marketplace_chat_message: {
+        Args: { p_message_id: string }
+        Returns: Json
+      }
       delete_my_marketplace_media: {
         Args: { p_asset_id: string; p_expected_asset_updated_at: string }
         Returns: Json
@@ -6504,6 +7371,10 @@ export type Database = {
       discard_my_catalog_import_file: {
         Args: { p_file_id: string; p_reason?: string }
         Returns: Json
+      }
+      discard_my_marketplace_chat_attachment: {
+        Args: { p_attachment_id: string; p_reason: string }
+        Returns: undefined
       }
       emit_marketplace_notification: {
         Args: {
@@ -6550,6 +7421,20 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      expire_marketplace_chat_attachments: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      export_marketplace_chat_monitor_queue: {
+        Args: {
+          p_has_report?: boolean
+          p_has_risk?: boolean
+          p_limit?: number
+          p_monitor_session_id?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       export_my_marketplace_catalog: {
         Args: { p_limit?: number; p_offset?: number; p_store_id: string }
         Returns: Json
@@ -6587,6 +7472,17 @@ export type Database = {
       }
       fail_my_catalog_import: {
         Args: { p_error_code: string; p_issues?: Json; p_job_id: string }
+        Returns: Json
+      }
+      finalize_marketplace_chat_attachment_from_server: {
+        Args: {
+          p_actual_byte_size: number
+          p_actual_content_type: string
+          p_actual_sha256: string
+          p_attachment_id: string
+          p_height: number
+          p_width: number
+        }
         Returns: Json
       }
       finalize_media_upload: {
@@ -6639,6 +7535,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      finish_onboarding_publication_job: {
+        Args: { p_job_id: string; p_token: string; p_urls: string[] }
+        Returns: undefined
       }
       generate_commission_statement: {
         Args: {
@@ -6747,6 +7647,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_marketplace_chat_as_monitor: {
+        Args: { p_monitor_session_id?: string; p_thread_id: string }
+        Returns: Json
+      }
       get_marketplace_product: { Args: { p_product_id: string }; Returns: Json }
       get_my_cash_reconciliation: {
         Args: { p_batch_id: string }
@@ -6767,6 +7671,19 @@ export type Database = {
       }
       get_my_marketplace_admin_roles: { Args: never; Returns: Json }
       get_my_marketplace_cart: { Args: { p_cart_id: string }; Returns: Json }
+      get_my_marketplace_chat_attachment: {
+        Args: { p_attachment_id: string }
+        Returns: Json
+      }
+      get_my_marketplace_conversation_page: {
+        Args: {
+          p_before_created_at?: string
+          p_before_id?: string
+          p_limit?: number
+          p_thread_id: string
+        }
+        Returns: Json
+      }
       get_my_marketplace_order: { Args: { p_order_id: string }; Returns: Json }
       get_my_marketplace_order_base_175213: {
         Args: { p_order_id: string }
@@ -6802,8 +7719,17 @@ export type Database = {
       }
       get_my_marketplace_support_thread_page: {
         Args: {
-          p_before_created_at?: string | null
-          p_before_id?: string | null
+          p_before_created_at?: string
+          p_before_id?: string
+          p_limit?: number
+          p_thread_id: string
+        }
+        Returns: Json
+      }
+      get_my_marketplace_support_thread_page_base_chat_core: {
+        Args: {
+          p_before_created_at?: string
+          p_before_id?: string
           p_limit?: number
           p_thread_id: string
         }
@@ -6832,6 +7758,7 @@ export type Database = {
         Args: { p_actor_id: string; p_roles: string[]; p_store_id: string }
         Returns: boolean
       }
+      has_my_activity_access: { Args: { p_activity: string }; Returns: boolean }
       invoke_catalog_image_worker: { Args: never; Returns: number }
       invoke_marketplace_push_worker: { Args: never; Returns: number }
       is_admin: { Args: never; Returns: boolean }
@@ -6909,6 +7836,17 @@ export type Database = {
         }
         Returns: Json
       }
+      list_marketplace_chat_monitor_queue: {
+        Args: {
+          p_filters?: Json
+          p_has_report?: boolean
+          p_has_risk?: boolean
+          p_limit?: number
+          p_monitor_session_id?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       list_marketplace_delivery_zones_for_admin: { Args: never; Returns: Json }
       list_marketplace_delivery_zones_for_admin_base_180000: {
         Args: never
@@ -6956,6 +7894,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_my_activity_workspaces: { Args: never; Returns: Json }
       list_my_cash_reconciliations: {
         Args: { p_before?: string; p_limit?: number; p_status?: string }
         Returns: Json
@@ -6977,6 +7916,15 @@ export type Database = {
         Returns: Json
       }
       list_my_manageable_merchants: { Args: never; Returns: Json }
+      list_my_marketplace_conversations: {
+        Args: {
+          p_before_created_at?: string
+          p_before_id?: string
+          p_kind?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
       list_my_marketplace_coupons: {
         Args: { p_store_id: string }
         Returns: Json
@@ -7029,11 +7977,11 @@ export type Database = {
       }
       list_my_marketplace_stores: { Args: never; Returns: Json }
       list_my_marketplace_support_threads: {
-        Args: { p_before?: string | null; p_limit?: number; p_status?: string | null }
+        Args: { p_before?: string; p_limit?: number; p_status?: string }
         Returns: Json
       }
       list_my_marketplace_support_threads_base_180000: {
-        Args: { p_before?: string | null; p_limit?: number; p_status?: string | null }
+        Args: { p_before?: string; p_limit?: number; p_status?: string }
         Returns: Json
       }
       list_my_store_branches: { Args: { p_store_id: string }; Returns: Json }
@@ -7109,6 +8057,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      marketplace_chat_conversation_summary: {
+        Args: { p_actor_id: string; p_thread_id: string }
+        Returns: Json
+      }
+      marketplace_chat_message_json: {
+        Args: { p_actor_id: string; p_message_id: string }
+        Returns: Json
+      }
+      marketplace_chat_message_json_base_private_media: {
+        Args: { p_actor_id: string; p_message_id: string }
+        Returns: Json
+      }
+      marketplace_chat_thread_id_from_topic: {
+        Args: { p_topic: string }
+        Returns: string
+      }
       marketplace_operational_replay: {
         Args: {
           p_actor_id: string
@@ -7136,6 +8100,15 @@ export type Database = {
         Returns: undefined
       }
       marketplace_release_ready: { Args: never; Returns: boolean }
+      moderate_marketplace_chat: {
+        Args: {
+          p_action: string
+          p_monitor_session_id?: string
+          p_reason: string
+          p_thread_id: string
+        }
+        Returns: Json
+      }
       moderate_product: {
         Args: {
           p_admin_id: string
@@ -7514,6 +8487,10 @@ export type Database = {
         }
         Returns: Json
       }
+      open_my_marketplace_conversation: {
+        Args: { p_kind: string; p_order_id: string; p_store_id: string }
+        Returns: Json
+      }
       preview_marketplace_checkout: {
         Args: { p_cart_id: string; p_customer_id: string }
         Returns: Json
@@ -7522,6 +8499,11 @@ export type Database = {
         Args: { p_cart_id: string }
         Returns: Json
       }
+      react_to_my_marketplace_chat_message: {
+        Args: { p_active: boolean; p_emoji: string; p_message_id: string }
+        Returns: Json
+      }
+      read_my_onboarding_drafts: { Args: never; Returns: Json }
       rebroadcast_delivery_order: {
         Args: { p_order_id: string }
         Returns: {
@@ -7599,6 +8581,20 @@ export type Database = {
           p_request_key: string
           p_route: string
         }
+        Returns: boolean
+      }
+      record_marketplace_chat_monitor_audit: {
+        Args: {
+          p_action: string
+          p_metadata?: Json
+          p_monitor_session_id: string
+          p_reason?: string
+          p_thread_id: string
+        }
+        Returns: undefined
+      }
+      record_marketplace_chat_monitor_open: {
+        Args: { p_monitor_session_id?: string; p_thread_id: string }
         Returns: boolean
       }
       record_my_product_category_classification: {
@@ -7763,10 +8759,15 @@ export type Database = {
         Args: { p_body: string; p_thread_id: string }
         Returns: Json
       }
+      report_my_marketplace_chat_message: {
+        Args: { p_message_id: string; p_reason: string; p_thread_id: string }
+        Returns: Json
+      }
       require_marketplace_admin_fallback: {
         Args: { p_non_admin_authorized: boolean }
         Returns: undefined
       }
+      require_marketplace_chat_monitor: { Args: never; Returns: undefined }
       respond_to_my_marketplace_delivery_offer: {
         Args: { p_accept: boolean; p_offer_id: string }
         Returns: Json
@@ -8048,6 +9049,16 @@ export type Database = {
         }
         Returns: Json
       }
+      save_my_onboarding_draft: {
+        Args: {
+          p_activity_kind: Database["public"]["Enums"]["activity_kind"]
+          p_data: Json
+          p_draft_id?: string
+          p_expected_version: number
+          p_step: number
+        }
+        Returns: Json
+      }
       save_my_store_branch: {
         Args: {
           p_address_text: string
@@ -8143,6 +9154,36 @@ export type Database = {
       seal_legacy_media_backfill_discovery: {
         Args: { p_run_id: string }
         Returns: undefined
+      }
+      search_my_marketplace_chat_messages: {
+        Args: {
+          p_before_created_at?: string
+          p_before_id?: string
+          p_limit?: number
+          p_query: string
+          p_thread_id: string
+        }
+        Returns: Json
+      }
+      send_my_marketplace_chat_image: {
+        Args: {
+          p_attachment_id: string
+          p_client_message_id: string
+          p_reply_to_id: string
+          p_thread_id: string
+        }
+        Returns: Json
+      }
+      send_my_marketplace_chat_message: {
+        Args: {
+          p_body: string
+          p_card_data: Json
+          p_client_message_id: string
+          p_kind: string
+          p_reply_to_id: string
+          p_thread_id: string
+        }
+        Returns: Json
       }
       set_delivery_order_status: {
         Args: {
@@ -8246,6 +9287,14 @@ export type Database = {
           p_order_id: string
           p_reason?: string
         }
+        Returns: Json
+      }
+      set_my_marketplace_chat_preferences: {
+        Args: { p_muted_until: string; p_thread_id: string }
+        Returns: Json
+      }
+      set_my_marketplace_chat_read_cursor: {
+        Args: { p_message_id: string; p_thread_id: string }
         Returns: Json
       }
       set_my_marketplace_order_status: {
@@ -8436,6 +9485,10 @@ export type Database = {
       }
       submit_my_marketplace_store_operational: {
         Args: { p_idempotency_key: string; p_store_id: string }
+        Returns: Json
+      }
+      submit_my_onboarding_draft: {
+        Args: { p_draft_id: string; p_expected_version: number }
         Returns: Json
       }
       submit_my_product_for_review: {
@@ -8782,6 +9835,18 @@ export type Database = {
       }
     }
     Enums: {
+      activity_kind:
+        | "store"
+        | "restaurant"
+        | "service"
+        | "real_estate"
+        | "driver"
+      activity_workspace_status:
+        | "draft"
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "suspended"
       app_role: "admin" | "merchant" | "driver"
       delivery_order_status:
         | "open"
@@ -9008,6 +10073,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      activity_kind: [
+        "store",
+        "restaurant",
+        "service",
+        "real_estate",
+        "driver",
+      ],
+      activity_workspace_status: [
+        "draft",
+        "pending",
+        "approved",
+        "rejected",
+        "suspended",
+      ],
       app_role: ["admin", "merchant", "driver"],
       delivery_order_status: [
         "open",

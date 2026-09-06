@@ -1,4 +1,8 @@
-﻿import Link from 'next/link';
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { DairtakLink } from '@/components/ui/dairtak-link';
+import { DairtakSelect } from '@/components/ui/dairtak-select';
 import { RotateCcw, Search } from 'lucide-react';
 import { Button } from '@heroui/react/button';
 import { Checkbox } from '@heroui/react/checkbox';
@@ -23,19 +27,40 @@ export type CatalogFiltersProps = {
 export function CatalogFilters({
   model,
   idPrefix = 'desktop',
-  isMobileDrawer = false,
   onApply,
 }: CatalogFiltersProps) {
+  const router = useRouter();
   const activeCount = countActiveCatalogFilters(model);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const params = new URLSearchParams();
+
+    for (const [key, value] of formData.entries()) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) {
+          params.set(key, trimmed);
+        }
+      }
+    }
+
+    onApply?.();
+    const queryString = params.toString();
+    router.push(queryString ? `/marketplace?${queryString}` : '/marketplace');
+  };
 
   return (
     <form
+      key={JSON.stringify([model.query, model.selectedCategory, model.selectedStore, model.minPrice, model.maxPrice, model.minRating, model.inStockOnly, model.selectedSort])}
       className={styles.filtersForm}
       action="/marketplace"
       method="get"
       role="search"
       aria-label="تصفية المنتجات"
-      onSubmit={onApply}
+      onSubmit={handleSubmit}
     >
       <div className={styles.filterSection}>
         <Label.Root htmlFor={`${idPrefix}-search`} className={styles.filterLabel}>
@@ -53,41 +78,21 @@ export function CatalogFilters({
       </div>
 
       <div className={styles.filterSection}>
-        <label htmlFor={`${idPrefix}-category`} className={styles.filterLabel}>
-          الفئة
-        </label>
-        <select
-          id={`${idPrefix}-category`}
+        <DairtakSelect
+          label="الفئة"
           name="category"
           defaultValue={model.selectedCategory ?? ''}
-          className={styles.selectField}
-        >
-          <option value="">كل الفئات</option>
-          {model.categories.map((category) => (
-            <option key={category.id} value={category.slug}>
-              {category.name} {typeof category.productCount === 'number' ? `(${category.productCount})` : ''}
-            </option>
-          ))}
-        </select>
+          options={[{ value: '', label: 'كل الفئات' }, ...model.categories.map((category) => ({ value: category.slug, label: `${category.name}${typeof category.productCount === 'number' ? ` (${category.productCount})` : ''}` }))]}
+        />
       </div>
 
       <div className={styles.filterSection}>
-        <label htmlFor={`${idPrefix}-store`} className={styles.filterLabel}>
-          المتجر
-        </label>
-        <select
-          id={`${idPrefix}-store`}
+        <DairtakSelect
+          label="المتجر"
           name="store"
           defaultValue={model.selectedStore ?? ''}
-          className={styles.selectField}
-        >
-          <option value="">كل المتاجر</option>
-          {model.stores.map((store) => (
-            <option key={store.slug} value={store.slug}>
-              {store.name} ({store.productCount})
-            </option>
-          ))}
-        </select>
+          options={[{ value: '', label: 'كل المتاجر' }, ...model.stores.map((store) => ({ value: store.slug, label: `${store.name} (${store.productCount})` }))]}
+        />
       </div>
 
       <div className={styles.filterSection}>
@@ -129,22 +134,12 @@ export function CatalogFilters({
       </div>
 
       <div className={styles.filterSection}>
-        <label htmlFor={`${idPrefix}-rating`} className={styles.filterLabel}>
-          الحد الأدنى للتقييم
-        </label>
-        <select
-          id={`${idPrefix}-rating`}
+        <DairtakSelect
+          label="الحد الأدنى للتقييم"
           name="rating"
-          defaultValue={model.minRating ?? ''}
-          className={styles.selectField}
-        >
-          <option value="">كل التقييمات</option>
-          {[4, 3, 2, 1].map((rating) => (
-            <option key={rating} value={rating}>
-              ★ {rating} نجوم فأكثر
-            </option>
-          ))}
-        </select>
+          defaultValue={model.minRating ? String(model.minRating) : ''}
+          options={[{ value: '', label: 'كل التقييمات' }, ...[4, 3, 2, 1].map((rating) => ({ value: String(rating), label: `${rating} نجوم فأكثر` }))]}
+        />
       </div>
 
       <div className={styles.filterSection}>
@@ -162,21 +157,12 @@ export function CatalogFilters({
       </div>
 
       <div className={styles.filterSection}>
-        <label htmlFor={`${idPrefix}-sort`} className={styles.filterLabel}>
-          الترتيب حسب
-        </label>
-        <select
-          id={`${idPrefix}-sort`}
+        <DairtakSelect
+          label="الترتيب حسب"
           name="sort"
           defaultValue={model.selectedSort}
-          className={styles.selectField}
-        >
-          {model.sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          options={model.sortOptions}
+        />
       </div>
 
       <div className={styles.filterActions}>
@@ -185,12 +171,10 @@ export function CatalogFilters({
           تطبيق الفلاتر
         </Button.Root>
         {activeCount > 0 ? (
-          <Link href="/marketplace">
-            <Button.Root className={styles.secondaryButton}>
+          <DairtakLink href="/marketplace" onClick={onApply} className={styles.secondaryButton}>
               <RotateCcw className="size-4" aria-hidden="true" />
               مسح الكل
-            </Button.Root>
-          </Link>
+            </DairtakLink>
         ) : null}
       </div>
     </form>

@@ -14,7 +14,9 @@ test('Batch 1: Shells and state panels use HeroUI primitives and do not expose u
   assert.match(marketplaceShell, /from '@heroui\/react\/badge'/);
   assert.match(roleShell, /from '@heroui\/react\/chip'/);
   assert.match(roleShell, /from '@heroui\/react\/card'/);
-  assert.match(statePanel, /from '@heroui\/react\/button'/);
+  assert.match(statePanel, /from '@\/components\/ui\/dairtak-link'/);
+  assert.match(statePanel, /<DairtakLink href=\{actionHref\}/);
+  assert.doesNotMatch(statePanel, /<Button/);
   assert.match(statePanel, /from '@heroui\/react\/skeleton'/);
   assert.match(statePanel, /from '@heroui\/react\/empty-state'/);
 });
@@ -64,11 +66,14 @@ test('Batch 4: Admin and Driver operations panels use HeroUI compound primitives
   assert.match(operationsPanels, /from '@heroui\/react\/button'/);
 });
 
-test('Theme alignment: marketplace stylesheet defines semantic HeroUI variables', () => {
-  const css = read('components/marketplace/marketplace.module.css');
-  assert.match(css, /--heroui-primary/);
-  assert.match(css, /--heroui-background/);
-  assert.match(css, /--heroui-foreground/);
-  assert.match(css, /--heroui-border/);
-  assert.match(css, /--heroui-focus/);
+test('Theme alignment: marketplace uses the shared HeroUI v3 semantic theme', () => {
+  const css = read('app/globals.css');
+  const shell = read('components/marketplace/marketplace-shell.tsx');
+  assert.match(shell, /dairtak-theme/);
+  assert.match(css, /\.dairtak-theme\s*\{/);
+  assert.match(css, /--accent: var\(--dairtak-orange\)/);
+  assert.match(css, /--background: var\(--kayan-surface\)/);
+  assert.match(css, /--foreground: var\(--kayan-black\)/);
+  assert.match(css, /--border: var\(--kayan-border\)/);
+  assert.match(css, /--focus: var\(--dairtak-orange-deep\)/);
 });

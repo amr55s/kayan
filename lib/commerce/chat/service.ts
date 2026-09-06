@@ -2,7 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import type { Json } from '@/lib/supabase/database.types';
+import type { Database, Json } from '@/lib/supabase/database.types';
 import {
   chatConversationKinds,
   chatMessageKinds,
@@ -27,6 +27,34 @@ import {
   reactionSchema,
   sendMessageSchema,
 } from './input';
+
+// Supabase's generated RPC Args do not express PostgreSQL parameter nullability.
+// These specific SQL parameters intentionally accept NULL (no cursor/filter,
+// no reply, unmute, or the unused side of a store/order intent). Keep generated
+// types untouched and retain their checks for every other argument.
+type NullableChatSqlParameters = {
+  open_my_marketplace_conversation: 'p_store_id' | 'p_order_id';
+  list_my_marketplace_conversations: 'p_kind' | 'p_before_created_at' | 'p_before_id';
+  get_my_marketplace_conversation_page: 'p_before_created_at' | 'p_before_id';
+  get_marketplace_chat_as_monitor: 'p_monitor_session_id';
+  list_marketplace_chat_monitor_queue: 'p_status' | 'p_has_report' | 'p_has_risk' | 'p_monitor_session_id';
+  search_my_marketplace_chat_messages: 'p_before_created_at' | 'p_before_id';
+  send_my_marketplace_chat_image: 'p_reply_to_id';
+  send_my_marketplace_chat_message: 'p_body' | 'p_reply_to_id';
+  set_my_marketplace_chat_preferences: 'p_muted_until';
+  moderate_marketplace_chat: 'p_monitor_session_id';
+  create_my_marketplace_support_thread: 'p_store_id' | 'p_order_id';
+};
+type GeneratedChatArgs<Name extends keyof NullableChatSqlParameters> = Database['public']['Functions'][Name]['Args'];
+type ChatSqlArgs<Name extends keyof NullableChatSqlParameters> = {
+  [Key in keyof GeneratedChatArgs<Name>]: Key extends NullableChatSqlParameters[Name]
+    ? GeneratedChatArgs<Name>[Key] | null : GeneratedChatArgs<Name>[Key];
+};
+export function chatRpcArgs<Name extends keyof NullableChatSqlParameters>(
+  _name: Name, args: ChatSqlArgs<Name>,
+): GeneratedChatArgs<Name> {
+  return args as GeneratedChatArgs<Name>;
+}
 
 export type ListConversationsInput = {
   kind?: ChatConversationKind | null;
@@ -269,35 +297,35 @@ export function toChatActionState(error: unknown): ChatActionState {
 export async function openConversation(intent: ConversationIntent): Promise<ChatConversationSummary> {
   const input = parseServiceInput(conversationIntentSchema, intent);
   const supabase = await authenticatedChatClient();
-  const data = await resolveChatRpc(supabase.rpc('open_my_marketplace_conversation', {
+  const data = await resolveChatRpc(supabase.rpc('open_my_marketplace_conversation', chatRpcArgs('open_my_marketplace_conversation', {
     p_store_id: input.kind === 'presale' ? input.storeId : null,
     p_order_id: input.kind === 'order' ? input.orderId : null,
     p_kind: input.kind,
-  }));
+  })));
   return parseRpcResult(chatConversationSummarySchema, data);
 }
 
 export async function listConversations(input: ListConversationsInput = {}): Promise<ChatConversationPage> {
   const parsedInput = parseServiceInput(listConversationsInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await resolveChatRpc(supabase.rpc('list_my_marketplace_conversations', {
+  const data = await resolveChatRpc(supabase.rpc('list_my_marketplace_conversations', chatRpcArgs('list_my_marketplace_conversations', {
     p_kind: parsedInput.kind ?? null,
     p_limit: parsedInput.limit ?? 30,
     p_before_created_at: parsedInput.cursor?.createdAt ?? null,
     p_before_id: parsedInput.cursor?.id ?? null,
-  }));
+  })));
   return parseRpcResult(chatConversationPageSchema, data);
 }
 
 export async function getConversationPage(input: GetConversationPageInput): Promise<ChatMessagePage> {
   const parsedInput = parseServiceInput(getConversationPageInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await resolveChatRpc(supabase.rpc('get_my_marketplace_conversation_page', {
+  const data = await resolveChatRpc(supabase.rpc('get_my_marketplace_conversation_page', chatRpcArgs('get_my_marketplace_conversation_page', {
     p_thread_id: parsedInput.conversationId,
     p_limit: parsedInput.limit ?? 50,
     p_before_created_at: parsedInput.cursor?.createdAt ?? null,
     p_before_id: parsedInput.cursor?.id ?? null,
-  }));
+  })));
   return parseRpcResult(chatMessagePageSchema, data);
 }
 
@@ -306,10 +334,9 @@ export async function getConversationPage(input: GetConversationPageInput): Prom
 export async function getMarketplaceChatAsMonitor(input: GetConversationPageInput): Promise<ChatMessagePage> {
   const parsedInput = parseServiceInput(getConversationPageInputSchema, input);
   const supabase = await authenticatedChatClient();
-  // @ts-expect-error Task 10 RPC is locally committed before generated types refresh.
-  const data = await resolveChatRpc(supabase.rpc('get_marketplace_chat_as_monitor', {
+  const data = await resolveChatRpc(supabase.rpc('get_marketplace_chat_as_monitor', chatRpcArgs('get_marketplace_chat_as_monitor', {
     p_thread_id: parsedInput.conversationId, p_monitor_session_id: null,
-  }));
+  })));
   return parseRpcResult(chatMessagePageSchema, data);
 }
 
@@ -317,7 +344,6 @@ export async function canShareConversationLocation(conversationId: string): Prom
   const parsed = uuid.safeParse(conversationId);
   if (!parsed.success) return false;
   const supabase = await authenticatedChatClient();
-  // @ts-expect-error locally committed Task 9 RPC is not generated until Staging apply.
   const { data, error } = await supabase.rpc('can_share_my_marketplace_chat_location', { p_thread_id: parsed.data });
   if (error || typeof data !== 'boolean') return false;
   return data;
@@ -335,10 +361,9 @@ export async function listChatMonitorQueue(filters: ChatMonitorFilters = {}): Pr
   const parsedFilters = filterSchema.safeParse(filters);
   if (!parsedFilters.success) throw new ChatServiceError('invalid_input');
   const supabase = await authenticatedChatClient();
-  // @ts-expect-error Task 10 RPC is committed locally before generated types refresh.
-  const data = await resolveChatRpc(supabase.rpc('list_marketplace_chat_monitor_queue', {
+  const data = await resolveChatRpc(supabase.rpc('list_marketplace_chat_monitor_queue', chatRpcArgs('list_marketplace_chat_monitor_queue', {
     p_status: null, p_has_report: null, p_has_risk: null, p_limit: 50, p_monitor_session_id: null, p_filters: parsedFilters.data,
-  }));
+  })));
   const parsed = z.array(chatMonitorQueueItemSchema).max(100).safeParse(data);
   if (!parsed.success) throw new ChatServiceError('service_unavailable');
   return parsed.data;
@@ -347,13 +372,13 @@ export async function listChatMonitorQueue(filters: ChatMonitorFilters = {}): Pr
 export async function searchConversationMessages(input: ChatSearchInput): Promise<ChatMessageSearchPage> {
   const parsedInput = parseServiceInput(chatSearchSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await resolveChatRpc(supabase.rpc('search_my_marketplace_chat_messages', {
+  const data = await resolveChatRpc(supabase.rpc('search_my_marketplace_chat_messages', chatRpcArgs('search_my_marketplace_chat_messages', {
     p_thread_id: parsedInput.conversationId,
     p_query: parsedInput.query,
     p_limit: parsedInput.limit,
     p_before_created_at: parsedInput.cursor?.createdAt ?? null,
     p_before_id: parsedInput.cursor?.id ?? null,
-  }));
+  })));
   return parseRpcResult(chatMessageSearchPageSchema, data);
 }
 
@@ -362,21 +387,19 @@ export async function sendMessage(input: SendMessageInput): Promise<ChatMessage>
   const supabase = await authenticatedChatClient();
   const data = parsedInput.kind === 'image' && parsedInput.attachmentId
     ? await resolveChatRpc(
-      // Generated database types are refreshed only after Staging migration apply.
-      // @ts-expect-error Task 9 locally committed RPC is intentionally not yet generated.
-      supabase.rpc('send_my_marketplace_chat_image', {
+      supabase.rpc('send_my_marketplace_chat_image', chatRpcArgs('send_my_marketplace_chat_image', {
         p_thread_id: parsedInput.conversationId, p_client_message_id: parsedInput.clientMessageId,
         p_attachment_id: parsedInput.attachmentId, p_reply_to_id: parsedInput.replyToId,
-      }),
+      })),
     )
-    : await resolveChatRpc(supabase.rpc('send_my_marketplace_chat_message', {
+    : await resolveChatRpc(supabase.rpc('send_my_marketplace_chat_message', chatRpcArgs('send_my_marketplace_chat_message', {
       p_thread_id: parsedInput.conversationId,
       p_client_message_id: parsedInput.clientMessageId,
       p_kind: parsedInput.kind,
       p_body: parsedInput.body,
       p_reply_to_id: parsedInput.replyToId,
       p_card_data: parsedInput.card,
-    }));
+    })));
   try {
     return parseChatMessage(data);
   } catch {
@@ -425,10 +448,10 @@ export async function deleteMessage(input: DeleteMessageInput): Promise<ChatMess
 export async function setConversationPreferences(input: SetConversationPreferencesInput): Promise<ChatPreferencesResult> {
   const parsedInput = parseServiceInput(setConversationPreferencesInputSchema, input);
   const supabase = await authenticatedChatClient();
-  const data = await resolveChatRpc(supabase.rpc('set_my_marketplace_chat_preferences', {
+  const data = await resolveChatRpc(supabase.rpc('set_my_marketplace_chat_preferences', chatRpcArgs('set_my_marketplace_chat_preferences', {
     p_thread_id: parsedInput.conversationId,
     p_muted_until: parsedInput.mutedUntil,
-  }));
+  })));
   return parseRpcResult(chatPreferencesResultSchema, data);
 }
 

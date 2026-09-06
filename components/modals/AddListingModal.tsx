@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   Home,
   Image as ImageIcon,
-  KeyRound,
   Link2,
   Send,
   Sparkles,
@@ -82,8 +81,6 @@ export function AddListingModal({
   const [phone, setPhone] = useState('');
   const [whatsappSameAsPhone, setWhatsappSameAsPhone] = useState(true);
   const [whatsapp, setWhatsapp] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [existingPlaceId, setExistingPlaceId] = useState('');
 
   const [title, setTitle] = useState('');
@@ -117,7 +114,6 @@ export function AddListingModal({
     displayName
     || phone
     || (!whatsappSameAsPhone && whatsapp)
-    || password
     || title
     || payment
     || description
@@ -141,8 +137,6 @@ export function AddListingModal({
     setPhone('');
     setWhatsappSameAsPhone(true);
     setWhatsapp('');
-    setPassword('');
-    setConfirmPassword('');
     setExistingPlaceId('');
     setTitle('');
     setCategory('restaurants');
@@ -205,12 +199,8 @@ export function AddListingModal({
       setErrorMsg('رقم واتساب غير صحيح، أدخل رقم مصري سليم أو استخدم رقم التواصل نفسه.');
       return;
     }
-    if (!identity && password.length < 12) {
-      setErrorMsg('كلمة المرور يجب أن تتكون من 12 حرفاً على الأقل.');
-      return;
-    }
-    if (!identity && password !== confirmPassword) {
-      setErrorMsg('كلمتا المرور غير متطابقتين.');
+    if (!identity) {
+      setErrorMsg('سجّل الدخول باستخدام Google قبل إرسال الطلب.');
       return;
     }
 
@@ -308,7 +298,6 @@ export function AddListingModal({
           displayName: effectiveDisplayName,
           phone,
           whatsapp: effectiveWhatsapp,
-          password,
           placeMode: mode,
           existingPlaceId: mode === 'existing'
             ? placesList.find(
@@ -447,7 +436,7 @@ export function AddListingModal({
                     <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-7 text-zinc-800">
                       <p className="font-black">اربط الطلب بحساب Google أولًا، ثم سنملأ اسمك تلقائيًا.</p>
                       <Link
-                        href="/signin?next=%2F%3Fregister%3Dplace"
+                        href="/signin?next=%2Fonboarding"
                         className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-zinc-950 px-4 font-black text-white"
                       >
                         المتابعة باستخدام Google
@@ -822,29 +811,6 @@ export function AddListingModal({
                       )}
                     </div>
 
-                    {!identity ? (
-                      <>
-                        <Input
-                          isRequired
-                          name="new-password"
-                          autoComplete="new-password"
-                          type="password"
-                          label="كلمة المرور"
-                          value={password}
-                          onValueChange={setPassword}
-                          startContent={<KeyRound className="size-4 text-zinc-400" />}
-                        />
-                        <Input
-                          isRequired
-                          name="confirm-password"
-                          autoComplete="new-password"
-                          type="password"
-                          label="تأكيد كلمة المرور"
-                          value={confirmPassword}
-                          onValueChange={setConfirmPassword}
-                        />
-                      </>
-                    ) : null}
                   </div>
                 </form>
               )}

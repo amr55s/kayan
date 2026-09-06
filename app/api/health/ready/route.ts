@@ -12,7 +12,7 @@ export const maxDuration = 10;
 const CHECK_TIMEOUT_MS = 4_000;
 const READY_CACHE_MS = 30_000;
 const NOT_READY_CACHE_MS = 5_000;
-const EXPECTED_SCHEMA_VERSION = '20260830115034';
+const EXPECTED_SCHEMA_VERSION = '20260905203103';
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, max-age=0',
 } as const;

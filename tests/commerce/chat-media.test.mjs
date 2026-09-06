@@ -48,7 +48,10 @@ test('migration keeps attachment metadata RPC-only and participant-scoped', () =
   assert.match(sql, /expire_marketplace_chat_attachments/u);
   assert.match(sql, /chat_media\.delete_requested/u);
   assert.match(sql, /on conflict \(event_key\) do nothing/u);
-  assert.match(sql, /revoke execute on function public\.marketplace_chat_message_json\(uuid, uuid\) from public/u);
+  assert.match(sql, /revoke all on function public\.marketplace_chat_message_json\(uuid, uuid\)\s+from public, anon, authenticated, service_role/u);
+  assert.ok(sql.indexOf('create or replace function public.marketplace_chat_message_json(')
+    < sql.indexOf('revoke all on function public.marketplace_chat_message_json(uuid, uuid)'),
+  'revoke the replacement only after it exists');
   assert.match(sql, /verified' and message_id is null/u);
   assert.match(sql, /revoke all on function public\.marketplace_chat_message_json_base_private_media/u);
   assert.doesNotMatch(sql, /grant execute on function public\.complete_my_marketplace_chat_attachment[^\n]*to authenticated/u);

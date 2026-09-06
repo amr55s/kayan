@@ -1,36 +1,52 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@heroui/react/button';
-import { Modal } from '@heroui/react/modal';
 import { useOverlayState } from '@heroui/react';
 import { Drawer } from '@heroui/react/drawer';
-import { Bike, BookOpen, Building2, Home, LayoutDashboard, LogIn, Menu, MessageSquareText, Share2, ShoppingBag, UserPlus, X } from 'lucide-react';
+import { BookOpen, Home, LayoutDashboard, LogIn, Menu, MessageSquareText, Share2, ShoppingBag, UserPlus, X } from 'lucide-react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { dashboardPathForRole, type AppRole } from '@/lib/auth/routes';
+import { beginGoogleSignIn } from '@/lib/auth/oauth-actions';
 import { SITE_NAME, SITE_NAME_AR } from '@/lib/brand';
-import { trackSiteEvent } from '@/lib/analytics/client';
 import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
-  isJoinOpen: boolean;
-  onJoinOpenChange: (open: boolean) => void;
+  isJoinOpen?: boolean;
+  onJoinOpenChange?: (open: boolean) => void;
   onOpenAddModal?: () => void;
   onOpenDriverModal?: () => void;
   onOpenFeedbackModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  isJoinOpen,
-  onJoinOpenChange,
-  onOpenAddModal,
-  onOpenDriverModal,
   onOpenFeedbackModal,
 }) => {
   const [dashboardPath, setDashboardPath] = useState<string | null>(null);
   const menuState = useOverlayState();
-  const joinState = useOverlayState({ isOpen: isJoinOpen, onOpenChange: onJoinOpenChange });
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
+  const joiningRef = useRef(false);
+
+  const join = useCallback(async () => {
+    if (joiningRef.current) return;
+    joiningRef.current = true;
+    setIsJoining(true);
+    setJoinError('');
+    try {
+      const result = await beginGoogleSignIn('/onboarding');
+      if (!result.success) {
+        setJoinError(result.message);
+        return;
+      }
+      window.location.assign(result.url);
+    } catch {
+      setJoinError('تعذر الاتصال. حاول الانضمام مرة أخرى؛ لم نفقد بياناتك.');
+    } finally {
+      joiningRef.current = false;
+      setIsJoining(false);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -38,15 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     async function loadDashboardPath() {
       const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) return;
-      const { data: profile } = await (supabase as any)
-        .from('profiles')
-        .select('role, is_active, must_change_password')
-        .eq('id', userData.user.id)
-        .maybeSingle();
-      if (mounted && profile?.is_active && !profile.must_change_password) {
-        setDashboardPath(dashboardPathForRole(profile.role as AppRole));
-      }
+      if (mounted) setDashboardPath(userData.user ? '/onboarding' : null);
     }
 
     void loadDashboardPath().catch((error) => {
@@ -56,11 +64,6 @@ export const Header: React.FC<HeaderProps> = ({
       mounted = false;
     };
   }, []);
-
-  const choose = (action?: () => void) => {
-    onJoinOpenChange(false);
-    action?.();
-  };
 
   const chooseMenu = (action?: () => void) => {
     menuState.close();
@@ -127,19 +130,21 @@ export const Header: React.FC<HeaderProps> = ({
           )}
           <div>
             <Link
-              href={dashboardPath ?? '/login'}
+              href={dashboardPath ?? '/signin'}
               className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 sm:px-3"
             >
               {dashboardPath ? <LayoutDashboard className="size-4" aria-hidden="true" /> : <LogIn className="size-4" aria-hidden="true" />}
               <span className="max-[359px]:sr-only">
-                {dashboardPath ? 'لوحة التحكم' : 'دخول'}
+                {dashboardPath ? 'مساحات عملي' : 'دخول'}
               </span>
             </Link>
           </div>
           <div>
             <Button
-              onClick={() => onJoinOpenChange(true)}
-              className="bg-zinc-950 px-3 text-xs font-black text-white hover:bg-zinc-800 sm:px-4"
+              onPress={() => { void join(); }}
+              isPending={isJoining}
+              isDisabled={isJoining}
+              className="min-h-11 bg-zinc-950 px-3 text-xs font-black text-white hover:bg-zinc-800 sm:px-4"
             >
               <UserPlus className="size-4" aria-hidden="true" />
               <span className="sm:hidden">انضم</span>
@@ -202,9 +207,9 @@ export const Header: React.FC<HeaderProps> = ({
                   <MessageSquareText className="size-5" aria-hidden="true" /> اقتراح أو تقييم
                 </button>
               )}
-              <Link href={dashboardPath ?? '/login'} onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100">
+              <Link href={dashboardPath ?? '/signin'} onClick={() => chooseMenu()} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100">
                 {dashboardPath ? <LayoutDashboard className="size-5" aria-hidden="true" /> : <LogIn className="size-5" aria-hidden="true" />}
-                {dashboardPath ? 'لوحة التحكم' : 'تسجيل الدخول'}
+                {dashboardPath ? 'مساحات عملي' : 'تسجيل الدخول'}
               </Link>
             </nav>
 
@@ -215,19 +220,15 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <div className="space-y-2">
                 <Button
-                  onPress={() => chooseMenu(onOpenDriverModal)}
-                  className="w-full justify-start border border-zinc-200 bg-white px-4 font-bold text-zinc-950"
+                  onPress={() => { menuState.close(); void join(); }}
+                  isPending={isJoining}
+                  isDisabled={isJoining}
+                  className="min-h-11 w-full justify-start bg-zinc-950 px-4 font-black text-white hover:bg-zinc-800"
                 >
-                  <Bike className="size-5" aria-hidden="true" />
-                  طلب حساب كابتن توصيل
+                  <UserPlus className="size-5" aria-hidden="true" />
+                  {isJoining ? 'جارٍ المتابعة…' : 'انضم باستخدام Google'}
                 </Button>
-                <Button
-                  onPress={() => chooseMenu(onOpenAddModal)}
-                  className="w-full justify-start bg-zinc-950 px-4 font-black text-white hover:bg-zinc-800"
-                >
-                  <Building2 className="size-5" aria-hidden="true" />
-                  طلب حساب محل أو خدمة
-                </Button>
+                <p className="px-1 text-xs leading-6 text-zinc-600">حساب واحد للشراء وأنشطتك. اختر ما تريد عمله بعد الدخول.</p>
               </div>
             </section>
           </Drawer.Body>
@@ -239,46 +240,12 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
       </header>
 
-      <Modal state={joinState}>
-        <Modal.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
-          <Modal.Container placement="bottom" size="md" className="sm:items-center">
-            <Modal.Dialog aria-label={`انضم إلى ${SITE_NAME_AR}`} dir="rtl" className="mx-3 rounded-t-2xl border border-zinc-200 bg-white sm:mx-0 sm:rounded-2xl">
-              <Modal.Header className="border-b border-zinc-100">
-                <div>
-                  <Modal.Heading className="text-lg font-black text-zinc-950">انضم إلى {SITE_NAME_AR}</Modal.Heading>
-                  <p className="mt-1 text-sm font-normal text-zinc-500">اختر نوع التسجيل المناسب.</p>
-                </div>
-              </Modal.Header>
-              <Modal.Body className="space-y-2 py-4">
-                <div className="grid grid-cols-2 gap-2 pb-2">
-                  <Link href="/guide" onClick={() => choose()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-bold text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
-                    <BookOpen className="size-4" aria-hidden="true" />
-                    طريقة الاستخدام
-                  </Link>
-                  <Link href="/share" onClick={() => choose()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-bold text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-950">
-                    <Share2 className="size-4" aria-hidden="true" />
-                    شارك ديرتك
-                  </Link>
-                </div>
-                <Button
-                  onClick={() => choose(onOpenDriverModal)}
-                  className="w-full justify-start border border-zinc-200 bg-white px-4 text-sm font-bold text-zinc-950 hover:bg-zinc-50"
-                >
-                  <Bike className="size-5" aria-hidden="true" />
-                  طلب حساب كابتن توصيل
-                </Button>
-                <Button
-                  onClick={() => choose(onOpenAddModal)}
-                  className="w-full justify-start bg-zinc-950 px-4 text-sm font-black text-white hover:bg-zinc-800"
-                >
-                  <Building2 className="size-5" aria-hidden="true" />
-                  طلب حساب محل أو خدمة
-                </Button>
-              </Modal.Body>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      </Modal>
+      {joinError ? (
+        <div role="alert" className="mx-auto my-3 max-w-xl rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p>{joinError}</p>
+          <Button variant="ghost" onPress={() => { void join(); }} isDisabled={isJoining} className="mt-2 min-h-11">إعادة المحاولة</Button>
+        </div>
+      ) : null}
     </>
   );
 };

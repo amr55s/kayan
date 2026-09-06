@@ -40,17 +40,18 @@ test('Google is the first step for merchant and driver applications', async () =
 
   assert.match(actions, /identity\.provider === 'google'/);
   assert.match(actions, /\.eq\('auth_user_id', googleUser\.id\)/);
-  assert.match(actions, /operationalProfile/);
+  assert.doesNotMatch(actions, /operationalProfile/);
+  assert.match(actions, /\.eq\('activity_kind', activityKind\)/);
   assert.match(signin, /if \(user\) redirect\(next\)/);
-  assert.match(driverModal, /register%3Ddriver/);
-  assert.match(merchantModal, /register%3Dplace/);
+  assert.match(driverModal, /next=%2Fonboarding/);
+  assert.match(merchantModal, /next=%2Fonboarding/);
   assert.match(directory, /cat === 'stores'[\s\S]{0,260}router\.push\('\/marketplace'\)/);
   assert.equal(accountRequestSchema.parse({
     kind: 'driver',
     displayName: 'كابتن تجريبي',
     phone: '01008747011',
     whatsapp: '01008747011',
-  }).password, '');
+  }).password, undefined);
 });
 
 test('select options submit stable values and legacy labels are normalized', async () => {
@@ -148,8 +149,11 @@ test('public branding uses DAIRTAK consistently', () => {
   assert.match(manifest, /"name": "DAIRTAK",/);
   assert.match(serviceWorker, /DAIRTAK/);
   assert.match(brandLogo, /src: '\/brand\/dairtak-logo\.svg'/);
-  assert.match(marketplaceShell, /aria-label="DAIRTAK — العودة إلى الصفحة الرئيسية"/);
-  assert.match(marketplaceShell, /<BrandLogo variant="full"/);
+  assert.match(marketplaceShell, /import \{ Header \} from '@\/components\/layout\/Header'/);
+  assert.match(marketplaceShell, /<Header \/>/);
+  const sharedHeader = read('components/layout/Header.tsx');
+  assert.match(sharedHeader, /aria-label=\{`\$\{SITE_NAME\} - الصفحة الرئيسية`\}/);
+  assert.match(sharedHeader, /<BrandLogo\s+variant="full"/);
   assert.match(services, /دليل الخدمات المحلية/);
 
   for (const file of publicFiles) {

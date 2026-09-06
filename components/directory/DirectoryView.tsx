@@ -43,7 +43,6 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isDriverOpen, setIsDriverOpen] = useState(false);
-  const [isJoinOpen, setIsJoinOpen] = useState(false);
   const [invalidDetail, setInvalidDetail] = useState(false);
   const [closingDetailKey, setClosingDetailKey] = useState<string | null>(null);
   const [feedbackInitialPlaceId, setFeedbackInitialPlaceId] = useState<string>();
@@ -52,18 +51,9 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   useEffect(() => {
     const registration = new URLSearchParams(window.location.search).get('register');
     if (!registration) return;
-    const frame = window.requestAnimationFrame(() => {
-      if (registration === 'driver') setIsDriverOpen(true);
-      else if (registration === 'place') setIsAddOpen(true);
-      else setIsJoinOpen(true);
-      const params = new URLSearchParams(window.location.search);
-      params.delete('register');
-      const nextUrl = params.size
-        ? `${window.location.pathname}?${params.toString()}`
-        : window.location.pathname;
-      router.replace(nextUrl, { scroll: false });
-    });
-    return () => window.cancelAnimationFrame(frame);
+    // Old bookmarks enter the same authenticated journey without preselecting
+    // a role or reviving the retired registration modal.
+    router.replace('/onboarding');
   }, [router]);
 
   const { favorites, favoritesCount } = useFavorites();
@@ -195,26 +185,19 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
     <div className="dir-rtl flex min-h-screen flex-col bg-zinc-50 pb-20 text-zinc-950 sm:pb-0">
       {/* Navbar Header */}
       <Header
-        isJoinOpen={isJoinOpen}
-        onJoinOpenChange={(open) => {
-          setIsJoinOpen(open);
-          if (open) {
-            trackSiteEvent('join_open', { targetType: 'feature', targetKey: 'join_menu' });
-          }
-        }}
         onOpenAddModal={() => {
           trackSiteEvent('add_listing_open', {
             targetType: 'feature',
             targetKey: 'add_listing',
           });
-          router.push(`/signin?next=${encodeURIComponent('/?register=place')}`);
+          router.push('/onboarding');
         }}
         onOpenDriverModal={() => {
           trackSiteEvent('driver_signup_open', {
             targetType: 'feature',
             targetKey: 'driver_signup',
           });
-          router.push(`/signin?next=${encodeURIComponent('/?register=driver')}`);
+          router.push('/onboarding');
         }}
         onOpenFeedbackModal={() => {
           trackSiteEvent('feedback_open', {

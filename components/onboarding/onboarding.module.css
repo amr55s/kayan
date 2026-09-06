@@ -1,0 +1,45 @@
+.page { min-height: 75vh; max-width: 90rem; margin-inline: auto; padding: 2rem 1rem 4rem; color: var(--kayan-black); }
+.intro { max-width: 46rem; margin-block-end: 1.75rem; }
+.intro h1 { font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 800; margin-block-end: .75rem; }
+.intro p,.muted { color: #52525b; line-height: 1.9; }
+.identity { display: flex; align-items: center; gap: .75rem; margin-block-start: 1.25rem; }
+.identityAvatar { flex-shrink: 0; }
+.identityText { display: grid; gap: .15rem; min-width: 0; overflow-wrap: anywhere; font-size: .875rem; }
+.identityText strong { color: var(--kayan-black); font-size: 1rem; }
+.layout { display: grid; grid-template-columns: 16rem minmax(0,1fr); gap: 1.5rem; align-items: start; }
+.steps { list-style: none; display: grid; gap: .75rem; padding: 1.5rem; margin: 0; border-radius: 24px; background: white; border: 1px solid var(--kayan-border); }
+.steps li { display: flex; gap: .75rem; align-items: center; color: #52525b; min-height: 44px; }
+.steps li[aria-current='step'] { color: var(--kayan-black); font-weight: 800; }
+.stepNumber { display: grid; place-items: center; width: 2rem; height: 2rem; flex-shrink: 0; border-radius: 50%; background: #f4f4f5; }
+.steps li[aria-current='step'] .stepNumber { background: var(--dairtak-orange-soft); color: #913600; }
+.form { min-width: 0; padding: clamp(1.1rem,3vw,2rem); }
+.heading { font-size: 1.4rem; font-weight: 800; margin-block-end: .5rem; outline: none; }
+.fields { display: grid; gap: 1.25rem; margin-block: 1.5rem; }
+.choices { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; margin-block: 1.5rem; }
+.choice { height: auto; min-height: 7rem; padding: 1.1rem; text-align: start; white-space: normal; align-items: start; justify-content: start; display: flex; flex-direction: column; gap: .5rem; background: #fff; border: 1px solid var(--kayan-border); border-radius: 16px; transition: border-color 180ms,background 180ms; }
+.choice[aria-pressed='true'] { border-color: var(--dairtak-orange-deep); background: var(--dairtak-orange-soft); }
+.choice strong { font-size: 1rem; }
+.choice span { color: #52525b; font-size: .88rem; font-weight: 400; line-height: 1.7; }
+.actions { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; margin-block-start: 1.75rem; padding-block-start: 1rem; border-block-start: 1px solid var(--kayan-border); }
+.status { font-size: .88rem; min-height: 1.5rem; line-height: 1.7; color: #52525b; margin-block: .75rem; }
+.error { border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; padding: .9rem; border-radius: 12px; margin-block: 1rem; }
+.notice { background: var(--dairtak-orange-soft); border-radius: 12px; padding: 1rem; line-height: 1.8; color: #71330e; }
+.workspaces { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,17rem),1fr)); gap: 1rem; margin-block: 1.5rem; }
+.workspace { display: grid; gap: .9rem; padding: 1.5rem; }
+.review { display: grid; gap: .9rem; margin-block: 1.5rem; overflow-wrap: anywhere; }
+.review div { display: grid; grid-template-columns: 8rem minmax(0,1fr); gap: 1rem; }
+.review dt { color: #52525b; }
+.photos { display: grid; grid-template-columns: repeat(auto-fill,minmax(100px,1fr)); gap: .75rem; }
+.photo { border: 1px solid var(--kayan-border); border-radius: 12px; padding: .5rem; overflow: hidden; }
+.photo img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
+.link { display: inline-flex; min-height: 44px; align-items: center; color: var(--kayan-black); text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 767px) {
+  .page { padding-block-start: 1.5rem; }
+  .layout { grid-template-columns: minmax(0,1fr); gap: 1rem; }
+  .steps { grid-template-columns: repeat(4,minmax(0,1fr)); gap: .5rem; padding: 1rem .5rem; }
+  .steps li { flex-direction: column; text-align: center; font-size: .75rem; gap: .4rem; }
+  .choices { grid-template-columns: minmax(0,1fr); }
+  .choice { min-height: 5.5rem; }
+  .review div { grid-template-columns: minmax(0,1fr); gap: .25rem; }
+}
+@media (prefers-reduced-motion: reduce) { .choice { transition: none; } }

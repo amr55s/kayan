@@ -28,9 +28,28 @@ export async function getCurrentProfile(): Promise<CurrentProfile | null> {
 
 export async function requireProfile(roles?: AppRole[]): Promise<CurrentProfile> {
   const profile = await getCurrentProfile();
-  if (!profile || !profile.is_active) redirect('/login');
+  if (!profile || !profile.is_active) redirect('/signin?next=%2Fonboarding');
   if (profile.must_change_password) redirect('/login?change-password=1');
-  if (roles && !roles.includes(profile.role)) redirect(dashboardPathForRole(profile.role));
+  if (roles) {
+    const supabase = await createClient();
+    const operationalRoles = roles.filter((role) => role !== 'admin');
+    const permissions = await Promise.all(operationalRoles.map(async (role) => {
+      const { data, error } = await (supabase as any).rpc('has_my_activity_access', { p_activity: role });
+      return !error && data === true;
+    }));
+    const allowed = (roles.includes('admin') && profile.role === 'admin') || permissions.some(Boolean);
+    if (!allowed) redirect('/onboarding');
+  }
+  return profile;
+}
+
+/** Server actions use this without redirects; authorization never rewrites role. */
+export async function requireOperationalActivity(role: 'merchant' | 'driver'): Promise<CurrentProfile> {
+  const profile = await getCurrentProfile();
+  if (!profile?.is_active || profile.must_change_password) throw new Error('activity_access_required');
+  const supabase = await createClient();
+  const { data, error } = await (supabase as any).rpc('has_my_activity_access', { p_activity: role });
+  if (error || data !== true) throw new Error('activity_access_required');
   return profile;
 }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
 import { Chip } from '@heroui/react/chip';
@@ -43,7 +44,7 @@ export function AccountRequestManager({
         onMessage(
           request.kind === 'driver'
             ? 'تم اعتماد حساب الكابتن وربطه ببطاقته.'
-            : 'تم اعتماد حساب النشاط وربطه بالمكان.',
+            : 'تم اعتماد النشاط. يجري تجهيز ظهوره في الدليل؛ المنتجات تظل مسودات حتى مراجعتها.',
         );
         setApprovingId(null);
         onRefresh();
@@ -65,7 +66,7 @@ export function AccountRequestManager({
         }
         setRejectingId(null);
         setReason('');
-        onMessage('تم رفض الطلب وحذف بيانات الدخول المعلقة.');
+        onMessage('تم رفض هذا النشاط فقط مع حفظ حساب المستخدم وباقي أنشطته.');
         onRefresh();
       } catch (error) {
         console.error('Reject account request failed:', error);
@@ -81,7 +82,7 @@ export function AccountRequestManager({
         <div>
           <h2 className="font-black">طلبات حسابات الكباتن والأنشطة</h2>
           <p className="mt-1 text-xs font-normal text-zinc-500">
-            الموافقة تنشئ الملف التشغيلي وتربطه بالبطاقة القديمة عند وجودها.
+            راجع البيانات والصور. الموافقة مستقلة لكل نشاط ولا تدمج حسابات المستخدمين.
           </p>
         </div>
         <Chip className="bg-zinc-950 text-white">{pendingRequests.length} معلق</Chip>
@@ -129,6 +130,7 @@ export function AccountRequestManager({
                     <p className="mt-1 text-xs text-zinc-400">
                       {formatCairoDateTime(request.created_at)}
                     </p>
+                    <Link href={`/admin/onboarding/${request.id}`} className="inline-flex min-h-11 items-center text-sm font-bold underline underline-offset-4">مراجعة تفاصيل الطلب والصور</Link>
                   </div>
 
                   {approvingId === request.id ? (
@@ -155,13 +157,14 @@ export function AccountRequestManager({
                   ) : rejectingId === request.id ? (
                     <div className="flex w-full flex-col gap-2 lg:max-w-md">
                       <TextField fullWidth className="space-y-1.5">
-                        <Label className="text-sm font-bold text-zinc-800">سبب الرفض (اختياري)</Label>
+                        <Label className="text-sm font-bold text-zinc-800">سبب الرفض والتعديل المطلوب</Label>
                         <Input value={reason} onChange={(event) => setReason(event.target.value)} className="min-h-11 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10" />
                       </TextField>
                       <div className="flex gap-2">
                         <Button
                           variant="danger"
                           isPending={pending}
+                          isDisabled={reason.trim().length < 2}
                           onPress={() => reject(request)}
                         >
                           تأكيد الرفض

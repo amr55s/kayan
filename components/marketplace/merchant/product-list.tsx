@@ -1,5 +1,5 @@
+import { DairtakLink } from '@/components/ui/dairtak-link';
 import Image from 'next/image';
-import Link from 'next/link';
 import { Archive, PackageOpen, Search, Send } from 'lucide-react';
 import { Button } from '@heroui/react/button';
 import { Input } from '@heroui/react/input';
@@ -103,16 +103,12 @@ export function MerchantProductList({
           </p>
         </div>
         <div className={styles.inlineActions}>
-          <Link href="/merchant/marketplace/excel">
-            <Button.Root className={styles.secondaryLink}>
+          <DairtakLink href="/merchant/marketplace/excel" className={styles.secondaryLink}>
               استيراد أو تصدير Excel
-            </Button.Root>
-          </Link>
-          <Link href="/merchant/marketplace/new">
-            <Button.Root className={styles.primaryLink}>
+            </DairtakLink>
+          <DairtakLink href="/merchant/marketplace/new" className={styles.primaryLink} variant="primary">
               إضافة منتج
-            </Button.Root>
-          </Link>
+            </DairtakLink>
         </div>
       </header>
 
@@ -249,13 +245,11 @@ export function MerchantProductList({
                   <td>{formatUpdatedAt(product.updatedAt)}</td>
                   <td>
                     <div className={styles.rowActions}>
-                      <Link
+                      <DairtakLink
                         href={`/merchant/marketplace/${encodeURIComponent(product.id)}/edit`}
-                      >
-                        <Button.Root className={styles.textLink}>
+                       className={styles.textLink}>
                           تعديل
-                        </Button.Root>
-                      </Link>
+                        </DairtakLink>
                       {product.status === 'draft' || product.status === 'rejected' ? (
                         <form action={actions.submitForReviewAction}>
                           <input type="hidden" name="productId" value={product.id} />
@@ -300,25 +294,21 @@ export function MerchantProductList({
       {viewModel.pagination.pageCount > 1 ? (
         <nav className={styles.pagination} aria-label="صفحات منتجات المتجر">
           {viewModel.pagination.page > 1 ? (
-            <Link
+            <DairtakLink
               href={catalogHref(viewModel.filters, viewModel.pagination.page - 1)}
-            >
-              <Button.Root className={styles.paginationLink}>
+             className={styles.paginationLink}>
                 السابق
-              </Button.Root>
-            </Link>
+              </DairtakLink>
           ) : null}
           <span className={styles.paginationCurrent} aria-current="page">
             {viewModel.pagination.page.toLocaleString('ar-EG')}
           </span>
           {viewModel.pagination.page < viewModel.pagination.pageCount ? (
-            <Link
+            <DairtakLink
               href={catalogHref(viewModel.filters, viewModel.pagination.page + 1)}
-            >
-              <Button.Root className={styles.paginationLink}>
+             className={styles.paginationLink}>
                 التالي
-              </Button.Root>
-            </Link>
+              </DairtakLink>
           ) : null}
         </nav>
       ) : null}

@@ -1,7 +1,7 @@
-﻿import { Badge } from '@heroui/react/badge';
+import { Badge } from '@heroui/react/badge';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { BrandLogo } from '@/components/layout/BrandLogo';
+import { Header } from '@/components/layout/Header';
 import type { MarketplaceNavigationItem } from './view-models';
 import styles from './marketplace.module.css';
 
@@ -23,28 +23,22 @@ export function MarketplaceShell({
   navigation = defaultNavigation,
 }: MarketplaceShellProps) {
   return (
-    <div className={styles.shell}>
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <Link href="/" className={styles.brand} aria-label="DAIRTAK — العودة إلى الصفحة الرئيسية">
-            <BrandLogo variant="full" className={styles.brandLogo} priority />
-          </Link>
-          <nav className={styles.primaryNav} aria-label="التنقل الرئيسي للمتجر">
-            {navigation.map((item) => (
-              <Link key={item.href} href={item.href} className={styles.navLink}>
-                <span>{item.label}</span>
-                {typeof item.badge === 'number' && item.badge > 0 ? (
-                  <Badge.Root aria-label={`${item.badge} عناصر`}>
-                    <Badge.Label className={styles.badge}>{item.badge}</Badge.Label>
-                  </Badge.Root>
-                ) : null}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      </header>
+    <div className={`dairtak-theme ${styles.shell}`}>
+      <Header />
 
       <main id="main-content" className={styles.page}>
+        <nav className={styles.marketplaceNav} aria-label="أقسام المتجر">
+          {navigation.map((item) => (
+            <Link key={item.href} href={item.href} className={styles.navLink}>
+              <span>{item.label}</span>
+              {typeof item.badge === 'number' && item.badge > 0 ? (
+                <Badge.Root aria-label={`${item.badge} عناصر`}>
+                  <Badge.Label className={styles.badge}>{item.badge}</Badge.Label>
+                </Badge.Root>
+              ) : null}
+            </Link>
+          ))}
+        </nav>
         {children}
       </main>
 

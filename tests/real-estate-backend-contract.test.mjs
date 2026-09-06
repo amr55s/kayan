@@ -42,5 +42,8 @@ test('real-estate reads degrade gracefully before the additive migration and rea
   assert.match(queries, /if \(result\.error\)[\s\S]*\.select\('\*'\)/u);
   assert.match(releaseMarker, /'version', '20260830115034'/u);
   assert.match(releaseMarker, /reviewed_real_estate_listings/u);
-  assert.match(read('app/api/health/ready/route.ts'), /EXPECTED_SCHEMA_VERSION = '20260830115034'/u);
+  const activeMarker = read('supabase/migrations/20260831060617_onboarding_release_marker.sql');
+  assert.match(activeMarker, /reviewed_real_estate_listings/u);
+  assert.match(activeMarker, /public\.place_real_estate/u);
+  assert.match(read('app/api/health/ready/route.ts'), /EXPECTED_SCHEMA_VERSION = '20260905203103'/u);
 });

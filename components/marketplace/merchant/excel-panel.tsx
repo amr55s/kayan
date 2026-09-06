@@ -254,10 +254,8 @@ export function MerchantExcelPanel({
               <Download size={21} aria-hidden="true" />
             </div>
             {viewModel.exportState.downloadUrl ? (
-              <a href={viewModel.exportState.downloadUrl}>
-                <Button.Root className={styles.primaryLink}>
+              <a href={viewModel.exportState.downloadUrl} className={styles.primaryLink}>
                   <Download size={16} aria-hidden="true" /> تنزيل ملف المنتجات
-                </Button.Root>
               </a>
             ) : <p className={styles.helper}>اربط متجرًا أولًا لتصدير الكتالوج.</p>}
           </section>

@@ -1,4 +1,5 @@
-﻿import { Button } from '@heroui/react/button';
+import { DairtakLink } from '@/components/ui/dairtak-link';
+import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
 import { Input } from '@heroui/react/input';
 import { Label } from '@heroui/react/label';
@@ -228,11 +229,9 @@ export function MarketplaceCart({
             {hasUnavailableLines ? (
               <p className={styles.notice}>احذف المنتجات غير المتوفرة قبل المتابعة.</p>
             ) : (
-              <Link href={checkoutHref}>
-                <Button.Root className={styles.primaryButton}>
+              <DairtakLink href={checkoutHref} className={styles.primaryButton} variant="primary">
                   متابعة إتمام الطلب
-                </Button.Root>
-              </Link>
+                </DairtakLink>
             )}
           </Card.Content>
         </Card.Root>

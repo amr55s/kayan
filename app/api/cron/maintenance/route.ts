@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { processMarketplaceDeletionOutbox } from '@/lib/commerce/outbox-worker';
 import { processCatalogImportImages } from '@/lib/commerce/catalog-image-worker';
 import { processMarketplacePushJobs } from '@/lib/commerce/push-worker';
+import { processOnboardingPublication } from '@/lib/onboarding/publication-worker';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
     if (legacyMedia.error) throw new Error(`legacy_media_maintenance_failed:${legacyMedia.error.code ?? 'unknown'}`);
     if (chatMedia.error) throw new Error(`chat_media_maintenance_failed:${chatMedia.error.code ?? 'unknown'}`);
     if (notifications.error) throw new Error(`notification_maintenance_failed:${notifications.error.code ?? 'unknown'}`);
-    const [outbox, catalogImages, push] = await Promise.all([
+    const [outbox, catalogImages, push, onboarding] = await Promise.all([
       processMarketplaceDeletionOutbox(15),
       // Daily Vercel Cron is a safe fallback. Production may invoke the
       // dedicated protected worker more frequently without changing this job.
@@ -53,6 +54,7 @@ export async function GET(request: Request) {
       // Daily fallback only. Production should invoke the protected push
       // endpoint more frequently for timely delivery.
       processMarketplacePushJobs(10),
+      processOnboardingPublication(),
     ]);
 
     const durationMs = Date.now() - startedAt;
@@ -67,6 +69,7 @@ export async function GET(request: Request) {
       outbox,
       catalogImages,
       push,
+      onboarding,
       durationMs,
     }, {
       headers: PRIVATE_NO_STORE,

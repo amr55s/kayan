@@ -18,7 +18,8 @@ test('the root keeps the directory deterministic and links into the marketplace'
   assert.match(directory, /<MarketplaceEntry/);
   assert.match(marketplaceEntry, /href="\/marketplace"/);
   assert.match(marketplaceEntry, /motion-reduce:/);
-  assert.match(marketplaceShell, /<BrandLogo variant="full"/);
+  assert.match(marketplaceShell, /<Header \/>/);
+  assert.match(read('components/layout/Header.tsx'), /<BrandLogo\s+variant="full"/);
   assert.match(marketplaceShell, /href: '\/'/);
   assert.doesNotMatch(page, /redirect\(/);
 });

@@ -1,6 +1,7 @@
 'use client';
 
-import Link from 'next/link';
+import { DairtakLink } from '@/components/ui/dairtak-link';
+
 import { useOverlayState } from '@heroui/react';
 import { Badge } from '@heroui/react/badge';
 import { Button } from '@heroui/react/button';
@@ -58,6 +59,10 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
   const mobileDrawerState = useOverlayState();
   const activeCount = countActiveCatalogFilters(model);
 
+  const handleMobileApply = () => {
+    mobileDrawerState.close();
+  };
+
   return (
     <section aria-labelledby="marketplace-catalog-title">
       <header className={styles.sectionHeader}>
@@ -106,11 +111,9 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
               ) : null}
             </Button>
             {activeCount > 0 ? (
-              <Link href="/marketplace">
-                <Button className={styles.secondaryButton}>
+              <DairtakLink href="/marketplace" className={styles.secondaryButton}>
                   مسح الفلاتر
-                </Button>
-              </Link>
+                </DairtakLink>
             ) : null}
           </div>
 
@@ -132,20 +135,19 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
             </div>
           ) : (
             <MarketplaceStatePanel
-              title="لم نجد منتجات بهذه المواصفات"
-              description="جرّب تعديل كلمات البحث أو اختيار فئة أخرى. لن نعرض نتائج بديلة غير مرتبطة بطلبك."
-              actionHref="/marketplace"
-              actionLabel="مسح عوامل البحث"
+              headingLevel={2}
+              title={activeCount > 0 ? 'لم نجد منتجات بهذه المواصفات' : 'المنتجات الجديدة في الطريق'}
+              description={activeCount > 0 ? 'جرّب تعديل كلمات البحث أو اختيار فئة أخرى.' : 'ستظهر هنا منتجات متاجر منطقتك بعد مراجعتها. يمكنك الآن استكشاف دليل ديرتك.'}
+              actionHref={activeCount > 0 ? '/marketplace' : '/'}
+              actionLabel={activeCount > 0 ? 'مسح عوامل البحث' : 'استكشف دليل ديرتك'}
             />
           )}
 
           {model.hasMore && model.nextCursor ? (
             <nav className={styles.pagination} aria-label="متابعة نتائج المنتجات">
-              <Link href={catalogHref(model, { cursor: model.nextCursor })}>
-                <Button className={styles.pageLink}>
+              <DairtakLink href={catalogHref(model, { cursor: model.nextCursor })} className={styles.pageLink}>
                   النتائج التالية
-                </Button>
-              </Link>
+                </DairtakLink>
             </nav>
           ) : null}
         </div>
@@ -153,7 +155,7 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
 
       {/* Accessible Mobile Filter Drawer */}
       <Drawer state={mobileDrawerState}>
-        <Drawer.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+        <Drawer.Backdrop variant="blur" className="dairtak-theme z-[100] bg-zinc-950/45">
           <Drawer.Content placement="bottom" className="max-h-[85dvh] rounded-t-3xl border-t border-zinc-200 bg-white">
             <Drawer.Dialog aria-label="تصفية نتائج المنتجات" dir="rtl">
               <Drawer.Header className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
@@ -166,7 +168,7 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
                   size="sm"
                   onPress={() => mobileDrawerState.close()}
                   aria-label="إغلاق نافذة التصفية"
-                  className="size-10"
+                  className="size-11"
                 >
                   <X className="size-5" aria-hidden="true" />
                 </Button>
@@ -176,7 +178,7 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
                   model={model}
                   idPrefix="mobile"
                   isMobileDrawer
-                  onApply={() => mobileDrawerState.close()}
+                  onApply={handleMobileApply}
                 />
               </Drawer.Body>
             </Drawer.Dialog>

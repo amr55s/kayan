@@ -158,9 +158,7 @@ export const accountRequestSchema = z
     kind: z.enum(['driver', 'merchant']),
     displayName: z.string().trim().min(2, 'اكتب الاسم كاملاً.').max(100),
     phone: egyptianPhone,
-    // Google-authenticated applicants do not create a second password. The
-    // server still requires a strong password for the legacy fallback flow.
-    password: z.string().max(128).optional().default(''),
+    // This is a public application, never a password-account creation API.
     whatsapp: egyptianPhone.optional().nullable().or(z.literal('')),
     vehicleType: z.string().trim().max(60).optional().nullable(),
     placeMode: z.enum(['existing', 'new']).optional().nullable(),

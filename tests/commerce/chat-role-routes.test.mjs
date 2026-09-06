@@ -66,7 +66,11 @@ test('monitor capability is distinct from support and legacy monitor lookup uses
     read('lib/admin/membership-input.ts'),
   ]);
   assert.match(guard, /p_roles: \['chat_monitor'\]/);
-  assert.doesNotMatch(guard, /\(supabase as any\)\.rpc/);
+  // Admin capability remains generated-type checked; new activity RPCs have a
+  // separate migration/type-generation lifecycle and are not admin authority.
+  const adminGuard = guard.split('export async function requireAdminAal2(')[1];
+  assert.doesNotMatch(adminGuard, /\(supabase as any\)\.rpc/);
+  assert.match(adminGuard, /data.currentLevel !== 'aal2'/);
   assert.match(legacy, /getConversationPage/);
   assert.doesNotMatch(legacy, /getMyMarketplaceSupportThread/);
   assert.match(legacy, /conversation\.kind !== 'support'/);

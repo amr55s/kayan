@@ -33,20 +33,10 @@ export async function requireMerchantAccess(merchantId: string) {
     await requireAdminAal2({ failureMode: 'throw' });
     return { user, merchantId, isAdmin: true };
   }
-  if (profile?.is_active && profile.role === 'merchant' && profile.merchant_id === merchantId) {
-    return { user, merchantId, isAdmin: false };
-  }
-
-  // Additive multi-store memberships are preferred for marketplace users. The
-  // legacy profile relation remains supported while existing staff migrate.
-  const { data: membership } = await (admin as any)
-    .from('merchant_memberships')
-    .select('merchant_id,is_active')
-    .eq('user_id', user.id)
-    .eq('merchant_id', merchantId)
-    .eq('is_active', true)
-    .maybeSingle();
-  if (!membership) throw new CommerceAccessError(403, 'forbidden');
+  const supabase = await createClient();
+  const { data: allowed, error: accessError } = await (supabase as any)
+    .rpc('can_manage_merchant', { p_merchant_id: merchantId });
+  if (accessError || allowed !== true) throw new CommerceAccessError(403, 'forbidden');
   return { user, merchantId, isAdmin: false };
 }
 
@@ -104,7 +94,8 @@ async function requireDeliveryProofParticipant(orderId: string, mode: 'upload' |
     .maybeSingle();
   if (!store) throw new CommerceAccessError(404, 'entity_not_found');
 
-  const [{ data: profile }, { data: assignment }, { data: customer }, { data: canFulfill }] = await Promise.all([
+  const sessionClient = await createClient() as any;
+  const [{ data: profile }, { data: assignment }, { data: customer }, { data: canFulfill }, driverAccess] = await Promise.all([
     admin.from('profiles').select('id,role,is_active').eq('id', user.id).maybeSingle(),
     admin.from('marketplace_delivery_assignments')
       .select('driver_id,status')
@@ -115,13 +106,13 @@ async function requireDeliveryProofParticipant(orderId: string, mode: 'upload' |
       .eq('id', order.customer_id)
       .eq('auth_user_id', user.id)
       .maybeSingle(),
-    (await createClient() as any).rpc('can_fulfill_store', { p_store_id: store.id }),
+    sessionClient.rpc('can_fulfill_store', { p_store_id: store.id }),
+    sessionClient.rpc('has_my_activity_access', { p_activity: 'driver' }),
   ]);
 
   const isAdmin = profile?.is_active && profile.role === 'admin';
   if (isAdmin) await requireAdminAal2({ failureMode: 'throw' });
-  const isAssignedDriver = profile?.is_active
-    && profile.role === 'driver'
+  const isAssignedDriver = !driverAccess.error && driverAccess.data === true
     && order.delivery_mode === 'platform'
     && assignment?.driver_id === user.id
     && (mode === 'read' || ['assigned', 'picked_up', 'issue'].includes(assignment.status));

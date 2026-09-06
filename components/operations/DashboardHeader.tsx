@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@heroui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell, Home, LogOut } from 'lucide-react';
@@ -69,6 +70,7 @@ export function DashboardHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {role !== 'admin' ? <Link href="/workspaces" className="inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-100">مساحات عملي</Link> : null}
           <Link
             href="/account/notifications"
             aria-label="الإشعارات"
@@ -85,16 +87,16 @@ export function DashboardHeader({
             <Home className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">العودة إلى ديرتك</span>
           </Link>
-          <button
+          <Button
             type="button"
-            onClick={signOut}
-            disabled={isSigningOut}
+            onPress={signOut}
+            isDisabled={isSigningOut}
             className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-zinc-950 px-3 text-xs font-bold text-white transition-colors hover:bg-zinc-800 disabled:cursor-wait disabled:opacity-60"
           >
             <LogOut className="size-4" aria-hidden="true" />
             <span className="sm:hidden">{isSigningOut ? 'جارٍ…' : 'خروج'}</span>
             <span className="hidden sm:inline">{isSigningOut ? 'جارٍ الخروج…' : 'تسجيل الخروج'}</span>
-          </button>
+          </Button>
         </div>
       </div>
       {errorMessage && (

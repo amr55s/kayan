@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Button } from '@heroui/react/button';
-import { beginGoogleSignIn } from '@/lib/auth/oauth-actions';
+import { beginGoogleSignIn, switchToGoogleForOnboarding } from '@/lib/auth/oauth-actions';
 import type { ChatLoginIntent } from '@/lib/auth/safe-next';
 
 export function GoogleSignInButton({
@@ -10,11 +10,13 @@ export function GoogleSignInButton({
   intent,
   label = 'المتابعة باستخدام Google',
   helper,
+  switchAccount = false,
 }: {
   next?: string;
   intent?: ChatLoginIntent | null;
   label?: string;
   helper?: string;
+  switchAccount?: boolean;
 }) {
   const [feedback, setFeedback] = useState<{ code: string; message: string } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -22,12 +24,18 @@ export function GoogleSignInButton({
   function signIn() {
     setFeedback(null);
     startTransition(async () => {
-      const result = await beginGoogleSignIn({ next, intent });
-      if (!result.success) {
-        setFeedback({ code: result.code, message: result.message });
-        return;
+      try {
+        const result = switchAccount
+          ? await switchToGoogleForOnboarding()
+          : await beginGoogleSignIn({ next, intent });
+        if (!result.success) {
+          setFeedback({ code: result.code, message: result.message });
+          return;
+        }
+        window.location.assign(result.url);
+      } catch {
+        setFeedback({ code: 'connection_failed', message: 'تعذر الاتصال بالخادم. أعد المحاولة؛ سلتك محفوظة.' });
       }
-      window.location.assign(result.url);
     });
   }
 

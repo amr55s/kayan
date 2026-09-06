@@ -1,11 +1,11 @@
-import { Button } from '@heroui/react/button';
+import { DairtakLink } from '@/components/ui/dairtak-link';
 import { EmptyState } from '@heroui/react/empty-state';
 import { Skeleton } from '@heroui/react/skeleton';
 import { CircleAlert, PackageOpen } from 'lucide-react';
-import Link from 'next/link';
 import styles from './marketplace.module.css';
 
 type MarketplaceStatePanelProps = {
+  headingLevel?: 1 | 2;
   kind?: 'empty' | 'error';
   title: string;
   description: string;
@@ -14,6 +14,7 @@ type MarketplaceStatePanelProps = {
 };
 
 export function MarketplaceStatePanel({
+  headingLevel = 1,
   kind = 'empty',
   title,
   description,
@@ -21,6 +22,7 @@ export function MarketplaceStatePanel({
   actionLabel,
 }: MarketplaceStatePanelProps) {
   const Icon = kind === 'error' ? CircleAlert : PackageOpen;
+  const Heading = headingLevel === 1 ? 'h1' : 'h2';
 
   return (
     <section
@@ -32,14 +34,12 @@ export function MarketplaceStatePanel({
         <span className={styles.stateIcon} aria-hidden="true">
           <Icon size={24} strokeWidth={1.8} />
         </span>
-        <h1 className={styles.stateTitle}>{title}</h1>
+        <Heading className={styles.stateTitle}>{title}</Heading>
         <p className={styles.stateDescription}>{description}</p>
         {actionHref && actionLabel ? (
-          <Link href={actionHref}>
-            <Button className={styles.primaryButton}>
+          <DairtakLink href={actionHref} className={styles.primaryButton} variant="primary">
               {actionLabel}
-            </Button>
-          </Link>
+            </DairtakLink>
         ) : null}
       </EmptyState>
     </section>

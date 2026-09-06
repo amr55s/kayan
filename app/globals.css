@@ -16,6 +16,8 @@
 @source "./admin/error.tsx";
 @source "./admin/layout.tsx";
 @source "./admin/page.tsx";
+@source "./admin/onboarding/**/*.tsx";
+@source "./workspaces/**/*.tsx";
 @source "./driver/page.tsx";
 @source "./error.tsx";
 @source "./global-error.tsx";
@@ -64,6 +66,15 @@
 @source "../components/operations/PushSubscriptionButton.tsx";
 @source "../components/observability/ClientErrorReporter.tsx";
 @source "../components/ui/heroui-compat.tsx";
+@source "../components/ui/dairtak-*.tsx";
+@source "../components/marketplace";
+@source "../components/onboarding";
+@source "../components/auth";
+@source "./onboarding";
+@source "./workspaces";
+@source "./signin";
+@source "./marketplace";
+@source "./account";
 
 @layer base {
   :root {
@@ -77,6 +88,14 @@
     --dairtak-orange: #ff7a1a;
     --dairtak-orange-soft: #fff1e7;
     --dairtak-orange-deep: #d95500;
+    --dairtak-card-radius: 1.5rem;
+    --dairtak-control-radius: 0.75rem;
+    --dairtak-card-border: rgba(228, 228, 231, 0.7);
+    --dairtak-card-shadow: 0 14px 34px -26px rgba(0, 0, 0, 0.45);
+    --dairtak-card-shadow-hover: 0 22px 42px -28px rgba(0, 0, 0, 0.5);
+    --dairtak-content-width: 90rem;
+    --dairtak-motion-duration: 180ms;
+    --dairtak-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
   }
   * {
     box-sizing: border-box;
@@ -124,10 +143,10 @@
 
 /* Custom Soft Elevation Cards */
 .soft-card {
-  background-color: #ffffff;
-  border: 1px solid rgba(228, 228, 231, 0.7);
-  box-shadow: 0 14px 34px -26px rgba(0, 0, 0, 0.45);
-  border-radius: 1.5rem;
+  background-color: var(--kayan-white);
+  border: 1px solid var(--dairtak-card-border);
+  box-shadow: var(--dairtak-card-shadow);
+  border-radius: var(--dairtak-card-radius);
   transition:
     border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
     box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
@@ -136,7 +155,7 @@
 
 .soft-card:hover {
   border-color: rgba(212, 212, 216, 1);
-  box-shadow: 0 22px 42px -28px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--dairtak-card-shadow-hover);
   transform: translateY(-2px);
 }
 
@@ -157,7 +176,6 @@ body {
   width: 100%;
   max-width: 100%;
   overflow-x: clip !important;
-  position: relative;
 }
 
 main,
@@ -176,6 +194,90 @@ footer,
   min-height: 44px;
   min-width: 44px;
 }
+
+/* Opt-in HeroUI v3 theme. Also apply it to portalled Drawer/Select content,
+   whose DOM does not inherit the originating page's custom properties. */
+.dairtak-theme {
+  --accent: var(--dairtak-orange);
+  --accent-foreground: var(--kayan-black);
+  --accent-hover: #ff8c38;
+  --accent-soft: var(--dairtak-orange-soft);
+  --accent-soft-foreground: #9a3412;
+  --background: var(--kayan-surface);
+  --foreground: var(--kayan-black);
+  --surface: var(--kayan-white);
+  --surface-foreground: var(--kayan-black);
+  --overlay: var(--kayan-white);
+  --overlay-foreground: var(--kayan-black);
+  --default: #f4f4f5;
+  --default-foreground: var(--kayan-black);
+  --warning: #f59e0b;
+  --warning-foreground: var(--kayan-black);
+  --warning-soft: #fffbeb;
+  --warning-soft-foreground: #78350f;
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --danger-soft: #fef2f2;
+  --danger-soft-foreground: #7f1d1d;
+  --muted: var(--kayan-muted);
+  --border: var(--kayan-border);
+  --separator: var(--kayan-border);
+  --focus: var(--dairtak-orange-deep);
+  --link: #9a3412;
+  --radius: 0.75rem;
+  --field-radius: var(--dairtak-control-radius);
+  --field-background: var(--kayan-white);
+  --field-foreground: var(--kayan-black);
+  --field-placeholder: var(--kayan-muted);
+  --field-border: #d4d4d8;
+  --field-border-width: 1px;
+  --surface-shadow: var(--dairtak-card-shadow);
+  font-family: var(--font-ibm-plex-arabic);
+  color: var(--kayan-black);
+}
+
+.dairtak-card {
+  background: var(--kayan-white);
+  border: 1px solid var(--dairtak-card-border);
+  border-radius: var(--dairtak-card-radius);
+  box-shadow: var(--dairtak-card-shadow);
+}
+
+.dairtak-field {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d4d4d8;
+  border-radius: var(--dairtak-control-radius);
+  background: var(--kayan-white);
+  color: var(--kayan-black);
+  padding-inline: 0.875rem;
+}
+
+.dairtak-button,
+.dairtak-button-secondary {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--dairtak-control-radius);
+  padding: 0.625rem 1rem;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: center;
+  text-decoration: none;
+  transition: background-color var(--dairtak-motion-duration) ease,
+    border-color var(--dairtak-motion-duration) ease;
+}
+
+.dairtak-button { background: var(--dairtak-orange); color: var(--kayan-black); }
+.dairtak-button:hover { background: #ff8c38; }
+.dairtak-button-secondary { border-color: var(--kayan-border); background: var(--kayan-white); color: var(--kayan-black); }
+.dairtak-button-secondary:hover { background: var(--kayan-surface); }
+.dairtak-theme .button { min-height: 44px; min-width: 44px; }
+.dairtak-theme :is(.input, .select__trigger, .textarea) { border-radius: var(--dairtak-control-radius); }
 
 /* Hide scrollbars visually while maintaining touch scroll functionality */
 .no-scrollbar::-webkit-scrollbar {

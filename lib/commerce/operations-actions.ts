@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import { marketplaceOrderStatuses } from './operations';
+import { chatRpcArgs } from './chat/service';
 
 const uuid = z.uuid();
 const transitionSchema = z.object({
@@ -347,10 +348,10 @@ export async function createMarketplaceSupportThreadAction(formData: FormData): 
   });
   if (!parsed.success) redirect('/account/orders?error=invalid_support_message');
   const supabase = await requireSupabase();
-  const { error } = await supabase.rpc('create_my_marketplace_support_thread', {
+  const { error } = await supabase.rpc('create_my_marketplace_support_thread', chatRpcArgs('create_my_marketplace_support_thread', {
     p_order_id: parsed.data.orderId ?? null, p_store_id: parsed.data.storeId ?? null,
     p_subject: parsed.data.subject, p_message: parsed.data.message,
-  });
+  }));
   if (error) redirect(resultUrl(parsed.data.returnTo, 'error', 'support_failed'));
   revalidatePath(parsed.data.returnTo);
   redirect(resultUrl(parsed.data.returnTo, 'notice', 'support_created'));

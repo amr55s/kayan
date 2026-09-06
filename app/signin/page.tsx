@@ -46,14 +46,14 @@ export default async function SignInPage({
   }
 
   return (
-    <main id="main-content" className="flex min-h-screen items-center justify-center bg-zinc-100 px-4 py-10">
-      <section className="w-full max-w-md rounded-[28px] border border-zinc-200 bg-white p-6 shadow-[0_24px_70px_-45px_rgba(0,0,0,.55)] sm:p-8" aria-labelledby="signin-title">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-[var(--kayan-surface)] px-4 py-10">
+      <section className="soft-card w-full max-w-md p-6 sm:p-8" aria-labelledby="signin-title">
         <Link href="/" aria-label="العودة إلى ديرتك" className="mx-auto flex h-20 max-w-[250px] items-center justify-center overflow-hidden rounded-2xl bg-white px-3 ring-1 ring-zinc-200">
           <BrandLogo variant="full" className="h-auto w-full" priority />
         </Link>
         <h1 id="signin-title" className="mt-6 text-2xl font-black text-zinc-950">دخول واحد لكل ديرتك</h1>
         <p className="mt-3 text-sm leading-7 text-zinc-600">
-          ادخل بجوجل للشراء أو لتقديم طلب تاجر أو كابتن. سنستخدم الاسم والبريد لتقليل الخطوات، ولن نمنح أي صلاحية تشغيلية قبل المراجعة.
+          ادخل بجوجل للشراء أو لإدارة متجرك وخدمتك وعقاراتك والتوصيل بحساب واحد. تختار أنشطتك بعد الدخول، ويُراجع كل نشاط بشكل مستقل.
         </p>
         {errors[errorCode] ? <p role="alert" className="mt-4 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-800">{errors[errorCode]}</p> : null}
         <div className="mt-6">
@@ -69,7 +69,7 @@ export default async function SignInPage({
         </div>
         <div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-zinc-200 pt-5 text-sm font-bold">
           <Link href="/marketplace" className="text-zinc-700 underline-offset-4 hover:underline">العودة إلى المتجر</Link>
-          <Link href="/login" className="text-zinc-700 underline-offset-4 hover:underline">دخول فريق التشغيل</Link>
+          <Link href="/login" className="inline-flex min-h-11 items-center text-zinc-700 underline-offset-4 hover:underline">الحسابات القديمة والإدارة</Link>
         </div>
       </section>
     </main>

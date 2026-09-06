@@ -9,10 +9,15 @@ const read = (path) => readFile(new URL(path, root), 'utf8');
 function themeTokens(css) {
   const tokens = new Map();
   postcss.parse(css).walkRules((rule) => {
-    if (rule.selector !== '.shell') return;
+    if (![':root', '.dairtak-theme'].includes(rule.selector)) return;
     rule.walkDecls(/^--/, (declaration) => tokens.set(declaration.prop, declaration.value));
   });
-  return tokens;
+  const resolve = (value, seen = new Set()) => value?.replace(/var\((--[a-z-]+)\)/g, (_, name) => {
+    assert.ok(!seen.has(name), `cyclic theme token ${name}`);
+    assert.ok(tokens.has(name), `missing shared theme token ${name}`);
+    return resolve(tokens.get(name), new Set([...seen, name]));
+  });
+  return new Map([...tokens].map(([name, value]) => [name, resolve(value)]));
 }
 
 function contrastRatio(foreground, background) {
@@ -58,7 +63,7 @@ test('legacy role layouts no longer inject a parallel raw chat navigation', asyn
 
 test('canonical shell publishes HeroUI v3 semantic DAIRTAK tokens and chat consumes them', async () => {
   const [marketplaceCss, chatCss, presentationalCss] = await Promise.all([
-    read('components/marketplace/marketplace.module.css'),
+    read('app/globals.css'),
     read('components/marketplace/chat/chat.module.css'),
     read('components/marketplace/chat/presentational/chat-presentational.module.css'),
   ]);
@@ -77,7 +82,7 @@ test('canonical shell publishes HeroUI v3 semantic DAIRTAK tokens and chat consu
 
 test('presentational semantic tokens are defined in theme scope with readable state contrast', async () => {
   const [marketplaceCss, presentationalCss] = await Promise.all([
-    read('components/marketplace/marketplace.module.css'),
+    read('app/globals.css'),
     read('components/marketplace/chat/presentational/chat-presentational.module.css'),
   ]);
   const tokens = themeTokens(marketplaceCss);

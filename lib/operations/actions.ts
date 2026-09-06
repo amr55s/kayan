@@ -1,17 +1,19 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { after } from 'next/server';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getCurrentProfile } from '@/lib/auth/guards';
+import { getCurrentProfile, requireOperationalActivity } from '@/lib/auth/guards';
 import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import { validateListingImageUrls } from '@/lib/images/urls';
 import { authEmailForPhone } from '@/lib/auth/phone';
 import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
 import { processAvatarForStorage } from '@/lib/images/server';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
+import { processOnboardingPublication } from '@/lib/onboarding/publication-worker';
 import {
   deleteMediaObject,
   getPrivateMediaBucketName,
@@ -84,11 +86,7 @@ async function requireRole(role: 'admin' | 'merchant' | 'driver') {
     const { profile } = await requireMarketplaceAdminRole(['super_admin'], { failureMode: 'throw' });
     return profile;
   }
-  const profile = await getCurrentProfile();
-  if (!profile || !profile.is_active || profile.role !== role || profile.must_change_password) {
-    throw new Error('غير مصرح لك بتنفيذ هذه العملية.');
-  }
-  return profile;
+  return requireOperationalActivity(role);
 }
 
 export async function createDeliveryOrder(input: unknown): Promise<ActionResult<{ id: string; publicCode: string }>> {
@@ -351,8 +349,6 @@ export async function submitAccountRequest(
   input: unknown,
   imageUrls: string[] = [],
 ): Promise<ActionResult<{ requestId: string }>> {
-  let authUserId: string | null = null;
-  let createdAuthUser = false;
   try {
     const data = accountRequestSchema.parse(input);
     const imageLimit = data.placeCategory === 'real_estate' ? 7 : 3;
@@ -383,9 +379,22 @@ export async function submitAccountRequest(
     )
       ? sessionData.user
       : null;
-    if (!googleUser && data.password.length < 12) {
-      throw new Error('ابدأ التسجيل باستخدام Google، أو استخدم كلمة مرور من 12 حرفاً على الأقل.');
+    if (!googleUser || !googleUser.email_confirmed_at) {
+      throw new Error('سجّل الدخول باستخدام حساب Google موثّق قبل إرسال طلب الانضمام.');
     }
+    const authUserId = googleUser.id;
+    let activityCategory = data.placeCategory;
+    if (data.kind === 'merchant' && data.placeMode === 'existing') {
+      const { data: place, error: placeError } = await (admin as any)
+        .from('places').select('category').eq('id', data.existingPlaceId).maybeSingle();
+      if (placeError) throw placeError;
+      if (!place) throw new Error('المكان المختار غير موجود.');
+      activityCategory = place.category;
+    }
+    const activityKind = data.kind === 'driver' ? 'driver'
+      : activityCategory === 'real_estate' ? 'real_estate'
+        : ['restaurants', 'home_made'].includes(activityCategory ?? '') ? 'restaurant'
+          : ['crafts', 'services'].includes(activityCategory ?? '') ? 'service' : 'store';
     const rateLimitSecret =
       process.env.SUPABASE_SECRET_KEY
       || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -405,54 +414,46 @@ export async function submitAccountRequest(
       throw new Error('تم إرسال طلبات كثيرة من هذا الاتصال. حاول بعد ساعة.');
     }
 
-    const { data: existingProfile } = await (admin as any)
+    const { data: existingProfile, error: existingProfileError } = await (admin as any)
       .from('profiles')
       .select('id')
       .eq('phone', data.phone)
       .maybeSingle();
-    if (existingProfile) {
-      throw new Error('رقم الهاتف لديه حساب بالفعل. استخدم صفحة تسجيل الدخول.');
+    if (existingProfileError) throw existingProfileError;
+    if (existingProfile && existingProfile.id !== googleUser.id) {
+      throw new Error('رقم الهاتف مرتبط بحساب آخر. تواصل مع الإدارة للتحقق من الملكية؛ لن نربط الحسابات تلقائيًا.');
     }
 
-    const { data: pendingRequest } = await (admin as any)
+    const { data: pendingRequest, error: pendingRequestError } = await (admin as any)
       .from('account_requests')
       .select('id')
       .eq('phone', data.phone)
-      .eq('kind', data.kind)
+      .eq('activity_kind', activityKind)
       .eq('status', 'pending')
+      .neq('auth_user_id', googleUser.id)
       .maybeSingle();
+    if (pendingRequestError) throw pendingRequestError;
     if (pendingRequest) {
       throw new Error('يوجد طلب حساب قيد المراجعة بالفعل لهذا الرقم.');
     }
-    if (googleUser) {
-      const { data: operationalProfile } = await (admin as any)
-        .from('profiles')
-        .select('id')
-        .eq('id', googleUser.id)
-        .maybeSingle();
-      if (operationalProfile) {
-        throw new Error('هذا الحساب مرتبط بالفعل بدور تشغيلي. تواصل مع الإدارة لتغييره.');
-      }
-      const { data: requestForAccount } = await (admin as any)
+    {
+      const { data: requestForAccount, error: existingRequestError } = await (admin as any)
         .from('account_requests')
-        .select('id')
+        .select('id, status')
         .eq('auth_user_id', googleUser.id)
-        .eq('status', 'pending')
+        .eq('activity_kind', activityKind)
         .maybeSingle();
+      if (existingRequestError) throw existingRequestError;
       if (requestForAccount) {
-        throw new Error('يوجد طلب حساب قيد المراجعة بالفعل لهذا الحساب.');
+        if (requestForAccount.status === 'pending') {
+          return { success: true, data: { requestId: requestForAccount.id } };
+        }
+        throw new Error('يوجد طلب سابق لهذا النشاط. افتح مساحة النشاط لاستكماله أو إعادة تقديمه.');
       }
     }
 
-    let legacyDriverId: string | null = null;
-    if (data.kind === 'driver') {
-      const { data: legacyDriver } = await (admin as any)
-        .from('drivers')
-        .select('id')
-        .eq('phone', data.phone)
-        .maybeSingle();
-      legacyDriverId = legacyDriver?.id ?? null;
-    } else if (data.placeMode === 'existing') {
+    // Legacy identities are linked only after an explicit ownership review.
+    if (data.kind === 'merchant' && data.placeMode === 'existing') {
       const { data: place } = await (admin as any)
         .from('places')
         .select('id')
@@ -465,32 +466,6 @@ export async function submitAccountRequest(
         .eq('place_id', data.existingPlaceId)
         .maybeSingle();
       if (linkedBranch) throw new Error('هذا المكان مرتبط بالفعل بحساب نشاط.');
-    }
-
-    if (googleUser) {
-      authUserId = googleUser.id;
-    } else {
-      const { data: authData, error: authError } = await admin.auth.admin.createUser({
-        email: authEmailForPhone(data.phone),
-        email_confirm: true,
-        phone: `+2${data.phone}`,
-        phone_confirm: true,
-        password: data.password,
-        user_metadata: {
-          display_name: data.displayName,
-          account_status: 'pending_review',
-          requested_role: data.kind,
-        },
-      });
-      if (authError || !authData.user) {
-        const authMessage = authError?.message.toLowerCase() ?? '';
-        if (authMessage.includes('already') || authMessage.includes('registered')) {
-          throw new Error('رقم الهاتف لديه حساب أو طلب سابق. جرّب تسجيل الدخول أو تواصل مع الإدارة.');
-        }
-        throw authError ?? new Error('تعذر إنشاء طلب الدخول.');
-      }
-      authUserId = authData.user.id;
-      createdAuthUser = true;
     }
 
     if (data.placeCategory === 'real_estate') {
@@ -518,12 +493,13 @@ export async function submitAccountRequest(
       .from('account_requests')
       .insert({
         kind: data.kind,
+        activity_kind: activityKind,
         auth_user_id: authUserId,
         display_name: data.displayName,
         phone: data.phone,
         whatsapp: data.whatsapp || null,
         vehicle_type: data.kind === 'driver' ? data.vehicleType || null : null,
-        legacy_driver_id: legacyDriverId,
+        legacy_driver_id: null,
         place_mode: data.kind === 'merchant' ? data.placeMode : null,
         existing_place_id:
           data.kind === 'merchant' && data.placeMode === 'existing'
@@ -594,8 +570,6 @@ export async function submitAccountRequest(
         user_metadata: {
           ...googleUser.user_metadata,
           display_name: data.displayName,
-          account_status: 'pending_review',
-          requested_role: data.kind,
         },
       });
       if (metadataError) {
@@ -606,13 +580,6 @@ export async function submitAccountRequest(
     safeRevalidatePaths('/admin');
     return { success: true, data: { requestId: request.id } };
   } catch (error) {
-    if (authUserId && createdAuthUser) {
-      try {
-        await createAdminClient().auth.admin.deleteUser(authUserId);
-      } catch {
-        // The orphaned Auth user has no profile and therefore no app permissions.
-      }
-    }
     return actionError(error);
   }
 }
@@ -624,13 +591,14 @@ export async function approveAccountRequest(
     await requireRole('admin');
     const id = z.uuid().parse(requestId);
     const admin = createAdminClient();
-    const { data: authUserId, error } = await (admin as any).rpc(
+    const session = await createClient();
+    const { data: authUserId, error } = await (session as any).rpc(
       'approve_account_request',
       { p_request_id: id },
     );
-    if (error) throw error;
+      if (error) throw error;
 
-    const { error: metadataError } = await admin.auth.admin.updateUserById(authUserId, {
+      const { error: metadataError } = await admin.auth.admin.updateUserById(authUserId, {
       user_metadata: { account_status: 'approved' },
     });
     if (metadataError) {
@@ -638,9 +606,19 @@ export async function approveAccountRequest(
       // and must not make the UI claim that activation failed.
       logSafeServerFailure('warn', 'approved_account_metadata_update_deferred', {
         failure: metadataError,
+        });
+      }
+      // The approval is committed; durable leased jobs remain retryable by cron
+      // if storage is temporarily unavailable or this background attempt fails.
+      after(async () => {
+        try {
+          await processOnboardingPublication();
+          safeRevalidatePaths('/', '/admin', '/workspaces');
+        } catch (failure) {
+          logSafeServerFailure('warn', 'onboarding_publication_deferred', { failure });
+        }
       });
-    }
-    safeRevalidatePaths('/', '/admin');
+      safeRevalidatePaths('/', '/admin');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -654,20 +632,15 @@ export async function rejectAccountRequest(
   try {
     await requireRole('admin');
     const id = z.uuid().parse(requestId);
-    const rejectionReason = z.string().trim().max(500).optional().parse(reason);
-    const admin = createAdminClient();
-    const { data: authUserId, error } = await (admin as any).rpc(
+    const rejectionReason = z.string().trim().min(2, 'اكتب سبب الرفض لتوضيح التعديل المطلوب.').max(500).parse(reason);
+    const session = await createClient();
+    const { error } = await (session as any).rpc(
       'reject_account_request',
       { p_request_id: id, p_reason: rejectionReason || null },
     );
     if (error) throw error;
 
-    const { error: deleteError } = await admin.auth.admin.deleteUser(authUserId);
-    if (deleteError) {
-      logSafeServerFailure('error', 'rejected_account_auth_cleanup_failed', {
-        failure: deleteError,
-      });
-    }
+    // Rejection applies to this activity only, never the shared Google account.
     safeRevalidatePaths('/admin');
     return { success: true };
   } catch (error) {
@@ -717,7 +690,6 @@ export async function updateMerchantPlace(
 ): Promise<ActionResult> {
   try {
     const profile = await requireRole('merchant');
-    if (!profile.merchant_id) throw new Error('الحساب غير مرتبط بمحل.');
     const data = merchantPlaceSchema.parse(input);
     const pendingImages = splitLegacyPlaceImageReferences(newImageUrls, 6);
     if (pendingImages.urls.length) {
@@ -726,14 +698,17 @@ export async function updateMerchantPlace(
     const existingImages = validateListingImageUrls(data.existingImages, 15);
 
     const supabase = await createClient();
-    const { data: branch } = await (supabase as any)
+    const { data: branch, error: branchError } = await (supabase as any)
       .from('merchant_branches')
-      .select('id')
-      .eq('merchant_id', profile.merchant_id)
+      .select('id, merchant_id')
       .eq('place_id', data.placeId)
       .eq('is_active', true)
       .maybeSingle();
+    if (branchError) throw branchError;
     if (!branch) throw new Error('غير مصرح لك بتعديل هذا المكان.');
+    const { data: canManage, error: accessError } = await (supabase as any)
+      .rpc('can_manage_merchant', { p_merchant_id: branch.merchant_id });
+    if (accessError || canManage !== true) throw new Error('غير مصرح لك بتعديل هذا المكان.');
 
     const { data: currentPlace, error: currentError } = await (supabase as any)
       .from('places')

@@ -10,7 +10,7 @@ import {
   ModalFooter,
   ModalHeader,
 } from '@/components/ui/heroui-compat';
-import { Bike, CheckCircle2, KeyRound, Send } from 'lucide-react';
+import { Bike, CheckCircle2, Send } from 'lucide-react';
 import Link from 'next/link';
 import { submitAccountRequest } from '@/lib/operations/actions';
 import { isValidEgyptianPhone } from '@/lib/utils';
@@ -31,8 +31,6 @@ export function DriverModal({
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [vehicleType, setVehicleType] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -45,8 +43,6 @@ export function DriverModal({
     setPhone('');
     setWhatsapp('');
     setVehicleType('');
-    setPassword('');
-    setConfirmPassword('');
     setIsSuccess(false);
     setErrorMsg('');
   }
@@ -63,12 +59,8 @@ export function DriverModal({
       setErrorMsg('أدخل رقم واتساب مصري صحيحاً، مثال: 01012345678.');
       return;
     }
-    if (!identity && password.length < 12) {
-      setErrorMsg('كلمة المرور يجب أن تتكون من 12 حرفاً على الأقل.');
-      return;
-    }
-    if (!identity && password !== confirmPassword) {
-      setErrorMsg('كلمتا المرور غير متطابقتين.');
+    if (!identity) {
+      setErrorMsg('سجّل الدخول باستخدام Google قبل إرسال الطلب.');
       return;
     }
 
@@ -80,7 +72,6 @@ export function DriverModal({
         phone,
         whatsapp,
         vehicleType,
-        password,
       });
       if (!result.success) {
         setErrorMsg(result.message);
@@ -157,7 +148,7 @@ export function DriverModal({
                   {!isIdentityLoading && !identity ? (
                     <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-7 text-zinc-800">
                       <p className="font-black">ابدأ بحساب Google لحماية الطلب وتعبئة بياناتك تلقائيًا.</p>
-                      <Link href="/signin?next=%2F%3Fregister%3Ddriver" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-zinc-950 px-4 font-black text-white">
+                      <Link href="/signin?next=%2Fonboarding" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-zinc-950 px-4 font-black text-white">
                         المتابعة باستخدام Google
                       </Link>
                     </div>
@@ -205,10 +196,6 @@ export function DriverModal({
                     value={vehicleType}
                     onValueChange={setVehicleType}
                   />
-                  {!identity ? <>
-                    <Input isRequired name="new-password" autoComplete="new-password" type="password" label="كلمة المرور" value={password} onValueChange={setPassword} startContent={<KeyRound className="size-4 text-zinc-400" />} />
-                    <Input isRequired name="confirm-password" autoComplete="new-password" type="password" label="تأكيد كلمة المرور" value={confirmPassword} onValueChange={setConfirmPassword} />
-                  </> : null}
                 </form>
               )}
             </ModalBody>

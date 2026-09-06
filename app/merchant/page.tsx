@@ -2,17 +2,21 @@ import { MerchantOrderWorkspace } from '@/components/operations/MerchantOrderWor
 import { DashboardHeader } from '@/components/operations/DashboardHeader';
 import { requireProfile } from '@/lib/auth/guards';
 import { createClient } from '@/lib/supabase/server';
+import { resolveMerchantWorkspace } from '@/lib/onboarding/workspace-access';
+import { redirect } from 'next/navigation';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export default async function MerchantPage() {
   const profile = await requireProfile(['merchant']);
+  const workspace = await resolveMerchantWorkspace();
+  if (!workspace) redirect('/onboarding');
   const supabase = await createClient();
   const { data: branches } = await (supabase as any)
     .from('merchant_branches')
     .select('id, merchant_id, place_id, name, phone, address, area, is_default, is_active')
-    .eq('merchant_id', profile.merchant_id)
+    .eq('merchant_id', workspace.merchantId)
     .eq('is_active', true)
     .order('is_default', { ascending: false });
   const placeIds = (branches ?? [])

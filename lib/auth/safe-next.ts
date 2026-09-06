@@ -2,7 +2,7 @@ const NAVIGATION_ORIGIN = 'https://navigation.invalid';
 const MAX_NEXT_LENGTH = 500;
 const MAX_DECODE_PASSES = Math.floor(MAX_NEXT_LENGTH / 2) + 2;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const ALLOWED_PATH = /^\/(?:$|marketplace(?:\/|$)|account(?:\/|$)|merchant(?:\/|$)|driver(?:\/|$)|admin(?:\/|$)|services(?:\/|$)|guide(?:\/|$)|share(?:\/|$))/u;
+const ALLOWED_PATH = /^\/(?:$|onboarding(?:\/|$)|workspaces(?:\/|$)|marketplace(?:\/|$)|account(?:\/|$)|merchant(?:\/|$)|driver(?:\/|$)|admin(?:\/|$)|services(?:\/|$)|guide(?:\/|$)|share(?:\/|$))/u;
 
 export type ChatLoginIntent =
   | { kind: 'presale'; storeId: string; productId: string | null }

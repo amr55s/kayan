@@ -183,7 +183,6 @@ alter function public.marketplace_chat_message_json(uuid, uuid)
 revoke all on function public.marketplace_chat_message_json_base_private_media(uuid, uuid)
   from public, anon, authenticated, service_role;
 revoke execute on function public.marketplace_chat_message_json_base_private_media(uuid, uuid) from public;
-revoke execute on function public.marketplace_chat_message_json(uuid, uuid) from public;
 create or replace function public.marketplace_chat_message_json(p_message_id uuid, p_actor_id uuid)
 returns jsonb language sql stable set search_path = '' as $$
   select public.marketplace_chat_message_json_base_private_media(p_message_id, p_actor_id)
@@ -200,6 +199,10 @@ returns jsonb language sql stable set search_path = '' as $$
         and public.can_access_marketplace_chat_thread(attachment.thread_id)
     ));
 $$;
+
+-- The original name exists only after the replacement has been created.
+revoke all on function public.marketplace_chat_message_json(uuid, uuid)
+  from public, anon, authenticated, service_role;
 
 create or replace function public.send_my_marketplace_chat_image(
   p_thread_id uuid, p_client_message_id uuid, p_attachment_id uuid, p_reply_to_id uuid

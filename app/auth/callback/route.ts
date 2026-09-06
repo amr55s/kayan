@@ -7,6 +7,7 @@ import { chatIntentCookie } from '@/lib/auth/chat-intent-cookie';
 import { handleGoogleOAuthCallback } from '@/lib/auth/callback-flow';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 import { createClient } from '@/lib/supabase/server';
+import { resolveOAuthSiteOrigin } from '@/lib/auth/oauth-origin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,8 +33,13 @@ function intentForm(intent: ChatLoginIntent): FormData {
 
 export async function GET(request: Request) {
   try {
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-    if (!siteUrl) throw new Error('site_url_missing');
+    const siteUrl = resolveOAuthSiteOrigin({
+      environment: process.env.VERCEL_ENV,
+      configuredSiteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+      deploymentHost: process.env.VERCEL_URL,
+      branchHost: process.env.VERCEL_BRANCH_URL,
+      requestOrigin: new URL(request.url).origin,
+    });
     const cookieStore = await cookies();
     const supabase = await createClient();
     const result = await handleGoogleOAuthCallback({ requestUrl: request.url }, {
