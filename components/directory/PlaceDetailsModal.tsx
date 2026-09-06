@@ -13,20 +13,23 @@ import {
   ModalBody,
   ModalContent,
   ModalHeader,
-} from '@heroui/react';
+} from '@/components/ui/heroui-compat';
 import {
   ArrowUpLeft,
+  Building,
   ChevronLeft,
   ChevronRight,
   Copy,
   CreditCard,
   ExternalLink,
+  Home,
   Images,
   MapPin,
   MessageCircle,
   MessagesSquare,
   Phone,
   Send,
+  Sparkles,
   Star,
   X,
 } from 'lucide-react';
@@ -36,6 +39,13 @@ import {
   formatWhatsAppUrl,
   getCategoryLabel,
 } from '@/lib/utils';
+import {
+  formatEgpPrice,
+  getRealEstateDetails,
+  getRealEstateFurnishingLabel,
+  getRealEstateOfferTypeLabel,
+  getRealEstatePropertyTypeLabel,
+} from '@/lib/listings/config';
 import { SITE_NAME_AR } from '@/lib/brand';
 import { trackSiteEvent, type SiteAnalyticsEvent } from '@/lib/analytics/client';
 import { ShareButton } from './ShareButton';
@@ -74,7 +84,7 @@ function DetailLink({
   const tones = {
     light: 'border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100',
     dark: 'border-zinc-900 bg-zinc-950 text-white hover:bg-zinc-800',
-    green: 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100',
+    green: 'border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-100',
     blue: 'border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100',
   };
   return (
@@ -229,14 +239,19 @@ export function PlaceDetailsModal({
     }
   }
 
+  const isRealEstate = place.category === 'real_estate';
+  const realEstateDetails = getRealEstateDetails(place);
+
   const whatsappUrl = formatWhatsAppUrl(
     place.whatsapp || place.phone,
-    `مرحباً، استفسار عبر ${SITE_NAME_AR} عن: ${place.title}`,
+    isRealEstate
+      ? `مرحباً، استفسار عبر ${SITE_NAME_AR} بخصوص عقار: ${place.title}`
+      : `مرحباً، استفسار عبر ${SITE_NAME_AR} عن: ${place.title}`,
   );
-  const hasCommunity = Boolean(place.whatsapp_group_url || place.telegram_url);
+  const hasCommunity = !isRealEstate && Boolean(place.whatsapp_group_url || place.telegram_url);
   const hasLocation = Boolean(place.address || place.map_url);
   const hasSecondaryActions = Boolean(
-    place.whatsapp_group_url || place.telegram_url || place.map_url,
+    (!isRealEstate && (place.whatsapp_group_url || place.telegram_url)) || place.map_url,
   );
 
   return (
@@ -269,9 +284,9 @@ export function PlaceDetailsModal({
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <ShareButton title={place.title} phone={place.phone} placeId={place.id} />
-                  <Button
-                    variant="light"
-                    onPress={() => onOpenChange(false)}
+                <Button
+                  variant="light"
+                  onPress={() => onOpenChange(false)}
                   aria-label="إغلاق تفاصيل المكان"
                   className="min-h-11 min-w-11 gap-1 rounded-xl bg-zinc-100 px-3 font-black text-zinc-900 hover:bg-zinc-200"
                 >
@@ -346,6 +361,12 @@ export function PlaceDetailsModal({
                               onError={() => markBroken(image)}
                               className="h-full w-full object-contain transition-transform duration-300 hover:scale-[1.02] motion-reduce:transition-none"
                             />
+                            {index === 0 && isRealEstate && (
+                              <span className="absolute start-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-blue-600/90 px-3 py-1 text-xs font-black text-white shadow-md backdrop-blur">
+                                <Star className="size-3 fill-current" />
+                                صورة الغلاف
+                              </span>
+                            )}
                             {index === 4 && images.length > 5 && (
                               <span className="absolute inset-0 flex items-center justify-center bg-zinc-950/65 text-lg font-black text-white">
                                 +{images.length - 5} صور
@@ -404,23 +425,135 @@ export function PlaceDetailsModal({
                         <Chip className="border border-zinc-200 bg-zinc-100 text-xs font-bold text-zinc-700">
                           {getCategoryLabel(place.category)}
                         </Chip>
+                        {isRealEstate && realEstateDetails?.offerType && (
+                          <Chip
+                            className={`border text-xs font-black ${
+                              realEstateDetails.offerType === 'rent'
+                                ? 'border-blue-200 bg-blue-50 text-blue-800'
+                                : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                            }`}
+                          >
+                            {getRealEstateOfferTypeLabel(realEstateDetails.offerType)}
+                          </Chip>
+                        )}
+                        {isRealEstate && realEstateDetails?.propertyType && (
+                          <Chip className="border border-zinc-200 bg-white text-xs font-bold text-zinc-700">
+                            {getRealEstatePropertyTypeLabel(realEstateDetails.propertyType)}
+                          </Chip>
+                        )}
                         {place.is_featured && (
-                          <Chip className="border border-amber-200 bg-amber-50 text-xs font-bold text-amber-800">
+                          <Chip className="border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] text-xs font-black text-[var(--dairtak-orange-deep)]">
                             <Star className="me-1 size-3.5 fill-current" aria-hidden="true" />
                             مكان مميز
                           </Chip>
                         )}
                       </div>
+
                       <h1 className="mt-3 break-words text-balance text-2xl font-black leading-tight text-zinc-950 sm:text-3xl">
                         {place.title}
                       </h1>
+
+                      {/* Real Estate Specifications Grid */}
+                      {isRealEstate && realEstateDetails && (
+                        <div className="mt-5 rounded-2xl border border-zinc-200 bg-zinc-50/70 p-4 sm:p-5">
+                          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-zinc-200/80 pb-3">
+                            <h2 className="flex items-center gap-2 text-base font-black text-zinc-950 sm:text-lg">
+                              <Home className="size-5 text-blue-600" aria-hidden="true" />
+                              مواصفات العقار
+                            </h2>
+                            {realEstateDetails.priceEgp && (
+                              <span className="rounded-xl bg-zinc-950 px-3.5 py-1.5 text-sm font-black text-white sm:text-base">
+                                {formatEgpPrice(realEstateDetails.priceEgp, realEstateDetails.offerType)}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
+                            {realEstateDetails.offerType && (
+                              <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                                <span className="text-[11px] font-semibold text-zinc-500">نوع العرض</span>
+                                <p className="mt-0.5 text-sm font-black text-zinc-900">
+                                  {getRealEstateOfferTypeLabel(realEstateDetails.offerType)}
+                                </p>
+                              </div>
+                            )}
+
+                            {realEstateDetails.propertyType && (
+                              <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                                <span className="text-[11px] font-semibold text-zinc-500">نوع العقار</span>
+                                <p className="mt-0.5 text-sm font-black text-zinc-900">
+                                  {getRealEstatePropertyTypeLabel(realEstateDetails.propertyType)}
+                                </p>
+                              </div>
+                            )}
+
+                            {realEstateDetails.rooms && (
+                              <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                                <span className="text-[11px] font-semibold text-zinc-500">عدد الغرف</span>
+                                <p className="mt-0.5 text-sm font-black text-zinc-900">
+                                  {realEstateDetails.rooms} {Number(realEstateDetails.rooms) === 1 ? 'غرفة' : Number(realEstateDetails.rooms) === 2 ? 'غرفتان' : 'غرف'}
+                                </p>
+                              </div>
+                            )}
+
+                            {realEstateDetails.bathrooms && (
+                              <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                                <span className="text-[11px] font-semibold text-zinc-500">الحمامات</span>
+                                <p className="mt-0.5 text-sm font-black text-zinc-900">
+                                  {realEstateDetails.bathrooms} {Number(realEstateDetails.bathrooms) === 1 ? 'حمام' : Number(realEstateDetails.bathrooms) === 2 ? 'حمامان' : 'حمامات'}
+                                </p>
+                              </div>
+                            )}
+
+                            {realEstateDetails.areaSqm && (
+                              <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                                <span className="text-[11px] font-semibold text-zinc-500">المساحة</span>
+                                <p className="mt-0.5 text-sm font-black text-zinc-900">
+                                  {realEstateDetails.areaSqm} م²
+                                </p>
+                              </div>
+                            )}
+
+                            {realEstateDetails.floor && (
+                              <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                                <span className="text-[11px] font-semibold text-zinc-500">الدور / الطابق</span>
+                                <p className="mt-0.5 text-sm font-black text-zinc-900">
+                                  الدور {realEstateDetails.floor}
+                                </p>
+                              </div>
+                            )}
+
+                            {realEstateDetails.furnishing && (
+                              <div className="rounded-xl border border-zinc-200 bg-white p-3">
+                                <span className="text-[11px] font-semibold text-zinc-500">حالة الفرش</span>
+                                <p className="mt-0.5 text-sm font-black text-zinc-900">
+                                  {getRealEstateFurnishingLabel(realEstateDetails.furnishing)}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {isRealEstate && (
+                        <h2 className="mt-5 text-base font-black text-zinc-900 sm:text-lg">
+                          تفاصيل ومواصفات العقار
+                        </h2>
+                      )}
+                      {place.category === 'stores' && (
+                        <h2 className="mt-5 text-base font-black text-zinc-900 sm:text-lg">
+                          المنتجات وما يميز المتجر
+                        </h2>
+                      )}
                       {place.description ? (
                         <p className="mt-4 whitespace-pre-wrap break-words text-pretty text-sm leading-8 text-zinc-600 sm:text-base">
                           {place.description}
                         </p>
                       ) : (
                         <p className="mt-3 text-sm text-zinc-500">
-                          تواصل مع المكان لمعرفة أحدث التفاصيل ومواعيد العمل.
+                          {isRealEstate
+                            ? 'تواصل مع صاحب العقار لمعرفة أحدث التفاصيل والمعاينة.'
+                            : 'تواصل مع المكان لمعرفة أحدث التفاصيل ومواعيد العمل.'}
                         </p>
                       )}
                     </section>
@@ -435,7 +568,7 @@ export function PlaceDetailsModal({
                           {place.whatsapp_group_url && (
                             <DetailLink
                               href={place.whatsapp_group_url}
-                              icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                              icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                               label="انضم عبر WhatsApp"
                               tone="green"
                               analyticsEvent="group_click"
@@ -512,7 +645,7 @@ export function PlaceDetailsModal({
                       />
                       <DetailLink
                         href={whatsappUrl}
-                        icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                        icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                         label="WhatsApp"
                         tone="green"
                         analyticsEvent="whatsapp_click"
@@ -522,7 +655,7 @@ export function PlaceDetailsModal({
                     <p className="dir-ltr rounded-xl bg-white p-3 text-center font-mono text-sm font-bold text-zinc-800">
                       {place.phone}
                     </p>
-                    {place.instapay_vfcash && (
+                    {!isRealEstate && place.instapay_vfcash && (
                       <div className="rounded-xl border border-zinc-200 bg-white p-3">
                         <p className="flex items-center gap-2 text-xs font-bold text-zinc-600">
                           <CreditCard className="size-4" aria-hidden="true" />
@@ -553,7 +686,7 @@ export function PlaceDetailsModal({
               <div className="absolute inset-x-0 bottom-0 z-20 grid grid-cols-2 gap-2 rounded-b-[1.5rem] border-t border-zinc-200 bg-white/95 px-3 pb-[max(.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl sm:hidden">
                 <DetailLink
                   href={whatsappUrl}
-                  icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                  icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                   label="WhatsApp"
                   tone="green"
                   analyticsEvent="whatsapp_click"
@@ -567,19 +700,19 @@ export function PlaceDetailsModal({
                   analyticsEvent="phone_click"
                   placeId={place.id}
                 />
-                {(place.whatsapp_group_url || place.telegram_url || place.map_url) && (
+                {((!isRealEstate && (place.whatsapp_group_url || place.telegram_url)) || place.map_url) && (
                   <div className="col-span-2 flex gap-2 overflow-x-auto">
-                    {place.whatsapp_group_url && (
+                    {!isRealEstate && place.whatsapp_group_url && (
                       <DetailLink
                         href={place.whatsapp_group_url}
-                        icon={<MessageCircle className="size-4" aria-hidden="true" />}
+                        icon={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
                         label="الجروب"
                         tone="green"
                         analyticsEvent="group_click"
                         placeId={place.id}
                       />
                     )}
-                    {place.telegram_url && (
+                    {!isRealEstate && place.telegram_url && (
                       <DetailLink
                         href={place.telegram_url}
                         icon={<Send className="size-4" aria-hidden="true" />}

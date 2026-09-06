@@ -7,3 +7,10 @@
 node_modules
 *.log
 supabase/.temp
+
+# Local document and QA artifacts are not part of the web app deployment.
+.docx_qa/
+output/
+tmp/
+tools/
+*.docx

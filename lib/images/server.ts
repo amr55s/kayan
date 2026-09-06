@@ -56,6 +56,7 @@ async function encodeWebp(input: Buffer, quality: number, scale = 1) {
  */
 export async function processImageForStorage(
   input: Buffer,
+  options: { alwaysReencode?: boolean } = {},
 ): Promise<ProcessedImage> {
   const source = await inspectImage(input);
   if (!source.width || !source.height) {
@@ -66,6 +67,7 @@ export async function processImageForStorage(
   // compressed. Keeping their original bytes avoids a second lossy encode,
   // which is especially important for menu text and small Arabic lettering.
   if (
+    !options.alwaysReencode &&
     source.format === 'webp' &&
     source.width <= MAX_WIDTH &&
     source.height <= MAX_HEIGHT &&
@@ -102,5 +104,38 @@ export async function processImageForStorage(
     extension: 'webp',
     width: verified.width,
     height: verified.height,
+  };
+}
+
+/** Produces a compact, metadata-free square portrait for public driver cards. */
+export async function processAvatarForStorage(input: Buffer): Promise<ProcessedImage> {
+  const source = await inspectImage(input);
+  if (!source.width || !source.height) {
+    throw new Error('invalid_image_dimensions');
+  }
+
+  const result = await sharp(input, {
+    failOn: 'error',
+    limitInputPixels: MAX_INPUT_PIXELS,
+    sequentialRead: true,
+  })
+    .rotate()
+    .resize(640, 640, {
+      fit: 'cover',
+      position: 'attention',
+      withoutEnlargement: false,
+      kernel: sharp.kernel.lanczos3,
+    })
+    .toColourspace('srgb')
+    .sharpen({ sigma: 0.35 })
+    .webp({ quality: 84, alphaQuality: 88, effort: 5, smartSubsample: true })
+    .toBuffer();
+
+  return {
+    buffer: Buffer.from(result),
+    contentType: 'image/webp',
+    extension: 'webp',
+    width: 640,
+    height: 640,
   };
 }

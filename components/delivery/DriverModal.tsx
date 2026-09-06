@@ -9,10 +9,12 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-} from '@heroui/react';
-import { Bike, CheckCircle2, KeyRound, Send } from 'lucide-react';
+} from '@/components/ui/heroui-compat';
+import { Bike, CheckCircle2, Send } from 'lucide-react';
+import Link from 'next/link';
 import { submitAccountRequest } from '@/lib/operations/actions';
 import { isValidEgyptianPhone } from '@/lib/utils';
+import { useGoogleApplicant } from '@/hooks/useGoogleApplicant';
 
 interface DriverModalProps {
   isOpen: boolean;
@@ -29,19 +31,18 @@ export function DriverModal({
   const [phone, setPhone] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [vehicleType, setVehicleType] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const { identity, isLoading: isIdentityLoading } = useGoogleApplicant(isOpen);
+
+  const effectiveName = name || identity?.displayName || '';
 
   function resetForm() {
     setName('');
     setPhone('');
     setWhatsapp('');
     setVehicleType('');
-    setPassword('');
-    setConfirmPassword('');
     setIsSuccess(false);
     setErrorMsg('');
   }
@@ -58,12 +59,8 @@ export function DriverModal({
       setErrorMsg('أدخل رقم واتساب مصري صحيحاً، مثال: 01012345678.');
       return;
     }
-    if (password.length < 12) {
-      setErrorMsg('كلمة المرور يجب أن تتكون من 12 حرفاً على الأقل.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setErrorMsg('كلمتا المرور غير متطابقتين.');
+    if (!identity) {
+      setErrorMsg('سجّل الدخول باستخدام Google قبل إرسال الطلب.');
       return;
     }
 
@@ -71,11 +68,10 @@ export function DriverModal({
     try {
       const result = await submitAccountRequest({
         kind: 'driver',
-        displayName: name,
+        displayName: effectiveName,
         phone,
         whatsapp,
         vehicleType,
-        password,
       });
       if (!result.success) {
         setErrorMsg(result.message);
@@ -119,7 +115,7 @@ export function DriverModal({
               <div>
                 <h2 className="text-lg font-black text-zinc-950">طلب حساب كابتن</h2>
                 <p className="mt-0.5 text-xs font-normal text-zinc-500">
-                  التسجيل بحساب وكلمة مرور بعد مراجعة الإدارة.
+                  أكمل بياناتك بعد Google، ثم تراجع الإدارة الطلب.
                 </p>
               </div>
             </ModalHeader>
@@ -130,12 +126,12 @@ export function DriverModal({
                   <CheckCircle2 className="size-14 text-emerald-600" />
                   <h3 className="text-xl font-black">تم إرسال الطلب</h3>
                   <p className="max-w-sm text-sm leading-7 text-zinc-600">
-                    بعد موافقة الإدارة ستدخل برقم الهاتف وكلمة المرور التي اخترتها.
+                    بعد موافقة الإدارة ستدخل بحساب Google المرتبط بالطلب.
                     لو رقمك مرتبط ببطاقة كابتن قديمة سيتم ربط الحساب بها تلقائياً.
                   </p>
                   <div className="flex flex-wrap justify-center gap-2">
                     <Button as="a" href="/share" variant="flat" className="font-bold">
-                      ساعدنا في نشر كيان
+                      ساعدنا في نشر ديرتك
                     </Button>
                     <Button onPress={onClose} className="bg-zinc-950 font-bold text-white">
                       تم
@@ -149,12 +145,25 @@ export function DriverModal({
                       {errorMsg}
                     </p>
                   )}
+                  {!isIdentityLoading && !identity ? (
+                    <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 text-sm leading-7 text-zinc-800">
+                      <p className="font-black">ابدأ بحساب Google لحماية الطلب وتعبئة بياناتك تلقائيًا.</p>
+                      <Link href="/signin?next=%2Fonboarding" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-zinc-950 px-4 font-black text-white">
+                        المتابعة باستخدام Google
+                      </Link>
+                    </div>
+                  ) : null}
+                  {identity ? (
+                    <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                      <div className="min-w-0"><p className="font-black text-emerald-900">حساب Google متصل</p><p className="truncate text-xs text-emerald-800">{identity.email}</p></div>
+                    </div>
+                  ) : null}
                   <Input
                     isRequired
                     name="displayName"
                     autoComplete="name"
                     label="اسم الكابتن"
-                    value={name}
+                    value={effectiveName}
                     onValueChange={setName}
                   />
                   <Input
@@ -187,25 +196,6 @@ export function DriverModal({
                     value={vehicleType}
                     onValueChange={setVehicleType}
                   />
-                  <Input
-                    isRequired
-                    name="new-password"
-                    autoComplete="new-password"
-                    type="password"
-                    label="كلمة المرور"
-                    value={password}
-                    onValueChange={setPassword}
-                    startContent={<KeyRound className="size-4 text-zinc-400" />}
-                  />
-                  <Input
-                    isRequired
-                    name="confirm-password"
-                    autoComplete="new-password"
-                    type="password"
-                    label="تأكيد كلمة المرور"
-                    value={confirmPassword}
-                    onValueChange={setConfirmPassword}
-                  />
                 </form>
               )}
             </ModalBody>
@@ -219,8 +209,9 @@ export function DriverModal({
                   type="submit"
                   form="driver-account-form"
                   isLoading={isSubmitting}
+                  isDisabled={isSubmitting || isIdentityLoading || !identity}
                   startContent={!isSubmitting && <Send className="size-4" />}
-                  className="bg-zinc-950 font-bold text-white"
+                  className="bg-zinc-950 font-black text-white hover:bg-zinc-800"
                 >
                   إرسال طلب الحساب
                 </Button>

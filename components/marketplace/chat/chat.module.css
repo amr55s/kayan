@@ -1,0 +1,603 @@
+.shell {
+  display: grid;
+  grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+  inline-size: 100%;
+  max-inline-size: 90rem;
+  min-block-size: min(46rem, calc(100dvh - 7rem));
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background: var(--surface);
+  box-shadow: 0 18px 50px rgb(24 24 27 / 8%);
+  color: var(--foreground);
+}
+
+.inboxPane,
+.conversationPane,
+.activeConversation,
+.history,
+.messageViewport {
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+.inboxPane {
+  display: flex;
+  flex-direction: column;
+  border-inline-end: 1px solid var(--border);
+  background: #fafafa;
+}
+
+.inboxHeader,
+.conversationHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-block-size: 4.5rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+  border-block-end: 1px solid var(--border);
+  background: rgb(255 255 255 / 96%);
+}
+
+.eyebrow,
+.inboxTitle,
+.rowMeta,
+.messageBody,
+.replyContext,
+.typingNotice,
+.searchResults p,
+.searchResults time,
+.composerHelpRow,
+.actionAnnouncement {
+  margin-block: 0;
+}
+
+.eyebrow {
+  color: #71717a;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.inboxTitle {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.inboxCount,
+.unreadBadge {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.75rem;
+  min-block-size: 1.75rem;
+  padding-inline: 0.4rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.conversationList,
+.messages,
+.searchResults {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.conversationList {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.conversationRow {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  min-block-size: 5.75rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+  border-block-end: 1px solid var(--border);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.conversationRow:hover,
+.conversationRow[data-active='true'] {
+  background: #fff;
+  box-shadow: inset -3px 0 var(--accent);
+}
+
+.conversationRow:focus-visible,
+.backLink:focus-visible,
+.searchInput:focus-visible,
+.reactionButton:focus-visible,
+.inlineAction:focus-visible,
+.retryMessageButton:focus-visible,
+.sendButton:focus-visible,
+.menuButton:focus-visible,
+.loadOlderButton:focus-visible,
+.newMessagesButton:focus-visible,
+.shell :global([data-focus-visible='true']) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: 50%;
+  background: #e4e4e7;
+  font-weight: 900;
+}
+
+.conversationSummary,
+.rowHeading,
+.rowFooter,
+.conversationIdentity,
+.composerHelpRow {
+  min-inline-size: 0;
+}
+
+.conversationSummary {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rowHeading,
+.rowFooter,
+.composerHelpRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.rowHeading strong,
+.preview,
+.conversationIdentity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowHeading time,
+.rowMeta,
+.preview,
+.messageMeta,
+.composerHelpRow,
+.typingNotice,
+.searchResults time {
+  color: #71717a;
+  font-size: 0.75rem;
+}
+
+.preview {
+  flex: 1;
+}
+
+.riskBadge {
+  flex: none;
+  color: #9a3412;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.conversationPane {
+  display: flex;
+  background: #f4f4f5;
+}
+
+.activeConversation {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  overflow: hidden;
+}
+
+.conversationHeader {
+  position: relative;
+  z-index: 2;
+}
+
+.backLink {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-block-size: 44px;
+  padding-inline: 0.6rem;
+  border-radius: 0.75rem;
+  color: var(--foreground);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.conversationIdentity {
+  display: grid;
+  flex: 1;
+  gap: 0.2rem;
+  overflow: hidden;
+}
+
+.conversationIdentity span {
+  color: #71717a;
+  font-size: 0.78rem;
+}
+
+.menuButton,
+.loadOlderButton,
+.newMessagesButton,
+.sendButton,
+.inlineAction,
+.retryMessageButton,
+.reactionButton,
+.searchInput {
+  min-block-size: 44px;
+}
+
+.actionAnnouncement {
+  min-block-size: 0;
+  padding-inline: 1rem;
+  color: #7c2d12;
+  font-size: 0.8rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.actionAnnouncement:not(:empty) {
+  padding-block: 0.65rem;
+  border-block-end: 1px solid #fed7aa;
+  background: #fff7ed;
+}
+
+.history {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.loadOlderButton {
+  align-self: center;
+  margin-block: 0.6rem 0;
+}
+
+.messageViewport {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-block: 1rem;
+  padding-inline: clamp(0.75rem, 3vw, 2rem);
+}
+
+.messageItem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  max-inline-size: min(78%, 38rem);
+  overflow-wrap: anywhere;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.messageItem[data-direction='outgoing'] {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.messageItem[data-direction='system'] {
+  align-self: center;
+  align-items: center;
+  max-inline-size: min(92%, 44rem);
+}
+
+.messageItem[data-status='sending'] {
+  opacity: 0.78;
+  transform: translateY(2px);
+}
+
+.messageItem[data-status='failed'] .messageBubble {
+  border-color: #fca5a5;
+}
+
+.messageBubble {
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  padding-block: 0.7rem;
+  padding-inline: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem 1rem 1rem 0.3rem;
+  background: var(--surface);
+  box-shadow: 0 4px 14px rgb(24 24 27 / 5%);
+}
+
+.messageItem[data-direction='outgoing'] .messageBubble {
+  border-color: var(--accent);
+  border-radius: 1rem 1rem 0.3rem 1rem;
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.messageItem[data-direction='system'] .messageBubble {
+  border-style: dashed;
+  border-radius: 999px;
+  background: #e4e4e7;
+  box-shadow: none;
+  text-align: center;
+}
+
+.senderLabel {
+  display: block;
+  margin-block-end: 0.25rem;
+  color: #52525b;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.messageItem[data-direction='outgoing'] .senderLabel,
+.messageItem[data-direction='outgoing'] .messageMeta {
+  color: #d4d4d8;
+}
+
+.replyContext {
+  margin-block-end: 0.45rem;
+  padding-inline-start: 0.5rem;
+  border-inline-start: 3px solid currentColor;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.messageBody {
+  white-space: pre-wrap;
+}
+
+.tombstone {
+  margin: 0;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.attachmentPlaceholder,
+.sharedCard {
+  display: grid;
+  gap: 0.35rem;
+  min-inline-size: min(16rem, 72vw);
+  max-inline-size: 100%;
+  padding-block: 0.7rem;
+  padding-inline: 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 0.75rem;
+}
+
+.chatAttachmentImage {
+  display: block;
+  inline-size: min(100%, 28rem);
+  block-size: auto;
+  max-block-size: 32rem;
+  border-radius: 0.75rem;
+  object-fit: contain;
+  background: #f4f4f5;
+}
+
+.attachmentPlaceholder small,
+.sharedCard small {
+  opacity: 0.75;
+}
+
+.messageMeta {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-block-start: 0.45rem;
+}
+
+.messageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  max-inline-size: 100%;
+}
+
+.reactionButton {
+  min-inline-size: 44px;
+  padding-inline: 0.3rem;
+}
+
+.reactionButton small {
+  margin-inline-start: 0.15rem;
+}
+
+.retryMessageButton {
+  align-self: flex-end;
+}
+
+.newMessagesButton {
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-end: 0.75rem;
+  z-index: 2;
+  transform: translateX(50%);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.typingNotice {
+  padding-block: 0.35rem;
+  padding-inline: 1rem;
+}
+
+.composer {
+  display: grid;
+  gap: 0.5rem;
+  padding-block: 0.75rem;
+  padding-inline: 1rem;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  border-block-start: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.composerRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.6rem;
+}
+
+.composerInput {
+  max-inline-size: 100%;
+  min-block-size: 44px;
+  resize: vertical;
+}
+
+.sendButton {
+  min-inline-size: 5.5rem;
+}
+
+.composerHelpRow {
+  flex-wrap: wrap;
+}
+
+.replyDraft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-block: 0.35rem;
+  padding-inline: 0.65rem;
+  border-inline-start: 3px solid var(--accent);
+  background: #f4f4f5;
+  overflow-wrap: anywhere;
+}
+
+.drawerContent {
+  inline-size: min(100%, 32rem);
+}
+
+.drawerDialog {
+  direction: rtl;
+}
+
+.searchForm {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.searchField {
+  inline-size: 100%;
+  max-inline-size: 100%;
+}
+
+.searchInput {
+  inline-size: 100%;
+  max-inline-size: 100%;
+}
+
+.searchResults {
+  display: grid;
+  gap: 0.5rem;
+  margin-block-start: 1rem;
+}
+
+.searchResults li {
+  padding-block: 0.7rem;
+  padding-inline: 0.8rem;
+  border: 1px solid #e4e4e7;
+  border-radius: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.searchEmpty,
+.conversationEmpty,
+.shellEmpty,
+.inboxEmpty {
+  margin: auto;
+  max-inline-size: 100%;
+}
+
+@media (max-width: 47.99rem) {
+  .shell {
+    display: block;
+    min-block-size: calc(100dvh - 4.5rem);
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .shell[data-has-conversation='true'] .inboxPane,
+  .shell[data-has-conversation='false'] .conversationPane {
+    display: none;
+  }
+
+  .inboxPane,
+  .conversationPane {
+    inline-size: 100%;
+    min-block-size: calc(100dvh - 4.5rem);
+    border-inline-end: 0;
+  }
+
+  .backLink {
+    display: inline-flex;
+  }
+
+  .conversationHeader {
+    padding-inline: 0.5rem;
+  }
+
+  .messageItem {
+    max-inline-size: 88%;
+  }
+
+  .composer {
+    position: sticky;
+    inset-block-end: 0;
+    z-index: 3;
+  }
+}
+
+@media (max-width: 24rem) {
+  .composerRow {
+    grid-template-columns: 1fr;
+  }
+
+  .sendButton {
+    inline-size: 100%;
+  }
+
+  .conversationIdentity span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversationRow,
+  .messageItem,
+  .newMessagesButton,
+  .reactionButton,
+  .inlineAction,
+  .retryMessageButton,
+  .sendButton,
+  .menuButton {
+    transition: none;
+  }
+
+  .messageViewport,
+  .messages {
+    scroll-behavior: auto;
+  }
+}

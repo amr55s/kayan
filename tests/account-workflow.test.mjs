@@ -30,10 +30,33 @@ test('public account requests use reviewed Auth accounts', () => {
   assert.match(adminManager, /موافقة وتفعيل/);
 });
 
-test('native select options submit stable values and legacy labels are normalized', async () => {
+test('Google is the first step for merchant and driver applications', async () => {
+  const actions = read('lib/operations/actions.ts');
+  const signin = read('app/signin/page.tsx');
+  const driverModal = read('components/delivery/DriverModal.tsx');
+  const merchantModal = read('components/modals/AddListingModal.tsx');
+  const directory = read('components/directory/DirectoryView.tsx');
+  const { accountRequestSchema } = await import('../lib/operations/validation.ts');
+
+  assert.match(actions, /identity\.provider === 'google'/);
+  assert.match(actions, /\.eq\('auth_user_id', googleUser\.id\)/);
+  assert.doesNotMatch(actions, /operationalProfile/);
+  assert.match(actions, /\.eq\('activity_kind', activityKind\)/);
+  assert.match(signin, /if \(user\) redirect\(next\)/);
+  assert.match(driverModal, /next=%2Fonboarding/);
+  assert.match(merchantModal, /next=%2Fonboarding/);
+  assert.match(directory, /cat === 'stores'[\s\S]{0,260}router\.push\('\/marketplace'\)/);
+  assert.equal(accountRequestSchema.parse({
+    kind: 'driver',
+    displayName: 'كابتن تجريبي',
+    phone: '01008747011',
+    whatsapp: '01008747011',
+  }).password, undefined);
+});
+
+test('select options submit stable values and legacy labels are normalized', async () => {
   const merchantModal = read('components/modals/AddListingModal.tsx');
   const userEditor = read('components/admin/UserEditorModal.tsx');
-  const compatibilityLayer = read('components/ui/heroui-compat.tsx');
   const operations = read('lib/operations/actions.ts');
   const { accountRequestSchema, listingCategorySchema } = await import(
     '../lib/operations/validation.ts'
@@ -47,17 +70,20 @@ test('native select options submit stable values and legacy labels are normalize
     merchantModal,
     /<SelectItem key=\{place\.id\} value=\{place\.id\}>/,
   );
-  assert.match(userEditor, /key="admin" value="admin"/);
+  assert.match(userEditor, /<ListBox\.Item id="admin" textValue="أدمن"/);
   assert.match(
     userEditor,
-    /key=\{merchant\.id\} value=\{merchant\.id\}/,
+    /<ListBox\.Item key=\{merchant\.id\} id=\{merchant\.id\}/,
   );
-  assert.match(compatibilityLayer, /value: string \| number/);
-  assert.match(operations, /Server action validation failed/);
+  assert.match(userEditor, /from '@heroui\/react\/select'/);
+  assert.doesNotMatch(userEditor, /heroui-compat/);
+  assert.match(operations, /operations_action_validation_failed/);
 
   assert.equal(listingCategorySchema.parse('pharmacy'), 'pharmacy');
   assert.equal(listingCategorySchema.parse('صيدليات وطب'), 'pharmacy');
   assert.equal(listingCategorySchema.parse('💊 صيدليات وطب'), 'pharmacy');
+  assert.equal(listingCategorySchema.parse('متجر'), 'stores');
+  assert.equal(listingCategorySchema.parse('🛍️ متجر'), 'stores');
   assert.throws(
     () => listingCategorySchema.parse('تصنيف غير موجود'),
     /اختر تصنيفاً صحيحاً من القائمة/,
@@ -85,8 +111,15 @@ test('selected category text keeps high contrast', () => {
   const globalStyles = read('app/globals.css');
   assert.match(
     categoryBar,
-    /isSelected \? 'text-white dark:text-zinc-950'/,
+    /isSelected[\s\S]{0,180}\? 'border-zinc-950 bg-zinc-950 text-white shadow-\[/,
   );
+  assert.match(categoryBar, /grid-cols-3/);
+  assert.match(categoryBar, /sm:grid-cols-9/);
+  assert.match(categoryBar, /h-16/);
+  assert.match(categoryBar, /sm:h-\[116px\]/);
+  assert.match(categoryBar, /aria-pressed=\{isSelected\}/);
+  assert.match(categoryBar, /filter\(\(cat\) => cat\.id !== 'all'\)/);
+  assert.match(categoryBar, /isSelected \? 'all' : cat\.id/);
   assert.match(merchantModal, /kayan-account-mode-tab/);
   assert.match(
     globalStyles,
@@ -95,78 +128,115 @@ test('selected category text keeps high contrast', () => {
   assert.doesNotMatch(categoryBar, /transition-all/);
 });
 
-test('public branding uses KAYAN CITY SPOT consistently', () => {
+test('public branding uses DAIRTAK consistently', () => {
   const brand = read('lib/brand.ts');
+  const brandLogo = read('components/layout/BrandLogo.tsx');
+  const marketplaceShell = read('components/marketplace/marketplace-shell.tsx');
+  const services = read('app/services/page.tsx');
   const manifest = read('public/manifest.json');
   const serviceWorker = read('public/sw.js');
   const publicFiles = [
     'app/layout.tsx',
-    'components/layout/Header.tsx',
-    'components/directory/DirectoryView.tsx',
+    'app/services/page.tsx',
+    'app/guide/page.tsx',
+    'app/share/page.tsx',
+    'components/marketplace/marketplace-shell.tsx',
     'components/auth/LoginForm.tsx',
     'components/operations/DashboardHeader.tsx',
-    'lib/share.ts',
   ];
 
-  assert.match(brand, /export const SITE_NAME = 'KAYAN CITY SPOT';/);
-  assert.match(manifest, /"name": "KAYAN CITY SPOT",/);
-  assert.match(serviceWorker, /KAYAN CITY SPOT/);
-  assert.match(
-    read('components/directory/DirectoryView.tsx'),
-    /انضم لجروب KAYAN CITY SPOT على واتساب/,
-  );
+  assert.match(brand, /export const SITE_NAME = 'DAIRTAK';/);
+  assert.match(manifest, /"name": "DAIRTAK",/);
+  assert.match(serviceWorker, /DAIRTAK/);
+  assert.match(brandLogo, /src: '\/brand\/dairtak-logo\.svg'/);
+  assert.match(marketplaceShell, /import \{ Header \} from '@\/components\/layout\/Header'/);
+  assert.match(marketplaceShell, /<Header \/>/);
+  const sharedHeader = read('components/layout/Header.tsx');
+  assert.match(sharedHeader, /aria-label=\{`\$\{SITE_NAME\} - الصفحة الرئيسية`\}/);
+  assert.match(sharedHeader, /<BrandLogo\s+variant="full"/);
+  assert.match(services, /دليل الخدمات المحلية/);
 
   for (const file of publicFiles) {
     assert.doesNotMatch(read(file), /خدمات الكيان|كيان هب|Kayan Hub|KayanHub/);
   }
 });
 
-test('WhatsApp support link stays visible across the whole site', () => {
+test('active public routes keep support and sharing inside the site', () => {
   const layout = read('app/layout.tsx');
-  const groupButton = read('components/layout/WhatsAppGroupButton.tsx');
   const installer = read('components/layout/PwaInstaller.tsx');
+  const installExperience = read('components/layout/PwaInstallExperience.tsx');
+  const activePublicSurfaces = [
+    'app/layout.tsx',
+    'app/services/page.tsx',
+    'app/guide/page.tsx',
+    'app/share/page.tsx',
+    'components/marketing/PublicShareHub.tsx',
+  ];
 
-  assert.match(layout, /<WhatsAppGroupButton \/>/);
+  assert.match(layout, /<PwaInstaller \/>/);
+  assert.match(layout, /telephone: false/);
+  assert.doesNotMatch(layout, /WhatsAppGroupButton|WHATSAPP_GROUP_URL/);
+  for (const file of activePublicSurfaces) {
+    assert.doesNotMatch(
+      read(file),
+      /(?:https?:\/\/)?(?:wa\.me|api\.whatsapp\.com|chat\.whatsapp\.com)|href=\{?[`'"]tel:/i,
+      `${file} must not expose an external messaging or click-to-call shortcut`,
+    );
+  }
+  assert.match(read('components/marketing/PublicShareHub.tsx'), /navigator\.share/);
+  assert.match(read('components/marketing/PublicShareHub.tsx'), /حدّد النص التالي وانسخه من داخل الموقع/);
   assert.match(
-    groupButton,
-    /WHATSAPP_GROUP_URL/,
-  );
-  assert.match(
-    read('lib/community.ts'),
-    /https:\/\/chat\.whatsapp\.com\/JTuPs9xv0CZAZhpzxttU3R\?mode=gi_t/,
-  );
-  assert.match(groupButton, /size-12/);
-  assert.match(groupButton, /sm:size-auto/);
-  assert.match(groupButton, /fixed bottom-/);
-  assert.match(groupButton, /جروب KAYAN CITY SPOT/);
-  assert.match(groupButton, /انضم عبر واتساب/);
-  assert.doesNotMatch(groupButton, /01094552421/);
-  assert.match(read('lib/community.ts'), /chat\.whatsapp\.com/);
-  assert.match(groupButton, /target="_blank"/);
-  assert.match(groupButton, /rel="noopener noreferrer"/);
-  assert.match(
-    installer,
+    installExperience,
     /bottom-\[calc\(5\.5rem\+env\(safe-area-inset-bottom\)\)\][\s\S]*sm:bottom-4/,
   );
 });
 
-test('driver contact fields stay explicit while public cards expose actions only', () => {
-  const modal = read('components/delivery/DriverModal.tsx');
-  const card = read('components/delivery/DriverCard.tsx');
-  const bar = read('components/delivery/DeliveryBar.tsx');
+test('driver contact data stays operational and is not exposed as a public action', () => {
+  const workspace = read('components/operations/DriverWorkspace.tsx');
+  const adminManager = read('components/admin/DriverManager.tsx');
+  const services = read('app/services/page.tsx');
 
-  assert.match(modal, /label="رقم للتواصل"/);
-  assert.match(modal, /label="رقم للواتس"/);
-  assert.match(modal, /name="whatsapp"[\s\S]*isRequired|isRequired[\s\S]*name="whatsapp"/);
-  assert.doesNotMatch(card, /للتواصل:/);
-  assert.doesNotMatch(card, /للواتس:/);
-  assert.match(card, />\s*واتساب\s*</);
-  assert.match(card, />\s*اتصال\s*</);
-  assert.match(card, /whatsapp_click/);
-  assert.match(card, /phone_click/);
-  assert.doesNotMatch(card, />\s*التفاصيل\s*</);
-  assert.doesNotMatch(bar, /اطلب حساب كابتن/);
-  assert.doesNotMatch(bar, /onOpenRegistration/);
+  assert.match(workspace, /name="contactPhone"/);
+  assert.match(workspace, /رقم التواصل محفوظ لفريق التشغيل ولا يظهر في دليل الكباتن العام/);
+  assert.doesNotMatch(workspace, /\{order\.recipient_phone\}/);
+  assert.match(adminManager, />رقم التشغيل الداخلي<\/Label>/);
+  assert.match(adminManager, /لا يظهر في الدليل العام/);
+  assert.doesNotMatch(adminManager, /href=\{?[`'"]tel:|wa\.me|api\.whatsapp\.com/i);
+  assert.doesNotMatch(services, /item\.phone|href=\{?[`'"]tel:|wa\.me|api\.whatsapp\.com/i);
+});
+
+test('legacy role dashboards expose the marketplace journey', () => {
+  const admin = read('components/operations/AdminWorkspace.tsx');
+  const driver = read('components/operations/DriverWorkspace.tsx');
+  const merchant = read('components/operations/MerchantOrderWorkspace.tsx');
+
+  assert.match(admin, /href="\/admin\/marketplace\/orders"/);
+  assert.match(driver, /href="\/driver\/marketplace"/);
+  assert.match(merchant, /href="\/merchant\/marketplace"/);
+});
+
+test('drivers can manage a safe public avatar from their dashboard', () => {
+  const actions = read('lib/operations/actions.ts');
+  const workspace = read('components/operations/DriverWorkspace.tsx');
+  const card = read('components/delivery/DriverCard.tsx');
+  const migration = read(
+    'supabase/migrations/20260810080000_move_active_legacy_media_to_spaces.sql',
+  );
+
+  assert.match(actions, /export async function updateDriverAvatar/);
+  assert.match(actions, /await requireRole\('driver'\)/);
+  assert.match(actions, /processAvatarForStorage/);
+  assert.match(actions, /writePrivateMediaObject/);
+  assert.match(actions, /writePublicMediaObject/);
+  assert.match(actions, /replace_my_driver_avatar_media/);
+  assert.match(workspace, /accept="image\/jpeg,image\/png,image\/webp"/);
+  assert.match(workspace, /تغيير صورة الكابتن|إضافة صورة الكابتن/);
+  assert.match(card, /src=\{driver\.avatar_url \|\| undefined\}/);
+  assert.match(card, /rounded-\[24px\] border border-zinc-200 bg-white/);
+  assert.match(card, /rounded-\[18px\] bg-zinc-50/);
+  assert.match(migration, /purpose in \('place', 'driver_avatar'\)/);
+  assert.match(migration, /update public\.driver_profiles/);
+  assert.match(migration, /media\.delete_requested/);
 });
 
 test('listing images are optimized before storage without sacrificing menu resolution', () => {
@@ -186,7 +256,7 @@ test('listing images are optimized before storage without sacrificing menu resol
   assert.match(clientPipeline, /MAX_PIXELS = 5_000_000/);
   assert.match(clientPipeline, /TARGET_UPLOAD_BYTES = 1_050_000/);
   assert.match(clientPipeline, /SERVER_FALLBACK_BYTES = 3_400_000/);
-  assert.match(clientPipeline, /using server fallback/);
+  assert.match(clientPipeline, /file\.size <= SERVER_FALLBACK_BYTES[\s\S]*SERVER_FALLBACK_TYPES\.has/u);
   assert.match(clientPipeline, /image\/webp/);
   assert.match(clientPipeline, /imageSmoothingQuality = 'high'/);
   assert.match(serverPipeline, /\.rotate\(\)/);
@@ -194,12 +264,15 @@ test('listing images are optimized before storage without sacrificing menu resol
   assert.match(serverPipeline, /\.webp\(\{/);
   assert.match(serverPipeline, /PASSTHROUGH_WEBP_BYTES/);
   assert.match(serverPipeline, /source\.format === 'webp'/);
-  assert.match(storageAction, /contentType: processed\.contentType/);
-  assert.match(storageAction, /cacheControl: '31536000'/);
-  assert.match(storageAction, /toPlainArrayBuffer\(processed\.buffer\)/);
-  assert.match(storageAction, /STORAGE_UPLOAD_ATTEMPTS = 2/);
-  assert.match(storageAction, /ALLOWED_IMAGE_TYPES/);
+  assert.match(storageAction, /createPrivateStageUpload/);
+  assert.match(storageAction, /checksumSha256/);
+  assert.match(storageAction, /requiredHeaders/);
   assert.match(storageAction, /صيغة الصورة غير مدعومة/);
+  assert.match(clientPipeline, /method: 'PUT'/);
+  assert.match(clientPipeline, /\/api\/legacy-media\/uploads/);
+  assert.match(clientPipeline, /MAX_PREPARED_UPLOAD_BYTES/);
+  assert.match(clientPipeline, /canvasToJpeg/);
+  assert.match(clientPipeline, /crypto\.subtle\.digest\('SHA-256'/);
   assert.match(nextConfig, /bodySizeLimit: '4mb'/);
   for (const form of imageForms) {
     assert.match(read(form), /uploadOptimizedImages/);
@@ -243,7 +316,7 @@ test('image and admin server actions return safe results instead of crashing RSC
   );
   assert.match(
     storageAction,
-    /Storage upload exception:[\s\S]*success: false/,
+    /storage_upload_preparation_failed[\s\S]*success: false/,
   );
   assert.match(clientPipeline, /failedFiles: string\[\]/);
   assert.match(clientPipeline, /failedFiles\.push\(originalFile\.name\)/);
@@ -267,9 +340,14 @@ test('new places wait for verified images and retry only failed files', () => {
   assert.match(clientPipeline, /image\/heic/);
   assert.match(clientPipeline, /sourceMimeType\(file\)/);
   assert.match(clientPipeline, /failures: Array/);
-  assert.match(storageAction, /\.info\(data\.path\)/);
+  const finalizeAction = read('app/api/legacy-media/uploads/[id]/finalize/route.ts');
+  assert.match(finalizeAction, /headPrivateMediaObject/);
+  assert.match(finalizeAction, /sourceHash !== row\.expected_sha256/);
   assert.match(storageAction, /p_limit: 24/);
-  assert.match(read('next.config.ts'), /img-src 'self' data: blob:/);
+  const imageConfig = read('next.config.ts');
+  assert.match(imageConfig, /const imageSources = \[/);
+  assert.match(imageConfig, /'https:\/\/\*\.digitaloceanspaces\.com'/);
+  assert.match(imageConfig, /img-src \$\{imageSources\}/);
 
   const adminSubmit = adminModal.slice(adminModal.indexOf('const handleSubmit'));
   assert.ok(
@@ -285,6 +363,8 @@ test('new places wait for verified images and retry only failed files', () => {
       publicSubmit.indexOf('submitAccountRequest('),
   );
   assert.match(publicSubmit, /إعادة محاولة الصور الفاشلة فقط/);
-  assert.match(adminActions, /uploadedImages\.length[\s\S]*أضف صورة واحدة على الأقل/);
-  assert.match(accountActions, /data\.placeMode === 'new'[\s\S]*uploadedImages\.length === 0/);
+  assert.match(adminActions, /pendingImages\.uploadIds\.length[\s\S]*أضف صورة واحدة على الأقل/);
+  assert.match(accountActions, /data\.placeMode === 'new'[\s\S]*imageUrls\.length === 0/);
+  assert.match(accountActions, /parseLegacyUploadToken/);
+  assert.match(accountActions, /real_estate[\s\S]*legacy_media_uploads/);
 });

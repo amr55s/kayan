@@ -1,13 +1,21 @@
-const CACHE_VERSION = 'kayan-v3';
+const CACHE_VERSION = 'dairtak-v2-notifications';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 const PUBLIC_PAGES = new Set(['/', '/guide', '/share']);
-const PRIVATE_PREFIXES = ['/admin', '/driver', '/merchant', '/login'];
+const PRIVATE_PREFIXES = [
+  '/account', '/admin', '/driver', '/merchant', '/login',
+  '/marketplace/cart', '/marketplace/checkout', '/marketplace/orders',
+];
 const SHELL_ASSETS = [
   '/offline.html',
   '/manifest.json',
-  '/kayan-services-logo.png',
+  '/brand/dairtak-mark.png',
+  '/brand/dairtak-wordmark.png',
+  '/brand/dairtak-logo-full.png',
+  '/brand/dairtak-mark.svg',
+  '/brand/dairtak-wordmark.svg',
+  '/brand/dairtak-logo.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/icons/apple-touch-icon.png',
@@ -25,7 +33,9 @@ self.addEventListener('activate', (event) => {
       caches.keys().then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith('kayan-') && !key.startsWith(CACHE_VERSION))
+            .filter((key) => (
+              key.startsWith('kayan-') || key.startsWith('dairtak-')
+            ) && !key.startsWith(CACHE_VERSION))
             .map((key) => caches.delete(key)),
         ),
       ),
@@ -35,7 +45,9 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === 'SKIP_WAITING') {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 function isPrivatePath(pathname) {
@@ -120,21 +132,31 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
-    payload = { body: event.data?.text() || 'لديك تحديث جديد.' };
+    payload = {};
   }
-  event.waitUntil(self.registration.showNotification(payload.title || 'KAYAN CITY SPOT', {
-    body: payload.body || 'لديك تحديث جديد.',
+  const rawUrl = typeof payload.url === 'string' ? payload.url : '';
+  const safeUrl = /^\/(account|merchant|admin|driver)(\/|$)/.test(rawUrl)
+    ? rawUrl
+    : '/account/notifications';
+  const rawTag = typeof payload.tag === 'string' ? payload.tag : '';
+  const safeTag = /^[a-z][a-z0-9_.-]{1,79}$/.test(rawTag) ? rawTag : 'dairtak-update';
+  event.waitUntil(self.registration.showNotification('DAIRTAK', {
+    body: 'لديك تحديث جديد داخل ديرتك.',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    data: { url: payload.url || '/driver' },
-    tag: payload.tag || 'kayan-update',
-    renotify: Boolean(payload.renotify),
+    data: { url: safeUrl },
+    tag: safeTag,
+    renotify: false,
   }));
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = new URL(event.notification.data?.url || '/driver', self.location.origin).toString();
+  const rawUrl = event.notification.data?.url;
+  const safePath = typeof rawUrl === 'string' && /^\/(account|merchant|admin|driver)(\/|$)/.test(rawUrl)
+    ? rawUrl
+    : '/account/notifications';
+  const targetUrl = new URL(safePath, self.location.origin).toString();
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windows) => {
       for (const client of windows) {

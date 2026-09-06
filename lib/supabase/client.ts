@@ -1,5 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
-import { Database } from './database.types';
+import type { Database } from './database.types';
 
 let clientInstance: ReturnType<typeof createBrowserClient<Database>> | null = null;
 
@@ -15,6 +15,15 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
     || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  if (
+    !supabaseUrl?.trim()
+    || !supabaseAnonKey?.trim()
+    || supabaseUrl.includes('placeholder')
+    || supabaseAnonKey.includes('placeholder')
+  ) {
+    throw new Error('Supabase public browser configuration is missing or invalid.');
+  }
+
   if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
     console.warn(
       '⚠️ [Supabase Warning]: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is missing or invalid in your .env file!'
@@ -22,8 +31,8 @@ export function createClient() {
   }
 
   clientInstance = createBrowserClient<Database>(
-    supabaseUrl && supabaseUrl.trim() ? supabaseUrl : 'https://placeholder.supabase.co',
-    supabaseAnonKey && supabaseAnonKey.trim() ? supabaseAnonKey : 'placeholder-anon-key'
+    supabaseUrl,
+    supabaseAnonKey,
   );
 
   return clientInstance;

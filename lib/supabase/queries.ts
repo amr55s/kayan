@@ -1,6 +1,8 @@
 import { createPublicClient } from './public';
 import { createAdminClient } from './admin';
-import type { Driver, Place } from '@/types';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
+import type { Driver, Place, StoreCoupon } from '@/types';
+import type { RealEstateDetailsDraft } from '@/lib/listings/config';
 
 type QueryOutcome<T> =
   | { status: 'fulfilled'; value: T }
@@ -23,6 +25,7 @@ type RegisteredDriverRow = {
   phone: string;
   whatsapp: string | null;
   vehicle_type: string | null;
+  avatar_url: string | null;
   is_available: boolean;
   active_until: string | null;
   created_at: string;
@@ -42,7 +45,7 @@ async function withTimeout<T>(
 ): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('انتهت مهلة تحميل كيان سيتي سبوت.')), timeoutMs);
+    timeoutId = setTimeout(() => reject(new Error('انتهت مهلة تحميل ديرتك.')), timeoutMs);
   });
 
   try {
@@ -93,6 +96,7 @@ export function mergePublicDrivers(
       phone: row.phone,
       whatsapp: row.whatsapp || legacy?.whatsapp || row.phone,
       vehicle_type: row.vehicle_type || legacy?.vehicle_type || null,
+      avatar_url: row.avatar_url,
       is_active: true,
       is_available: row.is_available,
       active_until: row.active_until,
@@ -112,16 +116,57 @@ export function mergePublicDrivers(
 
 async function fetchPlaces(): Promise<Place[]> {
   const supabase = createPublicClient();
-  const result: any = await withTimeout(
+  let result: any = await withTimeout(
     supabase
       .from('places')
-      .select('*')
+      .select('*, store_coupons(*), place_real_estate(*)')
       .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false }),
   );
 
+  // Keep the directory available during a staged deployment where the app
+  // reaches production a few seconds before the additive coupon migration.
+  if (result.error) {
+    result = await withTimeout(
+      supabase
+        .from('places')
+        .select('*')
+        .order('is_featured', { ascending: false })
+        .order('created_at', { ascending: false }),
+    );
+  }
+
   if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []) as Place[];
+  return (result.data ?? []).map((row: Place & {
+    store_coupons?: StoreCoupon[];
+    place_real_estate?: Array<{
+      area_sqm: number | null; bathrooms: number | null; floor: number | null;
+      furnishing: string | null; offer_type: string; price_egp: number;
+      property_type: string; rooms: number | null;
+    }>;
+  }) => {
+    const { store_coupons: coupons, place_real_estate: realEstateRows, ...place } = row;
+    const realEstate = realEstateRows?.[0];
+    return {
+      ...place,
+      coupons: (coupons ?? []).sort((left, right) =>
+        Number(right.is_featured) - Number(left.is_featured)
+        || left.display_order - right.display_order,
+      ),
+      real_estate_details: realEstate
+        ? {
+            offerType: realEstate.offer_type,
+            propertyType: realEstate.property_type,
+            priceEgp: String(realEstate.price_egp),
+            rooms: realEstate.rooms === null ? '' : String(realEstate.rooms),
+            bathrooms: realEstate.bathrooms === null ? '' : String(realEstate.bathrooms),
+            areaSqm: realEstate.area_sqm === null ? '' : String(realEstate.area_sqm),
+            floor: realEstate.floor === null ? '' : String(realEstate.floor),
+            furnishing: realEstate.furnishing ?? '',
+          } as RealEstateDetailsDraft
+        : null,
+    } as Place;
+  });
 }
 
 async function fetchLegacyDrivers(): Promise<LegacyDriverRow[]> {
@@ -166,15 +211,21 @@ export async function fetchHomePageData(): Promise<{
 
   const errors: string[] = [];
   if (placesResult.status === 'rejected') {
-    console.error('Public places query failed:', placesResult.reason);
+    logSafeServerFailure('error', 'public_places_query_failed', {
+      failure: placesResult.reason,
+    });
     errors.push('الأماكن');
   }
   if (legacyResult.status === 'rejected') {
-    console.error('Public drivers query failed:', legacyResult.reason);
+    logSafeServerFailure('error', 'public_legacy_drivers_query_failed', {
+      failure: legacyResult.reason,
+    });
     errors.push('الكباتن المسجلون سريعاً');
   }
   if (registeredResult.status === 'rejected') {
-    console.error('Registered drivers query failed:', registeredResult.reason);
+    logSafeServerFailure('error', 'public_registered_drivers_query_failed', {
+      failure: registeredResult.reason,
+    });
     errors.push('كباتن نظام التشغيل');
   }
 
@@ -186,7 +237,7 @@ export async function fetchHomePageData(): Promise<{
       registeredResult.status === 'fulfilled' ? registeredResult.value : [],
     ),
     directoryError: errors.length
-      ? `تعذر تحميل بعض بيانات كيان سيتي سبوت (${errors.join('، ')}). يمكنك إعادة المحاولة.`
+      ? `تعذر تحميل بعض بيانات ديرتك (${errors.join('، ')}). يمكنك إعادة المحاولة.`
       : undefined,
   };
 }

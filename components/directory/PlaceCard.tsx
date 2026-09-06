@@ -11,7 +11,7 @@ import {
   Chip,
   Image as HeroImage,
   Tooltip,
-} from '@heroui/react';
+} from '@/components/ui/heroui-compat';
 import {
   Check,
   Copy,
@@ -21,6 +21,7 @@ import {
   Images,
   MessageCircle,
   Phone,
+  ShoppingBag,
   Star,
 } from 'lucide-react';
 import type { Place } from '@/types';
@@ -29,11 +30,18 @@ import {
   formatWhatsAppUrl,
   getCategoryLabel,
 } from '@/lib/utils';
+import {
+  formatEgpPrice,
+  getRealEstateDetails,
+  getRealEstateOfferTypeLabel,
+  getRealEstatePropertyTypeLabel,
+} from '@/lib/listings/config';
 import { SITE_NAME_AR } from '@/lib/brand';
 import { ShareButton } from './ShareButton';
 import { UpvoteButton } from './UpvoteButton';
 import { useFavorites } from '@/hooks/useFavorites';
 import { trackSiteEvent } from '@/lib/analytics/client';
+import { CouponOffer } from './CouponOffer';
 
 type PlaceCardProps = {
   detailsHref: string;
@@ -63,6 +71,9 @@ export function PlaceCard({
     ? place.images.filter((image): image is string => Boolean(image))
     : [];
 
+  const isRealEstate = place.category === 'real_estate';
+  const realEstateDetails = getRealEstateDetails(place);
+
   async function copyWithStatus(
     value: string,
     setter: (copied: boolean) => void,
@@ -83,9 +94,28 @@ export function PlaceCard({
             <Chip className="h-6 border border-zinc-200/60 bg-zinc-100 px-2 text-[11px] font-medium text-zinc-600">
               {getCategoryLabel(place.category)}
             </Chip>
+
+            {isRealEstate && realEstateDetails?.offerType && (
+              <Chip
+                className={`h-6 px-2 text-[10px] font-black ${
+                  realEstateDetails.offerType === 'rent'
+                    ? 'border border-blue-200 bg-blue-50 text-blue-800'
+                    : 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+                }`}
+              >
+                {getRealEstateOfferTypeLabel(realEstateDetails.offerType)}
+              </Chip>
+            )}
+
+            {isRealEstate && realEstateDetails?.propertyType && (
+              <Chip className="h-6 border border-zinc-200 bg-white px-2 text-[10px] font-bold text-zinc-700">
+                {getRealEstatePropertyTypeLabel(realEstateDetails.propertyType)}
+              </Chip>
+            )}
+
             {place.is_featured && (
-              <Chip className="h-6 border border-amber-300/30 bg-amber-500/10 text-[10px] font-semibold text-amber-700">
-                <Star className="me-1 size-3 fill-amber-400 text-amber-400" aria-hidden="true" />
+              <Chip className="h-6 border border-[#ffd6bb] bg-[var(--dairtak-orange-soft)] text-[10px] font-black text-[var(--dairtak-orange-deep)]">
+                <Star className="me-1 size-3 fill-current" aria-hidden="true" />
                 مميز
               </Chip>
             )}
@@ -123,7 +153,7 @@ export function PlaceCard({
                   aria-hidden="true"
                   className={`size-4 transition-[color,fill,transform] ${
                     isFavorite(place.id)
-                      ? 'scale-110 fill-rose-800 text-rose-800'
+                      ? 'scale-110 fill-rose-500 text-rose-500 drop-shadow-[0_2px_5px_rgba(244,63,94,.28)]'
                       : 'text-zinc-400'
                   }`}
                 />
@@ -142,6 +172,33 @@ export function PlaceCard({
             {place.title}
           </Link>
         </h2>
+
+        {/* Real Estate Decision Specs & Price Banner */}
+        {isRealEstate && realEstateDetails?.priceEgp && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="rounded-lg bg-zinc-950 px-2 py-0.5 text-xs font-black text-white">
+              {formatEgpPrice(realEstateDetails.priceEgp, realEstateDetails.offerType)}
+            </span>
+            {realEstateDetails.rooms && (
+              <span className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-bold text-zinc-700">
+                {realEstateDetails.rooms} {Number(realEstateDetails.rooms) === 1 ? 'غرفة' : Number(realEstateDetails.rooms) === 2 ? 'غرفتان' : 'غرف'}
+              </span>
+            )}
+            {realEstateDetails.areaSqm && (
+              <span className="rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] font-bold text-zinc-700">
+                {realEstateDetails.areaSqm} م²
+              </span>
+            )}
+          </div>
+        )}
+
+        <span
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500"
+          aria-label={`${place.view_count ?? 0} مشاهدة للمكان`}
+        >
+          <Eye className="size-3.5" aria-hidden="true" />
+          {(place.view_count ?? 0).toLocaleString('ar-EG')} مشاهدة
+        </span>
       </CardHeader>
 
       {images.length > 0 && (
@@ -180,13 +237,26 @@ export function PlaceCard({
       )}
 
       <CardBody className="space-y-2 p-3 pt-2 sm:px-3.5">
+        {!isRealEstate && <CouponOffer place={place} />}
+
         {place.description && (
-          <p className="line-clamp-2 break-words text-xs leading-relaxed text-zinc-600">
-            {place.description}
-          </p>
+          <div className={place.category === 'stores'
+            ? 'rounded-xl border border-zinc-200 bg-zinc-50 p-2.5'
+            : undefined}
+          >
+            {place.category === 'stores' && (
+              <span className="mb-1 flex items-center gap-1.5 text-[11px] font-black text-zinc-800">
+                <ShoppingBag className="size-3.5" aria-hidden="true" />
+                المنتجات وما يميز المتجر
+              </span>
+            )}
+            <p className="line-clamp-1 break-words text-xs leading-relaxed text-zinc-600 sm:line-clamp-2">
+              {place.description}
+            </p>
+          </div>
         )}
 
-        {place.instapay_vfcash && (
+        {!isRealEstate && place.instapay_vfcash && (
           <div className="flex items-center justify-between gap-2 rounded-xl border border-zinc-200/60 bg-zinc-50 p-2 text-xs">
             <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-zinc-800">
               <CreditCard className="size-3.5 shrink-0 text-zinc-600" aria-hidden="true" />
@@ -233,7 +303,9 @@ export function PlaceCard({
           as="a"
           href={formatWhatsAppUrl(
             place.whatsapp || place.phone,
-            `مرحباً، استفسار عبر ${SITE_NAME_AR} عن: ${place.title}`,
+            isRealEstate
+              ? `مرحباً، استفسار عبر ${SITE_NAME_AR} بخصوص عقار: ${place.title}`
+              : `مرحباً، استفسار عبر ${SITE_NAME_AR} عن: ${place.title}`,
           )}
           target="_blank"
           rel="noopener noreferrer"
@@ -241,7 +313,7 @@ export function PlaceCard({
             targetType: 'place',
             targetKey: place.id,
           })}
-          startContent={<MessageCircle className="size-4" aria-hidden="true" />}
+          startContent={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
           className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-zinc-100 px-2 text-xs font-bold text-zinc-900 hover:bg-zinc-200 sm:text-sm"
         >
           واتساب
@@ -255,7 +327,7 @@ export function PlaceCard({
             targetKey: place.id,
           })}
           startContent={<Phone className="size-4 fill-current" aria-hidden="true" />}
-          className="min-w-0 flex-1 rounded-xl bg-zinc-900 px-2 text-xs font-bold text-white hover:bg-zinc-800 sm:text-sm"
+          className="min-w-0 flex-1 rounded-xl bg-zinc-950 px-2 text-xs font-black text-white hover:bg-zinc-800 sm:text-sm"
         >
           اتصال
         </Button>

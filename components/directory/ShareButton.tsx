@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button, Tooltip } from '@heroui/react';
+import { Button, Tooltip } from '@/components/ui/heroui-compat';
 import { Share2 } from 'lucide-react';
 import { sharePlace } from '@/lib/share';
 import { trackSiteEvent } from '@/lib/analytics/client';
@@ -37,8 +37,8 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ title, phone, pageUrl,
         variant="light"
         onClick={handleShare}
         aria-label="مشاركة المكان"
-        className={`size-11 min-w-11 bg-transparent p-0 hover:bg-transparent ${
-          shared ? 'text-emerald-600' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'
+        className={`size-11 min-w-11 rounded-xl bg-transparent p-0 hover:bg-[var(--dairtak-orange-soft)] ${
+          shared ? 'text-[var(--dairtak-orange-deep)]' : 'text-[var(--dairtak-orange)] hover:text-[var(--dairtak-orange-deep)]'
         }`}
       >
         <Share2 className="size-4" />

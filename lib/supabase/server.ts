@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Database } from './database.types';
+import { getSupabasePublicConfig } from '@/lib/env/server';
 
 /**
  * Creates a server-side Supabase client for Server Components, Server Actions, and Route Handlers.
@@ -9,13 +10,7 @@ import { Database } from './database.types';
 export async function createClient() {
   const cookieStore = await cookies();
 
-  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const rawKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-    || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  const supabaseUrl = rawUrl && rawUrl.trim() ? rawUrl : 'https://placeholder.supabase.co';
-  const supabaseAnonKey = rawKey && rawKey.trim() ? rawKey : 'placeholder-anon-key';
+  const { url: supabaseUrl, publishableKey: supabaseAnonKey } = getSupabasePublicConfig();
 
   return createServerClient<Database>(
     supabaseUrl,

@@ -1,14 +1,33 @@
 'use server';
 
 import { headers } from 'next/headers';
-import { createHash } from 'node:crypto';
+import { after } from 'next/server';
+import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getCurrentProfile } from '@/lib/auth/guards';
+import { getCurrentProfile, requireOperationalActivity } from '@/lib/auth/guards';
+import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import { validateListingImageUrls } from '@/lib/images/urls';
 import { authEmailForPhone } from '@/lib/auth/phone';
 import { safeRevalidatePaths } from '@/lib/cache/safe-revalidate';
+import { processAvatarForStorage } from '@/lib/images/server';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
+import { processOnboardingPublication } from '@/lib/onboarding/publication-worker';
+import {
+  deleteMediaObject,
+  getPrivateMediaBucketName,
+  getPublicMediaUrl,
+  getPublicMediaBucketName,
+  writePrivateMediaObject,
+  writePublicMediaObject,
+} from '@/lib/media/spaces';
+import {
+  claimLegacyPlaceUploads,
+  enqueueMediaDeletion,
+  parseLegacyUploadToken,
+  splitLegacyPlaceImageReferences,
+} from '@/lib/media/legacy';
 import {
   branchSchema,
   accountRequestSchema,
@@ -21,6 +40,9 @@ import {
 } from './validation';
 
 type ActionResult<T = undefined> = { success: true; data?: T } | { success: false; message: string };
+
+const DRIVER_AVATAR_MAX_BYTES = 3_500_000;
+const DRIVER_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 function actionError(error: unknown): ActionResult {
   if (error instanceof z.ZodError) {
@@ -41,7 +63,7 @@ function actionError(error: unknown): ActionResult {
       whatsapp: 'رقم واتساب غير صحيح.',
       password: 'راجع كلمة المرور وحاول مرة أخرى.',
     };
-    console.error('Server action validation failed:', error.issues);
+    logSafeServerFailure('warn', 'operations_action_validation_failed', { failure: 'validation_error' });
     return {
       success: false,
       message: fieldMessages[field] ?? 'راجع البيانات المدخلة ثم حاول مرة أخرى.',
@@ -55,16 +77,16 @@ function actionError(error: unknown): ActionResult {
     return { success: false, message: message.replace(/^.*?:\s*/, '') };
   }
 
-  console.error('Server action failed:', error);
+  logSafeServerFailure('error', 'operations_action_failed', { failure: error });
   return { success: false, message: 'تعذر تنفيذ العملية حالياً. حاول مرة أخرى.' };
 }
 
 async function requireRole(role: 'admin' | 'merchant' | 'driver') {
-  const profile = await getCurrentProfile();
-  if (!profile || !profile.is_active || profile.role !== role || profile.must_change_password) {
-    throw new Error('غير مصرح لك بتنفيذ هذه العملية.');
+  if (role === 'admin') {
+    const { profile } = await requireMarketplaceAdminRole(['super_admin'], { failureMode: 'throw' });
+    return profile;
   }
-  return profile;
+  return requireOperationalActivity(role);
 }
 
 export async function createDeliveryOrder(input: unknown): Promise<ActionResult<{ id: string; publicCode: string }>> {
@@ -109,6 +131,9 @@ export async function changeDeliveryOrderStatus(input: unknown): Promise<ActionR
     const data = statusChangeSchema.parse(input);
     const profile = await getCurrentProfile();
     if (!profile || !['admin', 'merchant', 'driver'].includes(profile.role) || !profile.is_active) throw new Error('غير مصرح لك بتنفيذ هذه العملية.');
+    if (profile.role === 'admin') {
+      await requireMarketplaceAdminRole(['operations'], { failureMode: 'throw' });
+    }
     const supabase = await createClient();
     const { error } = await (supabase as any).rpc('set_delivery_order_status', {
       p_order_id: data.orderId,
@@ -127,6 +152,9 @@ export async function rebroadcastDeliveryOrder(orderId: string): Promise<ActionR
   try {
     const profile = await getCurrentProfile();
     if (!profile || !['admin', 'merchant'].includes(profile.role) || !profile.is_active) throw new Error('غير مصرح لك بتنفيذ هذه العملية.');
+    if (profile.role === 'admin') {
+      await requireMarketplaceAdminRole(['operations'], { failureMode: 'throw' });
+    }
     const supabase = await createClient();
     const { error } = await (supabase as any).rpc('rebroadcast_delivery_order', { p_order_id: orderId });
     if (error) throw error;
@@ -169,23 +197,204 @@ export async function updateDriverPublicProfile(input: unknown): Promise<ActionR
   }
 }
 
+export async function updateDriverAvatar(
+  formData: FormData,
+): Promise<ActionResult<{ avatarUrl: string }>> {
+  let stagingKey: string | null = null;
+  let finalObjectKey: string | null = null;
+  let bucket: string | undefined;
+  let stagingBucket: string | undefined;
+  let uploadId: string | null = null;
+  let ownerId = 'unknown';
+  let committedAvatarUrl: string | null = null;
+  try {
+    const profile = await requireRole('driver');
+    ownerId = profile.id;
+    const file = formData.get('avatar');
+    if (!(file instanceof File) || !file.size) {
+      throw new Error('اختر صورة واضحة أولاً.');
+    }
+    if (file.size > DRIVER_AVATAR_MAX_BYTES) {
+      throw new Error('حجم الصورة كبير. اختر صورة أقل من 3.5 ميجابايت.');
+    }
+    if (!DRIVER_AVATAR_TYPES.has(file.type)) {
+      throw new Error('صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WebP.');
+    }
+
+    const admin = createAdminClient();
+    const rateSecret = process.env.CLIENT_ERROR_HASH_SALT
+      || process.env.SUPABASE_SECRET_KEY
+      || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!rateSecret) throw new Error('إعدادات الخادم غير مكتملة.');
+    const requestKey = createHash('sha256')
+      .update(`driver-avatar:${profile.id}:${rateSecret}`)
+      .digest('hex');
+    const { data: allowed, error: rateError } = await (admin as any).rpc(
+      'consume_public_submission_rate_limit',
+      { p_request_key: requestKey, p_limit: 12 },
+    );
+    if (rateError) throw rateError;
+    if (!allowed) throw new Error('تم تغيير الصورة مرات كثيرة. حاول مرة أخرى بعد ساعة.');
+
+    const source = Buffer.from(await file.arrayBuffer());
+    const sourceHash = createHash('sha256').update(source).digest('hex');
+    uploadId = randomUUID();
+    stagingKey = `staging/legacy-driver-avatar/${profile.id}/${uploadId}.${file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg'}`;
+    stagingBucket = getPrivateMediaBucketName();
+    bucket = getPublicMediaBucketName();
+    await writePrivateMediaObject({
+      body: source,
+      checksumSha256: sourceHash,
+      contentType: file.type,
+      objectKey: stagingKey,
+    });
+
+    const processed = await processAvatarForStorage(source);
+    const processedHash = createHash('sha256').update(processed.buffer).digest('hex');
+    finalObjectKey = `media/legacy/driver-avatar/${uploadId}.webp`;
+    await writePublicMediaObject({
+      body: processed.buffer,
+      checksumSha256: processedHash,
+      contentType: processed.contentType,
+      objectKey: finalObjectKey,
+    });
+    const publicUrl = getPublicMediaUrl(finalObjectKey);
+
+    const { error: insertError } = await (admin as any).from('legacy_media_uploads').insert({
+      id: uploadId,
+      owner_id: profile.id,
+      folder: 'driver_avatar',
+      purpose: 'driver_avatar',
+      staging_key: stagingKey,
+      expected_content_type: file.type,
+      expected_size_bytes: source.byteLength,
+      expected_sha256: sourceHash,
+      status: 'ready',
+      asset_id: randomUUID(),
+      bucket,
+      object_key: finalObjectKey,
+      public_url: publicUrl,
+      content_type: processed.contentType,
+      byte_size: processed.buffer.byteLength,
+      width: processed.width,
+      height: processed.height,
+      sha256: processedHash,
+      expires_at: new Date(Date.now() + 24 * 60 * 60_000).toISOString(),
+    });
+    if (insertError) throw insertError;
+
+    const supabase = await createClient();
+    const { data: replaced, error: replaceError } = await (supabase as any).rpc(
+      'replace_my_driver_avatar_media',
+      { p_upload_id: uploadId },
+    );
+    const avatarUrl = Array.isArray(replaced) ? replaced[0]?.avatar_url : replaced?.avatar_url;
+    if (replaceError || typeof avatarUrl !== 'string') {
+      throw replaceError ?? new Error('driver_avatar_replace_contract_failed');
+    }
+    committedAvatarUrl = avatarUrl;
+
+    try {
+      await deleteMediaObject(stagingKey, stagingBucket);
+    } catch (cleanupError) {
+      await enqueueMediaDeletion({
+        eventKey: `legacy.avatar.stage:${uploadId}`,
+        objectKey: stagingKey,
+        staging: true,
+        aggregateId: profile.id,
+        aggregateType: 'driver_avatar',
+        bucket: stagingBucket,
+      }).catch(() => undefined);
+      logSafeServerFailure('warn', 'driver_avatar_stage_cleanup_queued', {
+        failure: cleanupError,
+      });
+    }
+
+    safeRevalidatePaths('/', '/driver');
+    return { success: true, data: { avatarUrl } };
+  } catch (error) {
+    if (committedAvatarUrl) {
+      safeRevalidatePaths('/', '/driver');
+      return { success: true, data: { avatarUrl: committedAvatarUrl } };
+    }
+    if (uploadId) {
+      await (createAdminClient() as any).from('legacy_media_uploads').update({
+        status: 'failed',
+        failure_code: 'driver_avatar_replace_failed',
+        updated_at: new Date().toISOString(),
+      }).eq('id', uploadId).eq('owner_id', ownerId).eq('status', 'ready');
+    }
+    const cleanup: Promise<unknown>[] = [];
+    if (stagingKey) cleanup.push(enqueueMediaDeletion({
+      eventKey: `legacy.avatar.stage.failed:${uploadId ?? randomUUID()}`,
+      objectKey: stagingKey,
+      staging: true,
+      aggregateId: ownerId,
+      aggregateType: 'driver_avatar',
+      bucket: stagingBucket,
+    }));
+    if (finalObjectKey) cleanup.push(enqueueMediaDeletion({
+      eventKey: `legacy.avatar.media.failed:${uploadId ?? randomUUID()}`,
+      objectKey: finalObjectKey,
+      aggregateId: ownerId,
+      aggregateType: 'driver_avatar',
+      bucket,
+    }));
+    await Promise.allSettled(cleanup);
+    return actionError(error);
+  }
+}
+
 export async function submitAccountRequest(
   input: unknown,
   imageUrls: string[] = [],
 ): Promise<ActionResult<{ requestId: string }>> {
-  let authUserId: string | null = null;
   try {
     const data = accountRequestSchema.parse(input);
-    const uploadedImages = validateListingImageUrls(imageUrls, 3);
+    const imageLimit = data.placeCategory === 'real_estate' ? 7 : 3;
+    const pendingImages = splitLegacyPlaceImageReferences(imageUrls, imageLimit);
+    const uploadedImages = pendingImages.urls;
     if (
       data.kind === 'merchant'
       && data.placeMode === 'new'
-      && uploadedImages.length === 0
+      && imageUrls.length === 0
     ) {
       throw new Error('أضف صورة واحدة على الأقل للمكان أو المنيو قبل إرسال الطلب.');
     }
+    if (data.placeCategory === 'real_estate') {
+      if (imageUrls.length < 5 || imageUrls.length > 7) {
+        throw new Error('يجب رفع من 5 إلى 7 صور للعقار.');
+      }
+      if (pendingImages.urls.length || pendingImages.uploadIds.length !== imageUrls.length) {
+        throw new Error('صور العقار يجب أن تكون مرفوعة من حساب صاحب الطلب.');
+      }
+    }
 
     const admin = createAdminClient();
+    const sessionClient = await createClient();
+    const { data: sessionData, error: sessionError } = await sessionClient.auth.getUser();
+    if (sessionError) throw new Error('تعذر التحقق من جلسة Google. سجّل الدخول مرة أخرى.');
+    const googleUser = sessionData.user?.identities?.some(
+      (identity) => identity.provider === 'google',
+    )
+      ? sessionData.user
+      : null;
+    if (!googleUser || !googleUser.email_confirmed_at) {
+      throw new Error('سجّل الدخول باستخدام حساب Google موثّق قبل إرسال طلب الانضمام.');
+    }
+    const authUserId = googleUser.id;
+    let activityCategory = data.placeCategory;
+    if (data.kind === 'merchant' && data.placeMode === 'existing') {
+      const { data: place, error: placeError } = await (admin as any)
+        .from('places').select('category').eq('id', data.existingPlaceId).maybeSingle();
+      if (placeError) throw placeError;
+      if (!place) throw new Error('المكان المختار غير موجود.');
+      activityCategory = place.category;
+    }
+    const activityKind = data.kind === 'driver' ? 'driver'
+      : activityCategory === 'real_estate' ? 'real_estate'
+        : ['restaurants', 'home_made'].includes(activityCategory ?? '') ? 'restaurant'
+          : ['crafts', 'services'].includes(activityCategory ?? '') ? 'service' : 'store';
     const rateLimitSecret =
       process.env.SUPABASE_SECRET_KEY
       || process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -205,35 +414,46 @@ export async function submitAccountRequest(
       throw new Error('تم إرسال طلبات كثيرة من هذا الاتصال. حاول بعد ساعة.');
     }
 
-    const { data: existingProfile } = await (admin as any)
+    const { data: existingProfile, error: existingProfileError } = await (admin as any)
       .from('profiles')
       .select('id')
       .eq('phone', data.phone)
       .maybeSingle();
-    if (existingProfile) {
-      throw new Error('رقم الهاتف لديه حساب بالفعل. استخدم صفحة تسجيل الدخول.');
+    if (existingProfileError) throw existingProfileError;
+    if (existingProfile && existingProfile.id !== googleUser.id) {
+      throw new Error('رقم الهاتف مرتبط بحساب آخر. تواصل مع الإدارة للتحقق من الملكية؛ لن نربط الحسابات تلقائيًا.');
     }
 
-    const { data: pendingRequest } = await (admin as any)
+    const { data: pendingRequest, error: pendingRequestError } = await (admin as any)
       .from('account_requests')
       .select('id')
       .eq('phone', data.phone)
-      .eq('kind', data.kind)
+      .eq('activity_kind', activityKind)
       .eq('status', 'pending')
+      .neq('auth_user_id', googleUser.id)
       .maybeSingle();
+    if (pendingRequestError) throw pendingRequestError;
     if (pendingRequest) {
       throw new Error('يوجد طلب حساب قيد المراجعة بالفعل لهذا الرقم.');
     }
-
-    let legacyDriverId: string | null = null;
-    if (data.kind === 'driver') {
-      const { data: legacyDriver } = await (admin as any)
-        .from('drivers')
-        .select('id')
-        .eq('phone', data.phone)
+    {
+      const { data: requestForAccount, error: existingRequestError } = await (admin as any)
+        .from('account_requests')
+        .select('id, status')
+        .eq('auth_user_id', googleUser.id)
+        .eq('activity_kind', activityKind)
         .maybeSingle();
-      legacyDriverId = legacyDriver?.id ?? null;
-    } else if (data.placeMode === 'existing') {
+      if (existingRequestError) throw existingRequestError;
+      if (requestForAccount) {
+        if (requestForAccount.status === 'pending') {
+          return { success: true, data: { requestId: requestForAccount.id } };
+        }
+        throw new Error('يوجد طلب سابق لهذا النشاط. افتح مساحة النشاط لاستكماله أو إعادة تقديمه.');
+      }
+    }
+
+    // Legacy identities are linked only after an explicit ownership review.
+    if (data.kind === 'merchant' && data.placeMode === 'existing') {
       const { data: place } = await (admin as any)
         .from('places')
         .select('id')
@@ -248,37 +468,38 @@ export async function submitAccountRequest(
       if (linkedBranch) throw new Error('هذا المكان مرتبط بالفعل بحساب نشاط.');
     }
 
-    const { data: authData, error: authError } = await admin.auth.admin.createUser({
-      email: authEmailForPhone(data.phone),
-      email_confirm: true,
-      phone: `+2${data.phone}`,
-      phone_confirm: true,
-      password: data.password,
-      user_metadata: {
-        display_name: data.displayName,
-        account_status: 'pending_review',
-        requested_role: data.kind,
-      },
-    });
-    if (authError || !authData.user) {
-      const authMessage = authError?.message.toLowerCase() ?? '';
-      if (authMessage.includes('already') || authMessage.includes('registered')) {
-        throw new Error('رقم الهاتف لديه حساب أو طلب سابق. جرّب تسجيل الدخول أو تواصل مع الإدارة.');
+    if (data.placeCategory === 'real_estate') {
+      const uploadIds = imageUrls.map((value) => parseLegacyUploadToken(value));
+      const validUploadIds = uploadIds.filter((id): id is string => id !== null);
+      if (!authUserId || validUploadIds.length !== uploadIds.length) {
+        throw new Error('صور العقار غير صالحة. أعد رفع الصور قبل إرسال الطلب.');
       }
-      throw authError ?? new Error('تعذر إنشاء طلب الدخول.');
+      const { data: ownedUploads, error: ownedUploadsError } = await (admin as any)
+        .from('legacy_media_uploads')
+        .select('id')
+        .in('id', validUploadIds)
+        .eq('owner_id', authUserId)
+        .eq('purpose', 'place')
+        .eq('folder', 'requests')
+        .eq('status', 'ready')
+        .is('merchant_id', null)
+        .gt('expires_at', new Date().toISOString());
+      if (ownedUploadsError || (ownedUploads ?? []).length !== validUploadIds.length) {
+        throw new Error('بعض صور العقار غير جاهزة أو لا تخص هذا الحساب. أعد رفعها ثم حاول.');
+      }
     }
-    authUserId = authData.user.id;
 
     const { data: request, error: requestError } = await (admin as any)
       .from('account_requests')
       .insert({
         kind: data.kind,
+        activity_kind: activityKind,
         auth_user_id: authUserId,
         display_name: data.displayName,
         phone: data.phone,
         whatsapp: data.whatsapp || null,
         vehicle_type: data.kind === 'driver' ? data.vehicleType || null : null,
-        legacy_driver_id: legacyDriverId,
+        legacy_driver_id: null,
         place_mode: data.kind === 'merchant' ? data.placeMode : null,
         existing_place_id:
           data.kind === 'merchant' && data.placeMode === 'existing'
@@ -320,23 +541,45 @@ export async function submitAccountRequest(
           data.kind === 'merchant' && data.placeMode === 'new'
             ? data.placeMapUrl
             : null,
-        place_images: uploadedImages,
+        place_images: data.placeCategory === 'real_estate'
+          ? imageUrls
+          : uploadedImages,
+        real_estate_details:
+          data.kind === 'merchant'
+          && data.placeMode === 'new'
+          && data.placeCategory === 'real_estate'
+            ? {
+                offer_type: data.realEstateDetails?.offerType,
+                property_type: data.realEstateDetails?.propertyType,
+                price_egp: data.realEstateDetails?.priceEgp,
+                rooms: data.realEstateDetails?.rooms ?? null,
+                bathrooms: data.realEstateDetails?.bathrooms ?? null,
+                area_sqm: data.realEstateDetails?.areaSqm ?? null,
+                floor: data.realEstateDetails?.floor ?? null,
+                furnishing: data.realEstateDetails?.furnishing || null,
+              }
+            : null,
         status: 'pending',
       })
       .select('id')
       .single();
     if (requestError || !request) throw requestError ?? new Error('تعذر حفظ طلب الحساب.');
 
+    if (googleUser) {
+      const { error: metadataError } = await admin.auth.admin.updateUserById(googleUser.id, {
+        user_metadata: {
+          ...googleUser.user_metadata,
+          display_name: data.displayName,
+        },
+      });
+      if (metadataError) {
+        logSafeServerFailure('warn', 'google_account_request_metadata_sync_failed');
+      }
+    }
+
     safeRevalidatePaths('/admin');
     return { success: true, data: { requestId: request.id } };
   } catch (error) {
-    if (authUserId) {
-      try {
-        await createAdminClient().auth.admin.deleteUser(authUserId);
-      } catch {
-        // The orphaned Auth user has no profile and therefore no app permissions.
-      }
-    }
     return actionError(error);
   }
 }
@@ -348,21 +591,34 @@ export async function approveAccountRequest(
     await requireRole('admin');
     const id = z.uuid().parse(requestId);
     const admin = createAdminClient();
-    const { data: authUserId, error } = await (admin as any).rpc(
+    const session = await createClient();
+    const { data: authUserId, error } = await (session as any).rpc(
       'approve_account_request',
       { p_request_id: id },
     );
-    if (error) throw error;
+      if (error) throw error;
 
-    const { error: metadataError } = await admin.auth.admin.updateUserById(authUserId, {
+      const { error: metadataError } = await admin.auth.admin.updateUserById(authUserId, {
       user_metadata: { account_status: 'approved' },
     });
     if (metadataError) {
       // The database approval is already committed. Metadata is informational
       // and must not make the UI claim that activation failed.
-      console.warn('Approved account metadata update was deferred:', metadataError.message);
-    }
-    safeRevalidatePaths('/', '/admin');
+      logSafeServerFailure('warn', 'approved_account_metadata_update_deferred', {
+        failure: metadataError,
+        });
+      }
+      // The approval is committed; durable leased jobs remain retryable by cron
+      // if storage is temporarily unavailable or this background attempt fails.
+      after(async () => {
+        try {
+          await processOnboardingPublication();
+          safeRevalidatePaths('/', '/admin', '/workspaces');
+        } catch (failure) {
+          logSafeServerFailure('warn', 'onboarding_publication_deferred', { failure });
+        }
+      });
+      safeRevalidatePaths('/', '/admin');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -376,18 +632,15 @@ export async function rejectAccountRequest(
   try {
     await requireRole('admin');
     const id = z.uuid().parse(requestId);
-    const rejectionReason = z.string().trim().max(500).optional().parse(reason);
-    const admin = createAdminClient();
-    const { data: authUserId, error } = await (admin as any).rpc(
+    const rejectionReason = z.string().trim().min(2, 'اكتب سبب الرفض لتوضيح التعديل المطلوب.').max(500).parse(reason);
+    const session = await createClient();
+    const { error } = await (session as any).rpc(
       'reject_account_request',
       { p_request_id: id, p_reason: rejectionReason || null },
     );
     if (error) throw error;
 
-    const { error: deleteError } = await admin.auth.admin.deleteUser(authUserId);
-    if (deleteError) {
-      console.error('Rejected account Auth cleanup failed:', deleteError.message);
-    }
+    // Rejection applies to this activity only, never the shared Google account.
     safeRevalidatePaths('/admin');
     return { success: true };
   } catch (error) {
@@ -437,19 +690,25 @@ export async function updateMerchantPlace(
 ): Promise<ActionResult> {
   try {
     const profile = await requireRole('merchant');
-    if (!profile.merchant_id) throw new Error('الحساب غير مرتبط بمحل.');
     const data = merchantPlaceSchema.parse(input);
-    const uploadedImages = validateListingImageUrls(newImageUrls, 6);
+    const pendingImages = splitLegacyPlaceImageReferences(newImageUrls, 6);
+    if (pendingImages.urls.length) {
+      throw new Error('روابط الصور الجديدة غير صالحة. أعد رفع الصور من النموذج.');
+    }
+    const existingImages = validateListingImageUrls(data.existingImages, 15);
 
     const supabase = await createClient();
-    const { data: branch } = await (supabase as any)
+    const { data: branch, error: branchError } = await (supabase as any)
       .from('merchant_branches')
-      .select('id')
-      .eq('merchant_id', profile.merchant_id)
+      .select('id, merchant_id')
       .eq('place_id', data.placeId)
       .eq('is_active', true)
       .maybeSingle();
+    if (branchError) throw branchError;
     if (!branch) throw new Error('غير مصرح لك بتعديل هذا المكان.');
+    const { data: canManage, error: accessError } = await (supabase as any)
+      .rpc('can_manage_merchant', { p_merchant_id: branch.merchant_id });
+    if (accessError || canManage !== true) throw new Error('غير مصرح لك بتعديل هذا المكان.');
 
     const { data: currentPlace, error: currentError } = await (supabase as any)
       .from('places')
@@ -459,11 +718,17 @@ export async function updateMerchantPlace(
     if (currentError || !currentPlace) throw currentError ?? new Error('المكان غير موجود.');
 
     const currentImages = new Set<string>((currentPlace.images as string[]) ?? []);
-    if (data.existingImages.some((image) => !currentImages.has(image))) {
+    if (existingImages.some((image) => !currentImages.has(image))) {
       throw new Error('قائمة الصور الحالية غير صالحة.');
     }
 
-    const finalImages = Array.from(new Set([...data.existingImages, ...uploadedImages]));
+    const uploadedImages = await claimLegacyPlaceUploads(
+      pendingImages.uploadIds,
+      data.placeId,
+      existingImages,
+    );
+    const finalImages = Array.from(new Set([...existingImages, ...uploadedImages]));
+    if (finalImages.length > 15) throw new Error('يمكن حفظ 15 صورة كحد أقصى للمكان.');
 
     const admin = createAdminClient();
     const { error } = await (admin as any)
@@ -471,12 +736,7 @@ export async function updateMerchantPlace(
       .update({
         title: data.title,
         category: data.category,
-        phone: data.phone,
-        whatsapp: data.whatsapp || null,
-        instapay_vfcash: data.instapayVfcash || null,
         description: data.description || null,
-        whatsapp_group_url: data.whatsappGroupUrl,
-        telegram_url: data.telegramUrl,
         address: data.address || null,
         map_url: data.mapUrl,
         images: finalImages,
@@ -577,7 +837,9 @@ export async function provisionUser(input: unknown): Promise<ActionResult<{ id: 
       try {
         await createAdminClient().auth.admin.deleteUser(createdUserId);
       } catch (cleanupError) {
-        console.error('Incomplete provisioned user cleanup failed:', cleanupError);
+        logSafeServerFailure('error', 'incomplete_provisioned_user_cleanup_failed', {
+          failure: cleanupError,
+        });
       }
     }
     return actionError(error);

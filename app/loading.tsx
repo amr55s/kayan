@@ -13,7 +13,7 @@ export default function Loading() {
       </header>
 
       {/* Hero Skeleton */}
-      <div className="bg-gradient-to-b from-zinc-200/50 via-zinc-100/20 to-transparent dark:from-zinc-900/40 dark:via-zinc-900/10 py-10 px-4 text-center">
+      <div className="border-y border-zinc-200 bg-zinc-50 px-4 py-10 text-center dark:border-zinc-800 dark:bg-zinc-950">
         <div className="max-w-2xl mx-auto space-y-3">
           <div className="w-3/4 h-8 bg-zinc-200 dark:bg-zinc-800 mx-auto rounded-xl animate-pulse" />
           <div className="w-1/2 h-4 bg-zinc-200 dark:bg-zinc-800 mx-auto rounded-lg animate-pulse" />
@@ -21,7 +21,7 @@ export default function Loading() {
       </div>
 
       {/* Main Content Grid Skeleton */}
-      <main className="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+      <main id="main-content" className="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6" aria-busy="true" aria-label="جارٍ تحميل المحتوى">
         <div className="w-full h-14 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 animate-pulse" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (

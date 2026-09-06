@@ -26,9 +26,6 @@
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "@heroui/react": [
-        "./components/ui/heroui-compat.tsx"
       ]
     }
   },

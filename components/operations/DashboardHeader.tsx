@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import { Button } from '@heroui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Home, LogOut } from 'lucide-react';
+import { Bell, Home, LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import type { AppRole } from '@/lib/auth/routes';
+import { BrandLogo } from '@/components/layout/BrandLogo';
 
 const ROLE_LABELS: Record<AppRole, string> = {
   admin: 'إدارة المنصة',
@@ -29,6 +30,19 @@ export function DashboardHeader({
     setIsSigningOut(true);
     setErrorMessage('');
     try {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const registration = await navigator.serviceWorker.getRegistration('/').catch(() => undefined);
+        const subscription = await registration?.pushManager.getSubscription().catch(() => null);
+        if (subscription) {
+          await fetch('/api/push/subscribe', {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+          }).catch(() => undefined);
+          await subscription.unsubscribe().catch(() => false);
+        }
+      }
       const { error } = await createClient().auth.signOut();
       if (error) throw error;
       router.replace('/');
@@ -47,14 +61,7 @@ export function DashboardHeader({
       >
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200 shadow-sm">
-            <Image
-              src="/kayan-services-logo.png"
-              alt="شعار KAYAN CITY SPOT"
-              width={44}
-              height={44}
-              className="size-11 object-contain"
-              priority
-            />
+            <BrandLogo variant="mark" className="size-10" priority />
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-black text-zinc-950">{displayName}</p>
@@ -63,24 +70,33 @@ export function DashboardHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {role !== 'admin' ? <Link href="/workspaces" className="inline-flex min-h-11 items-center rounded-xl px-3 text-xs font-bold text-zinc-700 hover:bg-zinc-100">مساحات عملي</Link> : null}
+          <Link
+            href="/account/notifications"
+            aria-label="الإشعارات"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
+          >
+            <Bell className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">الإشعارات</span>
+          </Link>
           <Link
             href="/"
             aria-label="العودة إلى الخدمات"
             className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950"
           >
             <Home className="size-4" aria-hidden="true" />
-            <span className="hidden sm:inline">العودة إلى كيان سيتي سبوت</span>
+            <span className="hidden sm:inline">العودة إلى ديرتك</span>
           </Link>
-          <button
+          <Button
             type="button"
-            onClick={signOut}
-            disabled={isSigningOut}
+            onPress={signOut}
+            isDisabled={isSigningOut}
             className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-zinc-950 px-3 text-xs font-bold text-white transition-colors hover:bg-zinc-800 disabled:cursor-wait disabled:opacity-60"
           >
             <LogOut className="size-4" aria-hidden="true" />
             <span className="sm:hidden">{isSigningOut ? 'جارٍ…' : 'خروج'}</span>
             <span className="hidden sm:inline">{isSigningOut ? 'جارٍ الخروج…' : 'تسجيل الخروج'}</span>
-          </button>
+          </Button>
         </div>
       </div>
       {errorMessage && (

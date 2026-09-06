@@ -6,7 +6,9 @@ import {
   Pill,
   Wrench,
   Building2,
-  LayoutGrid
+  LayoutGrid,
+  Store,
+  Building,
 } from 'lucide-react';
 
 export interface CategoryItem {
@@ -34,9 +36,16 @@ export const CATEGORIES: CategoryItem[] = [
     emoji: '🍔',
   },
   {
+    id: 'stores',
+    label: 'متجر',
+    subtitle: 'عطور، شنط ومنتجات',
+    icon: Store,
+    emoji: '🛍️',
+  },
+  {
     id: 'home_made',
-    label: 'صنع يدي وأكل بيتي',
-    subtitle: 'مشغولات وأكل منزلية',
+    label: 'أكل منزلي',
+    subtitle: 'وجبات بيتية جاهزة',
     icon: ChefHat,
     emoji: '👩‍🍳',
   },
@@ -71,8 +80,15 @@ export const CATEGORIES: CategoryItem[] = [
   {
     id: 'services',
     label: 'خدمات ومكاتب',
-    subtitle: 'طباعة، عقارات، مكتبات',
+    subtitle: 'طباعة، مكتبات، خدمات',
     icon: Building2,
     emoji: '🏢',
+  },
+  {
+    id: 'real_estate',
+    label: 'عقارات',
+    subtitle: 'إيجار وتمليك',
+    icon: Building,
+    emoji: '🏠',
   },
 ];

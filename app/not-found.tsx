@@ -15,7 +15,7 @@ export default function NotFound() {
           href="/"
           className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-black text-white hover:bg-zinc-800"
         >
-          فتح دليل كيان
+          فتح دليل ديرتك
         </Link>
       </section>
     </main>

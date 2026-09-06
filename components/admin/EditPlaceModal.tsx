@@ -1,21 +1,18 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Button,
-  Input,
-  Textarea,
-  Select,
-  SelectItem,
-  Switch,
-  Image as HeroImage,
-} from '@heroui/react';
-import { Edit, PlusCircle, Check, Upload, X, Star, Building, CreditCard, Trash2 } from 'lucide-react';
+import Image from 'next/image';
+import { Button } from '@heroui/react/button';
+import { Input } from '@heroui/react/input';
+import { Label } from '@heroui/react/label';
+import { ListBox } from '@heroui/react/list-box';
+import { Modal } from '@heroui/react/modal';
+import { Select } from '@heroui/react/select';
+import { Switch } from '@heroui/react/switch';
+import { TextArea } from '@heroui/react/textarea';
+import { TextField } from '@heroui/react/textfield';
+import { useOverlayState } from '@heroui/react';
+import { Edit, PlusCircle, Check, Upload, X, Star, Building, Trash2 } from 'lucide-react';
 import { Place } from '@/types';
 import { serverInsertPlaceDirectly, serverUpdateActivePlace, serverDeleteActivePlace } from '@/lib/supabase/admin-actions';
 import {
@@ -23,8 +20,20 @@ import {
   LISTING_IMAGE_ACCEPT,
   uploadOptimizedImages,
 } from '@/lib/images/client';
-import { CATEGORY_OPTIONS } from '@/lib/categories';
+import {
+  CATEGORY_OPTIONS,
+  getListingDescriptionLabel,
+  getListingImageLabel,
+} from '@/lib/categories';
 import { isValidEgyptianPhone } from '@/lib/utils';
+
+function PlaceInput({ label, value, onValueChange, icon, isRequired, ...props }: Omit<React.ComponentProps<typeof Input>, 'value' | 'onChange'> & { label: string; value: string; onValueChange: (value: string) => void; icon?: React.ReactNode; isRequired?: boolean }) {
+  return <TextField fullWidth isRequired={isRequired} className="space-y-1.5"><Label className="text-xs font-bold text-zinc-700 dark:text-zinc-200">{label}</Label><div className="relative">{icon ? <span className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-zinc-400">{icon}</span> : null}<Input {...props} required={isRequired} value={value} onChange={(event) => onValueChange(event.target.value)} className={`min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900 ${icon ? 'ps-10' : ''}`} /></div></TextField>;
+}
+
+function PlaceTextarea({ label, value, onValueChange, ...props }: Omit<React.ComponentProps<typeof TextArea>, 'value' | 'onChange'> & { label: string; value: string; onValueChange: (value: string) => void }) {
+  return <TextField fullWidth className="space-y-1.5"><Label className="text-xs font-bold text-zinc-700 dark:text-zinc-200">{label}</Label><TextArea {...props} value={value} onChange={(event) => onValueChange(event.target.value)} className="min-h-24 w-full rounded-xl border border-zinc-300 bg-white p-3.5 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-zinc-950/10 dark:border-zinc-700 dark:bg-zinc-900" /></TextField>;
+}
 
 interface EditPlaceModalProps {
   isOpen: boolean;
@@ -64,6 +73,13 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
   const [processingMsg, setProcessingMsg] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalState = useOverlayState({
+    isOpen,
+    onOpenChange: (open) => {
+      if (!open) resetForm();
+      onOpenChange(open);
+    },
+  });
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -256,37 +272,21 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onOpenChange={(open) => {
-        if (!open) resetForm();
-        onOpenChange(open);
-      }}
-      size="2xl"
-      placement="center"
-      scrollBehavior="inside"
-      backdrop="blur"
-      classNames={{
-        base: "bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 dir-rtl font-sans max-w-[95vw] sm:max-w-2xl my-auto max-h-[90vh]",
-        header: "border-b border-zinc-100 dark:border-zinc-800 pb-3 shrink-0",
-        body: "py-4 space-y-4 overflow-y-auto",
-        footer: "border-t border-zinc-100 dark:border-zinc-800 pt-3 shrink-0 sticky bottom-0 bg-white dark:bg-zinc-900 z-10",
-      }}
-    >
-      <ModalContent>
-        {(onClose) => (
-          <>
-            <ModalHeader className="flex items-center gap-2 text-zinc-900 dark:text-white font-bold text-lg">
+    <Modal state={modalState}>
+      <Modal.Backdrop variant="blur" className="z-[100] bg-zinc-950/45">
+        <Modal.Container placement="center" size="lg" scroll="inside" className="p-3">
+          <Modal.Dialog aria-label={mode === 'create' ? 'إضافة مكان جديد' : 'تعديل بيانات المكان'} dir="rtl" className="max-h-[90vh] max-w-2xl border border-zinc-200 bg-white font-sans dark:border-zinc-800 dark:bg-zinc-900">
+            <Modal.Header className="flex shrink-0 items-center gap-2 border-b border-zinc-100 pb-3 text-lg font-bold text-zinc-900 dark:border-zinc-800 dark:text-white">
               <div className="p-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 shadow-sm">
                 {mode === 'create' ? <PlusCircle className="w-5 h-5" /> : <Edit className="w-5 h-5" />}
               </div>
               <div className="flex flex-col">
-                <span>{mode === 'create' ? 'إضافة مكان جديد' : 'تعديل بيانات المكان'}</span>
+                <Modal.Heading>{mode === 'create' ? 'إضافة مكان جديد' : 'تعديل بيانات المكان'}</Modal.Heading>
                 <span className="text-xs text-zinc-500 font-normal">النشر الفوري وإدارة صور المنيو</span>
               </div>
-            </ModalHeader>
+            </Modal.Header>
 
-            <ModalBody className="py-4 space-y-4">
+            <Modal.Body className="space-y-4 overflow-y-auto py-4">
               <form id="edit-place-modal-form" onSubmit={handleSubmit} className="space-y-4">
                 {errorMsg && (
                   <div className="p-3 text-xs bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 rounded-xl border border-rose-200 dark:border-rose-800 font-semibold">
@@ -300,131 +300,54 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
+                  <PlaceInput
                     isRequired
-                    labelPlacement="outside"
                     label="اسم المكان / الخدمة"
                     value={title}
                     onValueChange={setTitle}
-                    variant="bordered"
-                    size="md"
-                    startContent={<Building className="w-4 h-4 text-zinc-400 shrink-0" />}
-                    classNames={{
-                      label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                      inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                    }}
+                    icon={<Building className="size-4 shrink-0" aria-hidden="true" />}
                   />
 
                   <Select
                     isRequired
-                    labelPlacement="outside"
-                    label="التصنيف"
-                    selectedKeys={[category]}
-                    onChange={(e) => setCategory(e.target.value)}
-                    variant="bordered"
-                    size="md"
-                    classNames={{
-                      label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                      trigger: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                    }}
+                    selectedKey={category}
+                    onSelectionChange={(key) => setCategory(String(key))}
                   >
-                    {CATEGORY_OPTIONS.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.label}
-                      </SelectItem>
-                    ))}
+                    <Label className="text-xs font-bold text-zinc-700 dark:text-zinc-200">التصنيف</Label>
+                    <Select.Trigger className="min-h-11 w-full rounded-xl border border-zinc-300 bg-white px-3.5 text-start dark:border-zinc-700 dark:bg-zinc-900"><Select.Value /><Select.Indicator /></Select.Trigger>
+                    <Select.Popover className="z-[110] rounded-xl border border-zinc-200 bg-white p-1 shadow-xl"><ListBox>{CATEGORY_OPTIONS.map((c) => <ListBox.Item key={c.id} id={c.id} textValue={c.label} className="rounded-lg px-3 py-2 data-[focused]:bg-zinc-100 data-[selected]:font-bold">{c.label}</ListBox.Item>)}</ListBox></Select.Popover>
                   </Select>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
+                  <PlaceInput
                     isRequired
-                    labelPlacement="outside"
-                    label="رقم الهاتف الأساسي"
+                    label="رقم تشغيلي داخلي"
                     value={phone}
                     onValueChange={setPhone}
-                    variant="bordered"
                     type="tel"
-                    size="md"
-                    classNames={{
-                      label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                      inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                    }}
-                  />
-                  <Input
-                    labelPlacement="outside"
-                    label="رقم الواتساب (اختياري)"
-                    value={whatsapp}
-                    onValueChange={setWhatsapp}
-                    variant="bordered"
-                    type="tel"
-                    size="md"
-                    classNames={{
-                      label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                      inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                    }}
                   />
                 </div>
 
-                <div className="pt-2 mt-1">
-                  <Input
-                    labelPlacement="outside"
-                    label="رقم فودافون كاش / InstaPay"
-                    value={instapayVfcash}
-                    onValueChange={setInstapayVfcash}
-                    variant="bordered"
-                    type="tel"
-                    startContent={<CreditCard className="w-4 h-4 text-emerald-600 shrink-0" />}
-                    size="md"
-                    classNames={{
-                      label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1.5",
-                      inputWrapper: "h-11 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                    }}
-                  />
-                </div>
-
-                <Textarea
-                  labelPlacement="outside"
-                  label="الوصف أو مواعيد العمل"
+                <PlaceTextarea
+                  label={getListingDescriptionLabel(category)}
+                  placeholder={category === 'stores'
+                    ? 'أهم المنتجات والماركات، نطاق الأسعار، وخيارات الاستلام أو التوصيل…'
+                    : undefined}
                   value={description}
                   onValueChange={setDescription}
-                  variant="bordered"
-                  minRows={2}
-                  classNames={{
-                    label: "font-bold text-xs text-zinc-700 dark:text-zinc-200 mb-1",
-                    inputWrapper: "border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900",
-                  }}
+                  rows={2}
                 />
 
                 <div className="grid grid-cols-1 gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:grid-cols-2">
-                  <Input
-                    name="whatsappGroupUrl"
-                    type="url"
-                    inputMode="url"
-                    autoComplete="off"
-                    label="رابط جروب أو قناة WhatsApp"
-                    placeholder="https://chat.whatsapp.com/…"
-                    value={whatsappGroupUrl}
-                    onValueChange={setWhatsappGroupUrl}
-                  />
-                  <Input
-                    name="telegramUrl"
-                    type="url"
-                    inputMode="url"
-                    autoComplete="off"
-                    label="رابط Telegram"
-                    placeholder="https://t.me/…"
-                    value={telegramUrl}
-                    onValueChange={setTelegramUrl}
-                  />
-                  <Textarea
+                  <PlaceTextarea
                     name="address"
                     autoComplete="street-address"
                     label="العنوان"
                     value={address}
                     onValueChange={setAddress}
                   />
-                  <Input
+                  <PlaceInput
                     name="mapUrl"
                     type="url"
                     inputMode="url"
@@ -444,18 +367,13 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                       تمييز المكان في أعلى قائمة الخدمات (Featured Place)
                     </span>
                   </div>
-                  <Switch
-                    size="sm"
-                    color="warning"
-                    isSelected={isFeatured}
-                    onValueChange={setIsFeatured}
-                  />
+                  <Switch size="sm" isSelected={isFeatured} onChange={setIsFeatured} aria-label="تمييز المكان"><Switch.Content><Switch.Control><Switch.Thumb /></Switch.Control></Switch.Content></Switch>
                 </div>
 
                 {/* Professional Image Manager */}
                 <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-700 space-y-3">
                   <div className="flex items-center justify-between text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                    <span>إدارة صور المنيو والمكان</span>
+                    <span>إدارة {getListingImageLabel(category)}</span>
                     <span className="text-zinc-400 font-normal">
                       إجمالي {existingImages.length + uploadedImageUrls.length + newImageFiles.length} صور
                     </span>
@@ -484,15 +402,8 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                       {/* Existing Images */}
                       {existingImages.map((imgUrl, idx) => (
                         <div key={`existing-${idx}`} className="relative group w-full h-20 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800">
-                          <HeroImage
-                            src={imgUrl}
-                            alt={`صورة ${idx + 1}`}
-                            classNames={{
-                              wrapper: "w-full h-full",
-                              img: "w-full h-full object-cover",
-                            }}
-                            radius="none"
-                          />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={imgUrl} alt={`صورة ${idx + 1}`} className="h-full w-full object-cover" />
                           <button
                             type="button"
                             onClick={() => handleRemoveExistingImage(idx)}
@@ -507,15 +418,8 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                       {/* Images uploaded during this save attempt */}
                       {uploadedImageUrls.map((imgUrl, idx) => (
                         <div key={`uploaded-${imgUrl}`} className="relative group w-full h-20 rounded-xl overflow-hidden border-2 border-emerald-500 bg-emerald-50">
-                          <HeroImage
-                            src={imgUrl}
-                            alt={`صورة تم رفعها ${idx + 1}`}
-                            classNames={{
-                              wrapper: "w-full h-full",
-                              img: "w-full h-full object-cover",
-                            }}
-                            radius="none"
-                          />
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={imgUrl} alt={`صورة تم رفعها ${idx + 1}`} className="h-full w-full object-cover" />
                           <button
                             type="button"
                             onClick={() => setUploadedImageUrls((current) => current.filter((url) => url !== imgUrl))}
@@ -530,14 +434,13 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                       {/* New Upload Previews */}
                       {newImagePreviews.map((previewUrl, idx) => (
                         <div key={`new-${idx}`} className="relative group w-full h-20 rounded-xl overflow-hidden border-2 border-zinc-700 bg-zinc-100 dark:bg-zinc-800">
-                          <HeroImage
+                          <Image
                             src={previewUrl}
                             alt={`صورة جديدة ${idx + 1}`}
-                            classNames={{
-                              wrapper: "w-full h-full",
-                              img: "w-full h-full object-cover",
-                            }}
-                            radius="none"
+                            fill
+                            sizes="160px"
+                            unoptimized
+                            className="object-cover"
                           />
                           <button
                             type="button"
@@ -553,17 +456,15 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   )}
                 </div>
               </form>
-            </ModalBody>
+            </Modal.Body>
 
-            <ModalFooter className="flex items-center justify-between">
+            <Modal.Footer className="sticky bottom-0 z-10 flex shrink-0 items-center justify-between border-t border-zinc-100 bg-white pt-3 dark:border-zinc-800 dark:bg-zinc-900">
               {mode === 'edit' && place ? (
                 <Button
-                  color="danger"
-                  variant="flat"
-                  startContent={<Trash2 className="w-4 h-4" />}
-                  isLoading={isSubmitting}
+                  variant="danger-soft"
+                  isPending={isSubmitting}
                   onClick={async () => {
-                    if (confirm(`هل أنت متأكد من حذف مكان "${title || place.title}" نهائياً من كيان سيتي سبوت؟`)) {
+                    if (confirm(`هل أنت متأكد من حذف مكان "${title || place.title}" نهائياً من ديرتك؟`)) {
                       setIsSubmitting(true);
                       const res = await serverDeleteActivePlace(place.id);
                       setIsSubmitting(false);
@@ -577,28 +478,29 @@ export const EditPlaceModal: React.FC<EditPlaceModalProps> = ({
                   }}
                   className="font-bold text-xs h-11"
                 >
+                  <Trash2 className="w-4 h-4" aria-hidden="true" />
                   حذف المكان نهائياً
                 </Button>
               ) : <div />}
 
               <div className="flex items-center gap-2">
-                <Button variant="flat" color="default" onClick={onClose} disabled={isSubmitting} className="h-11 font-semibold">
+                <Button variant="secondary" onPress={modalState.close} isDisabled={isSubmitting} className="h-11 font-semibold">
                   إلغاء
                 </Button>
                 <Button
                   type="submit"
                   form="edit-place-modal-form"
-                  isLoading={isSubmitting}
-                  startContent={!isSubmitting && <Check className="w-4 h-4" />}
+                  isPending={isSubmitting}
                   className="font-bold text-white dark:text-zinc-900 bg-zinc-900 dark:bg-white hover:bg-zinc-800 dark:hover:bg-zinc-100 px-6 h-11 shadow-sm rounded-xl"
                 >
-                  {mode === 'create' ? 'إضافة المكان ونشره في كيان سيتي سبوت' : 'حفظ التعديلات الحالية'}
+                  {!isSubmitting && <Check className="w-4 h-4" aria-hidden="true" />}
+                  {mode === 'create' ? 'إضافة المكان ونشره في ديرتك' : 'حفظ التعديلات الحالية'}
                 </Button>
               </div>
-            </ModalFooter>
-          </>
-        )}
-      </ModalContent>
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </Modal>
   );
 };
