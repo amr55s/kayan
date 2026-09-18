@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { MarketplaceShell } from '@/components/marketplace/marketplace-shell';
+import { loadMarketplaceCart } from '@/lib/commerce/cart';
 
 export const metadata: Metadata = {
   title: 'المتجر | ديرتك',
@@ -14,6 +15,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function MarketplaceLayout({ children }: { children: ReactNode }) {
-  return <MarketplaceShell>{children}</MarketplaceShell>;
+async function loadCartCount() {
+  try {
+    const result = await loadMarketplaceCart({ ignorePendingGuest: true });
+    return result.model.itemCount;
+  } catch {
+    return 0;
+  }
+}
+
+export default async function MarketplaceLayout({ children }: { children: ReactNode }) {
+  const cartCount = await loadCartCount();
+  return <MarketplaceShell cartCount={cartCount}>{children}</MarketplaceShell>;
 }

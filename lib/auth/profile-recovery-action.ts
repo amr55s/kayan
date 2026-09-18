@@ -7,6 +7,7 @@ import { safeNextPath } from '@/lib/auth/safe-next';
 import { claimMarketplaceGuestCart } from '@/lib/commerce/cart';
 import type { ChatActionState } from '@/lib/commerce/chat/contracts';
 import { createClient } from '@/lib/supabase/server';
+import { ensureMarketplaceCustomerProfile } from '@/lib/commerce/ensure-customer';
 
 export async function retryGoogleProfileRecoveryAction(
   _previous: ChatActionState,
@@ -27,10 +28,7 @@ export async function retryGoogleProfileRecoveryAction(
     now: Date.now,
     readCookie: () => cookieStore.get(chatIntentCookie.name)?.value,
     deleteCookie: () => { cookieStore.delete(chatIntentCookie.name); },
-    prepareCustomer: async () => {
-      const { data, error } = await (supabase as any).rpc('ensure_marketplace_customer');
-      if (error || !data) throw error || new Error('customer_profile_missing');
-    },
+    prepareCustomer: () => ensureMarketplaceCustomerProfile(supabase as never),
     claimGuestCart: claimMarketplaceGuestCart,
   });
 }

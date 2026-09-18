@@ -182,7 +182,7 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
   }, [initialPlaces, selectedCategory, searchQuery, showFavoritesOnly, favorites]);
 
   return (
-    <div className="dir-rtl flex min-h-screen flex-col bg-zinc-50 pb-20 text-zinc-950 sm:pb-0">
+    <div className="dairtak-theme dir-rtl flex min-h-screen flex-col bg-[var(--dairtak-bg)] pb-20 text-[var(--dairtak-navy)] sm:pb-0">
       {/* Navbar Header */}
       <Header
         onOpenAddModal={() => {

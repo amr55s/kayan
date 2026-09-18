@@ -13,6 +13,9 @@ test('behavior analytics is anonymous, allow-listed, aggregated, and server-only
   assert.match(route, /origin !== requestUrl\.origin/);
   assert.match(route, /visitorId: z\.string\(\)\.uuid\(\)/);
   assert.match(route, /record_site_analytics/);
+  assert.match(route, /isMissingDatabaseRoutine\(error\)/);
+  assert.match(route, /createAdminClient\(\)/);
+  assert.match(route, /return new Response\(null, \{ status: 204 \}\)/);
   assert.match(route, /sharedEntityEvents/);
   assert.match(
     route,

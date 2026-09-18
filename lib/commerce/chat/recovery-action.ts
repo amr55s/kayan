@@ -6,6 +6,7 @@ import { parseChatLoginIntent, safeNextPath } from '@/lib/auth/safe-next';
 import { retryRecoveredChatIntent } from '@/lib/auth/callback-flow';
 import { claimMarketplaceGuestCart } from '@/lib/commerce/cart';
 import { createClient } from '@/lib/supabase/server';
+import { ensureMarketplaceCustomerProfile } from '@/lib/commerce/ensure-customer';
 import { openMarketplaceConversationAction } from './actions';
 import type { ChatActionState } from './contracts';
 
@@ -37,10 +38,7 @@ export async function retryMarketplaceConversationAction(
     now: Date.now,
     readCookie: () => cookieStore.get(chatIntentCookie.name)?.value,
     deleteCookie: () => { cookieStore.delete(chatIntentCookie.name); },
-    prepareCustomer: async () => {
-      const { data, error } = await (supabase as any).rpc('ensure_marketplace_customer');
-      if (error || !data) throw error || new Error('customer_profile_missing');
-    },
+    prepareCustomer: () => ensureMarketplaceCustomerProfile(supabase as never),
     claimGuestCart: claimMarketplaceGuestCart,
     openConversation: () => openMarketplaceConversationAction({ status: 'idle' }, formData),
   });

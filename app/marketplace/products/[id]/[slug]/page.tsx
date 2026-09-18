@@ -3,7 +3,7 @@ import { cache } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { MarketplaceProductDetails } from '@/components/marketplace/product-details';
 import { marketplaceProductHref } from '@/components/marketplace/format';
-import { fetchMarketplaceProduct } from '@/lib/commerce/catalog';
+import { fetchMarketplaceProduct, fetchRelatedMarketplaceProducts } from '@/lib/commerce/catalog';
 import { addMarketplaceCartItemAction } from '@/app/marketplace/actions';
 import { absoluteSiteUrl } from '@/lib/seo/site';
 import { serializeJsonLd } from '@/lib/seo/json-ld';
@@ -101,6 +101,15 @@ export default async function MarketplaceProductPage({ params, searchParams }: P
     ? recoveryValue
     : null;
   const structuredData = productJsonLd(product);
+  let relatedProducts: Awaited<ReturnType<typeof fetchRelatedMarketplaceProducts>> = [];
+  try {
+    relatedProducts = await fetchRelatedMarketplaceProducts({
+      storeSlug: product.store.slug,
+      excludeProductId: product.id,
+    });
+  } catch {
+    relatedProducts = [];
+  }
   return (
     <>
       <script
@@ -113,6 +122,7 @@ export default async function MarketplaceProductPage({ params, searchParams }: P
         isAuthenticated={Boolean(user)}
         chatLoginHref={createChatLoginHref({ returnTo, intent })}
         chatRecovery={chatRecovery}
+        relatedProducts={relatedProducts}
       />
     </>
   );

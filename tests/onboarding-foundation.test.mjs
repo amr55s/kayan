@@ -18,6 +18,7 @@ function load(relative, dependencies = {}) {
 }
 const types = load('../lib/onboarding/types.ts');
 const schemas = load('../lib/onboarding/validation.ts', { './types': types });
+const missingRoutine = load('../lib/supabase/missing-routine.ts');
 const validId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const userId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const draft = { id: validId, userId, activityKind: 'store', step: 1, version: 1,
@@ -45,6 +46,7 @@ test('invalid step/version/identity parameters fail before any RPC', async () =>
   let calls = 0;
   const repository = load('../lib/onboarding/repository.ts', {
     'server-only': {}, './validation': schemas,
+    '@/lib/supabase/missing-routine': missingRoutine,
     '@/lib/supabase/server': { createClient: async () => ({ rpc: async () => { calls++; return { data: draft, error: null }; } }) },
   });
   for (const invalid of [{ ...base, expectedVersion: -1 }, { ...base, step: 9 }, { ...base, draftId: 'wrong' }]) {
@@ -58,6 +60,7 @@ test('repository passes expected version and authenticated RPC only; conflicts s
   let error = null;
   const repository = load('../lib/onboarding/repository.ts', {
     'server-only': {}, './validation': schemas,
+    '@/lib/supabase/missing-routine': missingRoutine,
     '@/lib/supabase/server': { createClient: async () => ({ rpc: async (...args) => {
       calls.push(args); return { data: draft, error };
     } }) },
@@ -71,6 +74,29 @@ test('repository passes expected version and authenticated RPC only; conflicts s
   assert.equal(calls[1][1].p_expected_version, 1);
   error = { code: '40001', message: 'onboarding_version_conflict' };
   await assert.rejects(repository.saveMyOnboardingDraft(base), repository.OnboardingConflictError);
+  error = { code: 'PGRST202', message: 'Could not find the function public.read_my_onboarding_drafts without parameters in the schema cache' };
+  assert.deepEqual(await repository.readMyOnboardingDrafts(), []);
+  assert.deepEqual(await repository.listMyActivityWorkspaces(), []);
+  await assert.rejects(repository.saveMyOnboardingDraft(base), repository.OnboardingUnavailableError);
+});
+
+test('activity onboarding migrations that unblock draft save are present in order', () => {
+  const files = [
+    '20260830123358_activity_memberships_onboarding_drafts.sql',
+    '20260830174723_onboarding_request_transitions.sql',
+    '20260830175005_activity_resource_authorization.sql',
+    '20260831060617_onboarding_release_marker.sql',
+    '20260905203103_verified_onboarding_release_marker.sql',
+  ];
+  for (const file of files) {
+    const sql = readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), 'utf8');
+    assert.ok(sql.trim().length > 0, file);
+  }
+  const foundation = readFileSync(new URL('../supabase/migrations/20260830123358_activity_memberships_onboarding_drafts.sql', import.meta.url), 'utf8');
+  assert.match(foundation, /create function public\.save_my_onboarding_draft/);
+  assert.match(foundation, /create function public\.read_my_onboarding_drafts/);
+  const actions = readFileSync(new URL('../lib/onboarding/actions.ts', import.meta.url), 'utf8');
+  assert.match(actions, /code: 'schema'/);
 });
 
 test('migration isolates new drafts and approvals without modifying legacy profile roles', () => {

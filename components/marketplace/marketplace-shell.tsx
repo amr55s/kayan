@@ -1,7 +1,7 @@
-import { Badge } from '@heroui/react/badge';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Header } from '@/components/layout/Header';
+import { MarketplaceNav } from './marketplace-nav';
 import type { MarketplaceNavigationItem } from './view-models';
 import styles from './marketplace.module.css';
 
@@ -16,29 +16,31 @@ const defaultNavigation: MarketplaceNavigationItem[] = [
 type MarketplaceShellProps = {
   children: ReactNode;
   navigation?: MarketplaceNavigationItem[];
+  cartCount?: number;
 };
+
+function withCartBadge(
+  items: MarketplaceNavigationItem[],
+  cartCount: number | undefined,
+): MarketplaceNavigationItem[] {
+  if (typeof cartCount !== 'number') return items;
+  return items.map((item) => (
+    item.href === '/marketplace/cart' ? { ...item, badge: cartCount } : item
+  ));
+}
 
 export function MarketplaceShell({
   children,
   navigation = defaultNavigation,
+  cartCount,
 }: MarketplaceShellProps) {
+  const items = withCartBadge(navigation, cartCount);
   return (
     <div className={`dairtak-theme ${styles.shell}`}>
       <Header />
 
       <main id="main-content" className={styles.page}>
-        <nav className={styles.marketplaceNav} aria-label="أقسام المتجر">
-          {navigation.map((item) => (
-            <Link key={item.href} href={item.href} className={styles.navLink}>
-              <span>{item.label}</span>
-              {typeof item.badge === 'number' && item.badge > 0 ? (
-                <Badge.Root aria-label={`${item.badge} عناصر`}>
-                  <Badge.Label className={styles.badge}>{item.badge}</Badge.Label>
-                </Badge.Root>
-              ) : null}
-            </Link>
-          ))}
-        </nav>
+        <MarketplaceNav items={items} />
         {children}
       </main>
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { DairtakLink } from '@/components/ui/dairtak-link';
+import { DairtakSelect } from '@/components/ui/dairtak-select';
 
 import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
@@ -127,24 +128,26 @@ export function MarketplaceCodCheckout({
           <Card.Content className={styles.summaryContent}>
             <form className={styles.checkoutForm} action={submitOrderAction}>
               <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
-              <input type="hidden" name="addressId" value={addressId} />
 
               {model.addresses.length > 0 ? (
-                <label className={`${styles.selectWrap} ${styles.fullField}`} htmlFor="checkout-saved-address">
-                  <span className={styles.label}>عنوان محفوظ</span>
-                  <select
-                    id="checkout-saved-address"
+                <div className={`${styles.selectWrap} ${styles.fullField}`}>
+                  <DairtakSelect
+                    name="addressId"
+                    label="عنوان محفوظ"
                     value={addressId}
-                    className={styles.selectField}
-                    onChange={(event) => chooseAddress(event.target.value)}
-                  >
-                    {model.addresses.map((saved) => (
-                      <option key={saved.id} value={saved.id}>{saved.label} — {saved.addressLine}</option>
-                    ))}
-                    <option value="">استخدام عنوان جديد</option>
-                  </select>
-                </label>
-              ) : null}
+                    onValueChange={chooseAddress}
+                    options={[
+                      ...model.addresses.map((saved) => ({
+                        value: saved.id,
+                        label: `${saved.label} — ${saved.addressLine}`,
+                      })),
+                      { value: '', label: 'استخدام عنوان جديد' },
+                    ]}
+                  />
+                </div>
+              ) : (
+                <input type="hidden" name="addressId" value={addressId} />
+              )}
 
               <div className={styles.formGrid}>
                 <div className={styles.selectWrap}>
@@ -191,28 +194,22 @@ export function MarketplaceCodCheckout({
                   />
                 </div>
 
-                <label className={styles.selectWrap} htmlFor="checkout-zone">
-                  <span className={styles.label}>منطقة التوصيل</span>
-                  <select
-                    id="checkout-zone"
+                <div className={styles.selectWrap}>
+                  <DairtakSelect
                     name="deliveryZoneId"
+                    label="منطقة التوصيل"
                     value={zoneId}
-                    required
-                    className={styles.selectField}
-                    onChange={(event) => {
-                      const nextZoneId = event.target.value;
+                    isRequired
+                    onValueChange={(nextZoneId) => {
                       setZoneId(nextZoneId);
                       setDeliveryModes(defaultModes(model.deliveryZones.find((zone) => zone.id === nextZoneId)));
                     }}
-                  >
-                    <option value="" disabled>اختر المنطقة</option>
-                    {model.deliveryZones.map((zone) => (
-                      <option key={zone.id} value={zone.id}>
-                        {zone.name} — {formatMarketplaceMoney(zone.deliveryFee)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    options={model.deliveryZones.map((zone) => ({
+                      value: zone.id,
+                      label: `${zone.name} — ${formatMarketplaceMoney(zone.deliveryFee)}`,
+                    }))}
+                  />
+                </div>
 
                 <div className={`${styles.selectWrap} ${styles.fullField}`}>
                   <Label.Root htmlFor="checkout-address" className={styles.label}>العنوان بالتفصيل</Label.Root>
@@ -252,25 +249,21 @@ export function MarketplaceCodCheckout({
                     return <input key={option.storeId} type="hidden" name={`deliveryMode:${option.storeId}`} value={option.choices[0]!.mode} />;
                   }
                   return (
-                    <label key={option.storeId} className={styles.selectWrap} htmlFor={`delivery-mode-${option.storeId}`}>
-                      <span className={styles.label}>توصيل {group?.storeName ?? 'المتجر'}</span>
-                      <select
-                        id={`delivery-mode-${option.storeId}`}
+                    <div key={option.storeId} className={styles.selectWrap}>
+                      <DairtakSelect
                         name={`deliveryMode:${option.storeId}`}
+                        label={`توصيل ${group?.storeName ?? 'المتجر'}`}
                         value={deliveryModes[option.storeId] ?? option.choices[0]!.mode}
-                        className={styles.selectField}
-                        onChange={(event) => setDeliveryModes((current) => ({
+                        onValueChange={(nextMode) => setDeliveryModes((current) => ({
                           ...current,
-                          [option.storeId]: event.target.value as 'platform' | 'self',
+                          [option.storeId]: nextMode as 'platform' | 'self',
                         }))}
-                      >
-                        {option.choices.map((choice) => (
-                          <option key={choice.mode} value={choice.mode}>
-                            {choice.label} — {formatMarketplaceMoney(choice.deliveryFee)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        options={option.choices.map((choice) => ({
+                          value: choice.mode,
+                          label: `${choice.label} — ${formatMarketplaceMoney(choice.deliveryFee)}`,
+                        }))}
+                      />
+                    </div>
                   );
                 })}
 

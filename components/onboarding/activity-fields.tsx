@@ -4,13 +4,16 @@ import { Description, FieldError, Input, Label, ListBox, Select, TextArea, TextF
 import type { ActivityKind, OnboardingDraftData } from '@/lib/onboarding/types';
 import styles from './onboarding.module.css';
 
-export function DraftField({ label, value, onChange, required = false, multiline = false, maxLength = 150, type = 'text', inputMode }: {
+export function DraftField({ label, value, onChange, required = false, multiline = false, maxLength = 150, type = 'text', inputMode, autoComplete, dir }: {
   label: string; value?: string; onChange: (value: string) => void; required?: boolean; multiline?: boolean;
   maxLength?: number; type?: 'text' | 'tel'; inputMode?: 'text' | 'tel' | 'numeric' | 'decimal';
+  autoComplete?: string; dir?: 'ltr' | 'rtl';
 }) {
   return <TextField value={value ?? ''} onChange={onChange} isRequired={required} type={type}>
     <Label>{label}</Label>
-    {multiline ? <TextArea className="dairtak-field" rows={4} maxLength={maxLength} /> : <Input className="dairtak-field" maxLength={maxLength} inputMode={inputMode ?? (type === 'tel' ? 'tel' : 'text')} />}
+    {multiline
+      ? <TextArea className="dairtak-field" rows={4} maxLength={maxLength} autoComplete={autoComplete} dir={dir} />
+      : <Input className="dairtak-field" maxLength={maxLength} inputMode={inputMode ?? (type === 'tel' ? 'tel' : 'text')} autoComplete={autoComplete} dir={dir} />}
     <FieldError />
   </TextField>;
 }
@@ -36,10 +39,10 @@ export function ActivityBasics({ kind, data, email, places, onChange }: {
     : kind === 'real_estate' ? ['real_estate'] : ['stores', 'market', 'veggies', 'pharmacy'];
   const existing = places.filter(place => categories.includes(place.category));
   return <div className={styles.fields}>
-    <DraftField label="اسمك" value={data.displayName} required maxLength={100} onChange={displayName => onChange({ displayName })} />
-    <TextField value={email} isReadOnly><Label>البريد المرتبط بحساب Google</Label><Input className="dairtak-field" /><Description>نستخدم بريد حسابك؛ لا تحتاج إلى كتابته أو تغييره هنا.</Description></TextField>
-    <DraftField label="رقم الموبايل للتواصل" value={data.phone} required type="tel" maxLength={20} onChange={phone => onChange({ phone })} />
-    <DraftField label="واتساب (اختياري)" value={data.whatsapp} type="tel" maxLength={20} onChange={whatsapp => onChange({ whatsapp })} />
+    <DraftField label="اسمك" value={data.displayName} required maxLength={100} autoComplete="name" onChange={displayName => onChange({ displayName })} />
+    <TextField value={email} isReadOnly><Label>البريد المرتبط بحساب Google</Label><Input className="dairtak-field" dir="ltr" autoComplete="username" /><Description>نستخدم بريد حسابك؛ لا تحتاج إلى كتابته أو تغييره هنا.</Description></TextField>
+    <DraftField label="رقم الموبايل للتواصل" value={data.phone} required type="tel" maxLength={20} autoComplete="tel" dir="ltr" onChange={phone => onChange({ phone })} />
+    <DraftField label="واتساب (اختياري)" value={data.whatsapp} type="tel" maxLength={20} autoComplete="tel" dir="ltr" onChange={whatsapp => onChange({ whatsapp })} />
     {kind === 'driver' ? <DraftSelect label="وسيلة التوصيل" value={data.vehicleType} onChange={vehicleType => onChange({ vehicleType })}
       options={[[ 'motorcycle', 'موتوسيكل' ], [ 'bicycle', 'عجلة' ], [ 'car', 'سيارة' ], [ 'other', 'وسيلة أخرى' ]]} /> : <>
       {kind !== 'real_estate' ? <DraftSelect label="مكان النشاط" value={data.placeMode ?? 'new'} onChange={placeMode => onChange({ placeMode: placeMode === 'existing' ? 'existing' : 'new', existingPlaceId: '' })}
@@ -49,7 +52,7 @@ export function ActivityBasics({ kind, data, email, places, onChange }: {
           options={existing.map(place => [place.id, place.title] as const)} />
         <p className={styles.muted}>ستراجع الإدارة ملكيتك للمكان قبل ربطه. إن لم تجده، اختر إضافة نشاط جديد.</p>
       </> : <>
-        <DraftField label={kind === 'real_estate' ? 'عنوان العرض' : 'اسم النشاط'} value={data.name} required onChange={name => onChange({ name })} />
+        <DraftField label={kind === 'real_estate' ? 'عنوان العرض' : 'اسم النشاط'} value={data.name} required autoComplete="organization" onChange={name => onChange({ name })} />
         {kind === 'restaurant' ? <DraftSelect label="نوع الأكل" value={data.category ?? 'restaurants'} onChange={category => onChange({ category })}
           options={[[ 'restaurants', 'مطعم أو كافيه' ], [ 'home_made', 'أكل بيتي' ]]} /> : null}
         {kind === 'service' ? <DraftSelect label="تصنيف الخدمة" value={data.category ?? 'services'} onChange={category => onChange({ category })}

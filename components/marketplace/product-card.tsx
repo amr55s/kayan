@@ -8,6 +8,7 @@ import {
   formatMarketplaceMoney,
   marketplaceDiscountPercentage,
   marketplaceProductHref,
+  marketplaceStoreHref,
 } from './format';
 import type {
   MarketplaceFormAction,
@@ -27,6 +28,8 @@ export function MarketplaceProductCard({
   const productHref = marketplaceProductHref(product);
   const discount = marketplaceDiscountPercentage(product.price, product.compareAtPrice);
   const showRating = Boolean(product.rating && product.rating.count > 0);
+  const defaultVariantId = product.defaultVariantId;
+  const canAddToCart = Boolean(addToCartAction && defaultVariantId && product.isInStock);
 
   return (
     <Card.Root className={styles.productCard}>
@@ -54,7 +57,9 @@ export function MarketplaceProductCard({
       </Link>
 
       <Card.Header className={styles.cardHeader}>
-        <span className={styles.storeName}>{product.store.name}</span>
+        <Link href={marketplaceStoreHref(product.store.slug)} className={styles.storeName}>
+          {product.store.name}
+        </Link>
         <Link href={productHref} className={styles.productTitleLink}>
           <h2 className={styles.productTitle}>{product.name}</h2>
         </Link>
@@ -87,16 +92,13 @@ export function MarketplaceProductCard({
         >
           {product.isInStock ? product.fulfillmentLabel ?? 'متاح للطلب' : 'غير متوفر حاليًا'}
         </span>
-        {addToCartAction ? (
+        {canAddToCart && defaultVariantId ? (
           <form action={addToCartAction}>
             <input type="hidden" name="productId" value={product.id} />
-            {product.defaultVariantId ? (
-              <input type="hidden" name="variantId" value={product.defaultVariantId} />
-            ) : null}
+            <input type="hidden" name="variantId" value={defaultVariantId} />
             <input type="hidden" name="quantity" value="1" />
             <Button
               type="submit"
-              isDisabled={!product.isInStock}
               className={styles.primaryButton}
             >
               أضف إلى السلة

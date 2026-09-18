@@ -1,17 +1,22 @@
+import { Breadcrumbs } from '@heroui/react/breadcrumbs';
 import { Card } from '@heroui/react/card';
 import { Chip } from '@heroui/react/chip';
 import { Separator } from '@heroui/react/separator';
+import Link from 'next/link';
 import {
   formatMarketplaceMoney,
   marketplaceDiscountPercentage,
   marketplaceProductHref,
+  marketplaceStoreHref,
 } from './format';
+import { MarketplaceProductCard } from './product-card';
 import { MarketplaceProductGallery } from './product-gallery';
 import { MarketplacePurchaseForm } from './purchase-form';
 import { ChatEntryButton } from './chat/chat-entry-button';
 import type {
   MarketplaceFormAction,
   MarketplaceProductDetailsViewModel,
+  MarketplaceProductSummary,
 } from './view-models';
 import styles from './marketplace.module.css';
 import type { ChatRecoveryCode } from './chat/chat-entry-state';
@@ -22,12 +27,14 @@ export function MarketplaceProductDetails({
   isAuthenticated,
   chatLoginHref,
   chatRecovery,
+  relatedProducts = [],
 }: {
   product: MarketplaceProductDetailsViewModel;
   addToCartAction?: MarketplaceFormAction;
   isAuthenticated: boolean;
   chatLoginHref: string;
   chatRecovery?: ChatRecoveryCode | null;
+  relatedProducts?: MarketplaceProductSummary[];
 }) {
   const discount = marketplaceDiscountPercentage(product.price, product.compareAtPrice);
   const showRating = Boolean(product.rating && product.rating.count > 0);
@@ -38,16 +45,24 @@ export function MarketplaceProductDetails({
       : [];
 
   return (
-    <article className={styles.detailsGrid}>
-      <MarketplaceProductGallery images={images} productName={product.name} />
+    <div>
+      <Breadcrumbs className={styles.breadcrumbs}>
+        <Breadcrumbs.Item href="/marketplace">المتجر</Breadcrumbs.Item>
+        <Breadcrumbs.Item href={marketplaceStoreHref(product.store.slug)}>
+          {product.store.name}
+        </Breadcrumbs.Item>
+        <Breadcrumbs.Item>{product.name}</Breadcrumbs.Item>
+      </Breadcrumbs>
+      <article className={styles.detailsGrid}>
+        <MarketplaceProductGallery images={images} productName={product.name} />
 
       <Card.Root className={styles.detailsPanel}>
         <Card.Content className={styles.detailsContent}>
           <div>
-            <span className={styles.storeName}>
+            <Link href={marketplaceStoreHref(product.store.slug)} className={styles.storeName}>
               يباع بواسطة {product.store.name}
               {product.store.isVerified ? ' — متجر موثّق' : ''}
-            </span>
+            </Link>
             <h1 className={styles.detailsName}>{product.name}</h1>
           </div>
 
@@ -124,6 +139,23 @@ export function MarketplaceProductDetails({
           ) : null}
         </Card.Content>
       </Card.Root>
-    </article>
+      </article>
+      {relatedProducts.length > 0 ? (
+        <section className={styles.relatedSection} aria-labelledby="related-products-title">
+          <h2 id="related-products-title" className={styles.relatedTitle}>
+            المزيد من {product.store.name}
+          </h2>
+          <div className={styles.productGrid}>
+            {relatedProducts.map((related) => (
+              <MarketplaceProductCard
+                key={related.id}
+                product={related}
+                addToCartAction={addToCartAction}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
   );
 }

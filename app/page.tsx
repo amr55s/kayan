@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { DirectoryView } from '@/components/directory/DirectoryView';
 import { fetchHomePageData } from '@/lib/supabase/queries';
+import Loading from './loading';
 
 export const revalidate = 60;
 export const maxDuration = 60;
@@ -21,11 +23,13 @@ export default async function HomePage() {
   const { places, drivers, directoryError, renderedAt } = await fetchHomePageData();
 
   return (
-    <DirectoryView
-      initialPlaces={places}
-      initialDrivers={drivers}
-      directoryError={directoryError}
-      renderedAt={renderedAt}
-    />
+    <Suspense fallback={<Loading />}>
+      <DirectoryView
+        initialPlaces={places}
+        initialDrivers={drivers}
+        directoryError={directoryError}
+        renderedAt={renderedAt}
+      />
+    </Suspense>
   );
 }

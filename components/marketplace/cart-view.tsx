@@ -4,6 +4,7 @@ import { Card } from '@heroui/react/card';
 import { Input } from '@heroui/react/input';
 import { Label } from '@heroui/react/label';
 import { Separator } from '@heroui/react/separator';
+import { Minus, Plus } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatMarketplaceMoney, marketplaceProductHref } from './format';
@@ -66,27 +67,35 @@ function CartLine({
 
         <div className={styles.cartActions}>
           {updateLineAction ? (
-            <form action={updateLineAction} className={styles.cartActions}>
-              <input type="hidden" name="variantId" value={line.variantId} />
-              <div className={styles.selectWrap}>
-                <Label.Root htmlFor={`quantity-${line.id}`} className={styles.label}>
-                  الكمية
-                </Label.Root>
-                <Input.Root
-                  id={`quantity-${line.id}`}
-                  name="quantity"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={Math.max(1, line.maxQuantity)}
-                  defaultValue={String(line.quantity)}
-                  className={styles.quantityInput}
-                />
-              </div>
-              <Button.Root type="submit" className={styles.secondaryButton}>
-                تحديث
-              </Button.Root>
-            </form>
+            <div className={styles.quantityStepper} role="group" aria-label={`كمية ${line.productName}`}>
+              <form action={updateLineAction}>
+                <input type="hidden" name="variantId" value={line.variantId} />
+                <input type="hidden" name="quantity" value={String(Math.max(1, line.quantity - 1))} />
+                <Button.Root
+                  type="submit"
+                  isIconOnly
+                  className={styles.iconButton}
+                  aria-label="تقليل الكمية"
+                  isDisabled={line.quantity <= 1 || !line.isAvailable}
+                >
+                  <Minus className="size-4" aria-hidden="true" />
+                </Button.Root>
+              </form>
+              <span className={styles.quantityValue} aria-live="polite">{line.quantity}</span>
+              <form action={updateLineAction}>
+                <input type="hidden" name="variantId" value={line.variantId} />
+                <input type="hidden" name="quantity" value={String(Math.min(line.maxQuantity, line.quantity + 1))} />
+                <Button.Root
+                  type="submit"
+                  isIconOnly
+                  className={styles.iconButton}
+                  aria-label="زيادة الكمية"
+                  isDisabled={line.quantity >= line.maxQuantity || !line.isAvailable}
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                </Button.Root>
+              </form>
+            </div>
           ) : (
             <span className={styles.muted}>الكمية: {line.quantity}</span>
           )}

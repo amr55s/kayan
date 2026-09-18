@@ -7,11 +7,12 @@ const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), '
 
 test('Batch 1: Shells and state panels use HeroUI primitives and do not expose unstyled buttons or badges', () => {
   const marketplaceShell = read('components/marketplace/marketplace-shell.tsx');
+  const marketplaceNav = read('components/marketplace/marketplace-nav.tsx');
   const roleShell = read('components/marketplace/role-shell.tsx');
   const merchantShell = read('components/marketplace/merchant/merchant-marketplace-shell.tsx');
   const statePanel = read('components/marketplace/state-panel.tsx');
 
-  assert.match(marketplaceShell, /from '@heroui\/react\/badge'/);
+  assert.match(`${marketplaceShell}\n${marketplaceNav}`, /from '@heroui\/react\/badge'/);
   assert.match(roleShell, /from '@heroui\/react\/chip'/);
   assert.match(roleShell, /from '@heroui\/react\/card'/);
   assert.match(statePanel, /from '@\/components\/ui\/dairtak-link'/);
@@ -33,6 +34,7 @@ test('Batch 2: Customer marketplace components use HeroUI compound primitives', 
   assert.match(productCard, /from '@heroui\/react\/button'/);
   assert.match(productDetails, /from '@heroui\/react\/separator'/);
   assert.match(productDetails, /from '@heroui\/react\/card'/);
+  assert.match(productDetails, /from '@heroui\/react\/breadcrumbs'/);
   assert.match(productGallery, /from '@heroui\/react\/scroll-shadow'/);
   assert.match(purchaseForm, /from '@heroui\/react\/radio-group'/);
   assert.match(cartView, /from '@heroui\/react\/card'/);
@@ -71,7 +73,7 @@ test('Theme alignment: marketplace uses the shared HeroUI v3 semantic theme', ()
   const shell = read('components/marketplace/marketplace-shell.tsx');
   assert.match(shell, /dairtak-theme/);
   assert.match(css, /\.dairtak-theme\s*\{/);
-  assert.match(css, /--accent: var\(--dairtak-orange\)/);
+  assert.match(css, /--accent: var\(--dairtak-orange-deep\)/);
   assert.match(css, /--background: var\(--kayan-surface\)/);
   assert.match(css, /--foreground: var\(--kayan-black\)/);
   assert.match(css, /--border: var\(--kayan-border\)/);

@@ -35,6 +35,9 @@ test('product editor exposes manual product, variant, inventory and media contra
   assert.match(gallery, /uploadMarketplaceImage/);
   assert.match(gallery, /name="orderedAssetIds"/);
   assert.match(gallery, /name="expectedAssetUpdatedAt"/);
+  assert.match(gallery, /احفظ بيانات المنتج أولًا قبل رفع الصور/);
+  assert.match(read('app/api/media/uploads/route.ts'), /staging\/\$\{merchantId\}\/\$\{input\.purpose\}\/\$\{input\.entityId\}\/\$\{input\.slot\}/);
+  assert.match(read('app/api/onboarding/media/route.ts'), /onboarding\/\$\{user\.id\}\/\$\{draftId\.data\}\/\$\{assetId\}\.webp/);
 });
 
 test('Excel panel renders validation, apply, export, history and failure states', () => {

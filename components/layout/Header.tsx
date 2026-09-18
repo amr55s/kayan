@@ -54,7 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
 
     async function loadDashboardPath() {
       const { data: userData } = await supabase.auth.getUser();
-      if (mounted) setDashboardPath(userData.user ? '/onboarding' : null);
+      if (mounted) setDashboardPath(userData.user ? '/workspaces' : null);
     }
 
     void loadDashboardPath().catch((error) => {

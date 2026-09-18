@@ -21,8 +21,19 @@ function validateRecoverySnapshot(value: unknown): Snapshot | null {
   if (!data.success || typeof value.step !== 'number' || ![2, 3, 4].includes(value.step)) return null;
   return { data: data.data, step: value.step as OnboardingStep };
 }
-function withSessionRecovery(action: (storage: Storage) => void) {
-  try { action(window.sessionStorage); } catch { /* The server save remains authoritative if browser storage is unavailable. */ }
+function withDraftRecovery(action: (storage: Storage) => void) {
+  for (const storage of [window.sessionStorage, window.localStorage]) {
+    try { action(storage); } catch { /* Browser storage is optional; the server save remains authoritative. */ }
+  }
+}
+function readLocalDraftRecovery(scope: RecoveryScope, validate: (value: unknown) => Snapshot | null) {
+  for (const storage of [window.sessionStorage, window.localStorage]) {
+    try {
+      const candidate = readDraftRecovery(storage, scope, validate);
+      if (candidate) return candidate;
+    } catch { /* Try the next storage. */ }
+  }
+  return null;
 }
 const saveLabels: Record<SaveState, string> = {
   saved: 'كل التعديلات محفوظة', waiting: 'تعديلات بانتظار الحفظ…', saving: 'جارٍ حفظ المسودة…',
@@ -64,7 +75,7 @@ export function OnboardingWizard({ kind, initialDraft, identity, places }: {
         setError(result.message);
         throw new Error(result.code === 'conflict' ? 'onboarding_version_conflict' : result.code);
       }
-      withSessionRecovery(storage => acknowledgeDraftRecovery(storage, recoveryScope, value, result.draft.version));
+      withDraftRecovery(storage => acknowledgeDraftRecovery(storage, recoveryScope, value, result.draft.version));
       return result.draft;
     },
   }));
@@ -73,7 +84,7 @@ export function OnboardingWizard({ kind, initialDraft, identity, places }: {
     current.current = next;
     setSnapshot(next);
     queue.schedule(next);
-    withSessionRecovery(storage => { persistDraftRecovery(storage, recoveryScope, next, queue.getVersion()); });
+    withDraftRecovery(storage => { persistDraftRecovery(storage, recoveryScope, next, queue.getVersion()); });
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => { void queue.flush().catch(() => undefined); }, 700);
   }
@@ -82,13 +93,17 @@ export function OnboardingWizard({ kind, initialDraft, identity, places }: {
   }
   useEffect(() => {
     const recoveryFrame = window.requestAnimationFrame(() => {
-      withSessionRecovery(storage => {
-        const candidate = readDraftRecovery(storage, recoveryScope, validateRecoverySnapshot);
-        // A save may have reached the server immediately before a tab was closed.
-        if (candidate && JSON.stringify(candidate.snapshot) === JSON.stringify(current.current)) {
-          discardDraftRecovery(storage, recoveryScope);
-        } else setRecovery(candidate);
-      });
+      const candidate = readLocalDraftRecovery(recoveryScope, validateRecoverySnapshot);
+      if (candidate && JSON.stringify(candidate.snapshot) === JSON.stringify(current.current)) {
+        withDraftRecovery(storage => discardDraftRecovery(storage, recoveryScope));
+      } else if (!initialDraft && candidate && canRestoreDraftRecovery(candidate, queue.getVersion())) {
+        current.current = candidate.snapshot;
+        setSnapshot(candidate.snapshot);
+        queue.schedule(candidate.snapshot);
+        withDraftRecovery(storage => persistDraftRecovery(storage, recoveryScope, candidate.snapshot, queue.getVersion()));
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => { void queue.flush().catch(() => undefined); }, 700);
+      } else setRecovery(candidate);
       setRecoveryChecked(true);
     });
     function beforeUnload(event: BeforeUnloadEvent) {
@@ -125,7 +140,7 @@ export function OnboardingWizard({ kind, initialDraft, identity, places }: {
       window.removeEventListener('online', retry);
       document.removeEventListener('click', saveBeforeNavigation, true);
     };
-  }, [queue, router, recoveryScope, saveRuntime]);
+  }, [queue, router, recoveryScope]);
   useEffect(() => { title.current?.focus(); }, [snapshot.step]);
 
   async function saveNow() {
@@ -147,7 +162,7 @@ export function OnboardingWizard({ kind, initialDraft, identity, places }: {
         if (!draft) return;
         const result = await submitOnboardingDraftAction({ draftId: draft.id, expectedVersion: queue.getVersion() });
         if (!result.success) { setError(result.message); return; }
-        withSessionRecovery(storage => discardDraftRecovery(storage, recoveryScope));
+        withDraftRecovery(storage => discardDraftRecovery(storage, recoveryScope));
         router.replace('/workspaces');
         router.refresh();
       }
@@ -225,13 +240,13 @@ export function OnboardingWizard({ kind, initialDraft, identity, places }: {
             schedule(restored);
           }}>استعادة التعديلات ومتابعتها</Button> : <p>توجد نسخة أحدث على الخادم. احتفظنا بالمحلية للمقارنة فقط حتى لا تكتب فوق تعديلات التبويب الآخر.</p>}
           <Button type="button" variant="secondary" className="dairtak-button-secondary" onPress={() => {
-            withSessionRecovery(storage => discardDraftRecovery(storage, recoveryScope));
+            withDraftRecovery(storage => discardDraftRecovery(storage, recoveryScope));
             setRecovery(null);
           }}>تجاهل المحلية واستخدام النسخة المحفوظة</Button>
         </section> : null}
         {error ? <div role="alert" className={styles.error}>{error}
           {saveState === 'conflict' ? <p><Link className={styles.link} href={`/onboarding?activity=${kind}`} target="_blank" rel="noopener">افتح النسخة الأحدث في تبويب جديد للمقارنة</Link></p> : null}
-          {saveState === 'error' ? <div><Button type="button" variant="secondary" onPress={() => { void saveNow().then(() => setError('')).catch(() => undefined); }}>إعادة الحفظ</Button><Link className={styles.link} href={`/signin?next=${encodeURIComponent(`/onboarding?activity=${kind}`)}`} target="_blank" rel="noopener">تجديد تسجيل الدخول دون إغلاق هذه الصفحة</Link></div> : null}
+          {saveState === 'error' ? <div className={styles.actions}><Button type="button" className="dairtak-button" onPress={() => { void saveNow().then(() => setError('')).catch(() => undefined); }}>إعادة الحفظ</Button><Link className={styles.link} href={`/signin?next=${encodeURIComponent(`/onboarding?activity=${kind}`)}`} target="_blank" rel="noopener">تجديد تسجيل الدخول دون إغلاق هذه الصفحة</Link></div> : null}
         </div> : null}
         <fieldset disabled={!recoveryChecked || Boolean(recovery) || busy || uploading || saveState === 'conflict'} style={{ border: 0, padding: 0, minWidth: 0 }}>
           {step === 2 ? <ActivityBasics kind={kind} data={data} email={identity.email} places={places} onChange={change} /> : null}

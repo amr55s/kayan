@@ -16,8 +16,9 @@ test('marketplace reuses the real main header and keeps its content server-rende
 test('shared theme preserves main identity and explicitly discovers route/component classes', () => {
   const css = read('app/globals.css');
   for (const contract of [
-    '--dairtak-orange: #ff7a1a', '--dairtak-card-radius: 1.5rem',
-    '--dairtak-content-width: 90rem', '--accent: var(--dairtak-orange)',
+    '--dairtak-orange: #ff7a1a', '--dairtak-navy: #09090b', '--dairtak-bg: #fafafa',
+    '--dairtak-card-radius: 1.5rem',
+    '--dairtak-content-width: 90rem', '--accent: var(--dairtak-orange-deep)',
     '--field-radius: var(--dairtak-control-radius)',
     '@source "../components/marketplace"', '@source "./onboarding"',
   ]) assert.ok(css.includes(contract), contract);
@@ -68,4 +69,47 @@ test('catalog filters use HeroUI, remain sidebar/drawer based and restore values
   // A positioned document body offsets HeroUI's flipped (bottom-anchored) portal
   // by the document height, potentially selecting the item under the trigger.
   assert.doesNotMatch(read('app/globals.css'), /html,\s*body\s*\{[^}]*position:\s*relative/s);
+});
+
+test('signed-in public header opens workspaces, not a second skip target or onboarding dump', () => {
+  const header = read('components/layout/Header.tsx');
+  const directory = read('components/directory/DirectoryView.tsx');
+  assert.match(header, /setDashboardPath\(userData\.user \? '\/workspaces' : null\)/);
+  assert.match(header, /dashboardPath \?\? '\/signin'/);
+  assert.match(directory, /className="dairtak-theme /);
+  assert.doesNotMatch(read('components/marketplace/marketplace.module.css'), /\.skipLink\b/);
+});
+
+test('loading skeletons never claim the unique main landmark', () => {
+  const home = read('app/loading.tsx');
+  const services = read('app/services/loading.tsx');
+  const page = read('app/page.tsx');
+  assert.doesNotMatch(home, /id=["']main-content["']/);
+  assert.doesNotMatch(services, /id=["']main-content["']/);
+  assert.match(home, /aria-busy="true"/);
+  assert.match(page, /<Suspense fallback=\{<Loading \/>\}>/);
+  assert.match(page, /<DirectoryView/);
+});
+
+test('filled orange chrome uses white foreground, while white inputs keep dark text', () => {
+  const css = read('app/globals.css');
+  assert.match(css, /--accent-foreground:\s*var\(--kayan-white\)/);
+  assert.match(css, /\.dairtak-button \{ background: var\(--dairtak-orange-deep\); color: #fff; \}/);
+  assert.match(css, /::selection \{\s*background: var\(--dairtak-orange-deep\);\s*color: #fff;/);
+  assert.match(css, /caret-color: var\(--kayan-black\)/);
+  assert.match(css, /caret-color: var\(--field-foreground\)/);
+  const onboarding = read('components/onboarding/onboarding.module.css');
+  assert.match(onboarding, /aria-current='step'\] \.stepNumber \{ background: var\(--dairtak-orange-deep\); color: #fff; \}/);
+});
+
+test('onboarding draft recovery survives reload and re-auth without dropping local fields', () => {
+  const wizard = read('components/onboarding/onboarding-wizard.tsx');
+  const actions = read('lib/onboarding/actions.ts');
+  assert.match(wizard, /window\.sessionStorage/);
+  assert.match(wizard, /window\.localStorage/);
+  assert.match(wizard, /!initialDraft && candidate && canRestoreDraftRecovery/);
+  assert.match(wizard, /target="_blank"/);
+  assert.match(wizard, /إعادة الحفظ/);
+  assert.match(actions, /code: 'schema'/);
+  assert.match(actions, /تعديلاتك ما زالت في هذه الصفحة/);
 });

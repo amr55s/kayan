@@ -4,6 +4,10 @@ export function marketplaceProductHref(product: { id: string; slug: string }): s
   return `/marketplace/products/${encodeURIComponent(product.id)}/${encodeURIComponent(product.slug)}`;
 }
 
+export function marketplaceStoreHref(slug: string): string {
+  return `/marketplace?store=${encodeURIComponent(slug)}`;
+}
+
 const formatters = new Map<string, Intl.NumberFormat>();
 
 export function formatMarketplaceMoney(money: MarketplaceMoney): string {

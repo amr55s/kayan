@@ -8,6 +8,7 @@ import type {
 } from '@/components/marketplace/view-models';
 import { databaseMinorToNumber } from '@/lib/commerce/money';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
+import { isMissingDatabaseRoutine } from '@/lib/supabase/missing-routine';
 import { createPublicClient } from '@/lib/supabase/public';
 
 const uuid = z.uuid();
@@ -217,6 +218,23 @@ export async function fetchMarketplaceCatalog(input: {
       cursor = null;
     }
   }
+  const emptyCatalog = (): MarketplaceCatalogViewModel => ({
+    products: [],
+    categories: [],
+    stores: [],
+    sortOptions: marketplaceCatalogSorts.map((option) => ({ ...option })),
+    query,
+    selectedCategory: category,
+    selectedStore: store,
+    selectedSort: sort,
+    minPrice: minPrice.input,
+    maxPrice: maxPrice.input,
+    inStockOnly: Boolean(input.inStock),
+    minRating,
+    nextCursor: null,
+    hasMore: false,
+  });
+
   const supabase = createPublicClient();
   const { data, error } = await (supabase as any).rpc('list_marketplace_catalog_v2', {
     p_query: query || null,
@@ -230,6 +248,12 @@ export async function fetchMarketplaceCatalog(input: {
     p_cursor: cursor,
     p_limit: 24,
   });
+  if (isMissingDatabaseRoutine(error)) {
+    logSafeServerFailure('warn', 'marketplace_catalog_rpc_unavailable', {
+      failure: 'routine_missing',
+    });
+    return emptyCatalog();
+  }
   if (error) throw new Error(`marketplace_catalog_query_failed:${error.code ?? 'unknown'}`);
   const parsed = catalogResponseSchema.safeParse(data);
   if (!parsed.success) {
@@ -276,6 +300,12 @@ export async function fetchMarketplaceProduct(
   const { data, error } = await (supabase as any).rpc('get_marketplace_product', {
     p_product_id: productId,
   });
+  if (isMissingDatabaseRoutine(error)) {
+    logSafeServerFailure('warn', 'marketplace_product_rpc_unavailable', {
+      failure: 'routine_missing',
+    });
+    return null;
+  }
   if (error) throw new Error(`marketplace_product_query_failed:${error.code ?? 'unknown'}`);
   if (data == null) return null;
   const parsed = productResponseSchema.safeParse(data);
@@ -331,4 +361,19 @@ export async function fetchMarketplaceProduct(
     returnPolicyNote: 'يمكن طلب الإرجاع من صفحة الطلب، وتتم مراجعته داخل الموقع.',
   };
   return details;
+}
+
+export async function fetchRelatedMarketplaceProducts(input: {
+  storeSlug: string;
+  excludeProductId: string;
+  limit?: number;
+}): Promise<MarketplaceProductSummary[]> {
+  const limit = Math.min(8, Math.max(1, input.limit ?? 8));
+  const catalog = await fetchMarketplaceCatalog({
+    inStock: true,
+    store: input.storeSlug,
+  });
+  return catalog.products
+    .filter((product) => product.id !== input.excludeProductId)
+    .slice(0, limit);
 }

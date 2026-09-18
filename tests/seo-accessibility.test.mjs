@@ -61,6 +61,9 @@ test('private route families are noindex and the global skip target remains reac
   assert.match(read('app/layout.tsx'), /href="#main-content"/);
   assert.match(read('components/auth/LoginForm.tsx'), /<main id="main-content"/);
   assert.match(read('components/marketplace/marketplace-shell.tsx'), /<main id="main-content"/);
+  assert.doesNotMatch(read('app/loading.tsx'), /id=["']main-content["']/);
+  assert.doesNotMatch(read('app/services/loading.tsx'), /id=["']main-content["']/);
+  assert.equal((read('public/manifest.json').match(/"url": "\/marketplace"/) || []).length, 1);
   assert.match(read('components/marketplace/product-gallery.tsx'), /role="group"[\s\S]*aria-label=/);
   assert.match(read('components/marketplace/state-panel.tsx'), /role=\{kind === 'error' \? 'alert'/);
 });

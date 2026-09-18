@@ -45,5 +45,11 @@ export const config = {
     '/admin/:path*',
     '/driver/:path*',
     '/merchant/:path*',
+    '/account/:path*',
+    '/marketplace/cart',
+    '/marketplace/cart/:path*',
+    '/marketplace/checkout',
+    '/marketplace/checkout/:path*',
+    '/marketplace/orders/:path*',
   ],
 };

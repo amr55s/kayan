@@ -1,10 +1,18 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
+import { isMissingDatabaseRoutine } from '@/lib/supabase/missing-routine';
 import { onboardingDraftSchema, saveOnboardingDraftSchema, workspaceSummarySchema } from './validation';
 import type { OnboardingDraft, SaveOnboardingDraftInput, WorkspaceSummary } from './types';
 
 export class OnboardingConflictError extends Error {
   constructor() { super('onboarding_version_conflict'); this.name = 'OnboardingConflictError'; }
+}
+
+export class OnboardingUnavailableError extends Error {
+  constructor() {
+    super('onboarding_schema_unavailable');
+    this.name = 'OnboardingUnavailableError';
+  }
 }
 
 // Generated RPC signatures validate inputs; Zod validates each JSON response.
@@ -14,6 +22,7 @@ function onboardingRpcData({ data, error }: {
 }) {
   if (error) {
     if (error.message.includes('onboarding_version_conflict')) throw new OnboardingConflictError();
+    if (isMissingDatabaseRoutine(error)) throw new OnboardingUnavailableError();
     throw new Error(error.message);
   }
   return data;
@@ -21,12 +30,16 @@ function onboardingRpcData({ data, error }: {
 
 export async function readMyOnboardingDrafts(): Promise<OnboardingDraft[]> {
   const client = await createClient();
-  return onboardingDraftSchema.array().parse(onboardingRpcData(await client.rpc('read_my_onboarding_drafts')));
+  const result = await client.rpc('read_my_onboarding_drafts');
+  if (isMissingDatabaseRoutine(result.error)) return [];
+  return onboardingDraftSchema.array().parse(onboardingRpcData(result));
 }
 
 export async function listMyActivityWorkspaces(): Promise<WorkspaceSummary[]> {
   const client = await createClient();
-  return workspaceSummarySchema.array().parse(onboardingRpcData(await client.rpc('list_my_activity_workspaces')));
+  const result = await client.rpc('list_my_activity_workspaces');
+  if (isMissingDatabaseRoutine(result.error)) return [];
+  return workspaceSummarySchema.array().parse(onboardingRpcData(result));
 }
 
 export async function saveMyOnboardingDraft(input: SaveOnboardingDraftInput): Promise<OnboardingDraft> {

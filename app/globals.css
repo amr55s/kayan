@@ -80,14 +80,17 @@
   :root {
     color-scheme: light;
     --font-ibm-plex-arabic: "IBM Plex Sans Arabic", Tahoma, Arial, system-ui, sans-serif;
-    --kayan-black: #09090b;
+    --dairtak-navy: #09090b;
+    --dairtak-bg: #fafafa;
+    --kayan-black: var(--dairtak-navy);
     --kayan-white: #ffffff;
-    --kayan-surface: #fafafa;
+    --kayan-surface: var(--dairtak-bg);
     --kayan-muted: #71717a;
     --kayan-border: #e4e4e7;
     --dairtak-orange: #ff7a1a;
     --dairtak-orange-soft: #fff1e7;
-    --dairtak-orange-deep: #d95500;
+    /* Filled orange chrome uses this deeper swatch so white text stays readable. */
+    --dairtak-orange-deep: #c2410c;
     --dairtak-card-radius: 1.5rem;
     --dairtak-control-radius: 0.75rem;
     --dairtak-card-border: rgba(228, 228, 231, 0.7);
@@ -129,8 +132,8 @@
 }
 
 ::selection {
-  background: var(--dairtak-orange);
-  color: #09090b;
+  background: var(--dairtak-orange-deep);
+  color: #fff;
 }
 
 @media (max-width: 767px) {
@@ -198,9 +201,9 @@ footer,
 /* Opt-in HeroUI v3 theme. Also apply it to portalled Drawer/Select content,
    whose DOM does not inherit the originating page's custom properties. */
 .dairtak-theme {
-  --accent: var(--dairtak-orange);
-  --accent-foreground: var(--kayan-black);
-  --accent-hover: #ff8c38;
+  --accent: var(--dairtak-orange-deep);
+  --accent-foreground: var(--kayan-white);
+  --accent-hover: #9a3412;
   --accent-soft: var(--dairtak-orange-soft);
   --accent-soft-foreground: #9a3412;
   --background: var(--kayan-surface);
@@ -250,6 +253,7 @@ footer,
   border-radius: var(--dairtak-control-radius);
   background: var(--kayan-white);
   color: var(--kayan-black);
+  caret-color: var(--kayan-black);
   padding-inline: 0.875rem;
 }
 
@@ -272,12 +276,27 @@ footer,
     border-color var(--dairtak-motion-duration) ease;
 }
 
-.dairtak-button { background: var(--dairtak-orange); color: var(--kayan-black); }
-.dairtak-button:hover { background: #ff8c38; }
+.dairtak-button { background: var(--dairtak-orange-deep); color: #fff; }
+.dairtak-button:hover,
+.dairtak-button:focus-visible,
+.dairtak-button[data-pending],
+.dairtak-button[aria-disabled='true'] {
+  background: #9a3412;
+  color: #fff;
+}
 .dairtak-button-secondary { border-color: var(--kayan-border); background: var(--kayan-white); color: var(--kayan-black); }
 .dairtak-button-secondary:hover { background: var(--kayan-surface); }
 .dairtak-theme .button { min-height: 44px; min-width: 44px; }
-.dairtak-theme :is(.input, .select__trigger, .textarea) { border-radius: var(--dairtak-control-radius); }
+.dairtak-theme .button[data-variant='primary'] { color: #fff; }
+.dairtak-theme :is(.input, .select__trigger, .textarea) {
+  border-radius: var(--dairtak-control-radius);
+  color: var(--field-foreground);
+  caret-color: var(--field-foreground);
+}
+.dairtak-theme :is(.input, .textarea, .select__trigger)[data-focus-visible='true'],
+.dairtak-theme :is(.input, .textarea, .select__trigger):focus-visible {
+  border-color: var(--dairtak-orange);
+}
 
 /* Hide scrollbars visually while maintaining touch scroll functionality */
 .no-scrollbar::-webkit-scrollbar {

@@ -1,3 +1,4 @@
+import { MarketplaceNotice } from '@/components/marketplace/marketplace-notice';
 import { MerchantProductList } from '@/components/marketplace/merchant/product-list';
 import { StoreOnboardingPanel } from '@/components/marketplace/operational-setup-panels';
 import type { MerchantProductStatus, MerchantStockStatus } from '@/components/marketplace/merchant/view-models';
@@ -57,8 +58,8 @@ export default async function MerchantMarketplacePage({
 
   return (
     <>
-      {notice ? <p role="status" className="mb-4 border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">{notice}</p> : null}
-      {error ? <p role="alert" className="mb-4 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-900">{error}</p> : null}
+      {notice ? <MarketplaceNotice tone="success">{notice}</MarketplaceNotice> : null}
+      {error ? <MarketplaceNotice tone="danger">{error}</MarketplaceNotice> : null}
       <MerchantProductList
         viewModel={viewModel}
         actions={{

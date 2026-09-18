@@ -55,7 +55,7 @@ export function LoginForm() {
   }
 
   return (
-    <main id="main-content" className="dir-rtl flex min-h-screen w-full items-center justify-center bg-zinc-100 px-4 py-10 text-zinc-900">
+    <main id="main-content" className="dir-rtl flex min-h-screen w-full items-center justify-center bg-[var(--dairtak-bg)] px-4 py-10 text-[var(--dairtak-navy)]">
       <Card className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-2 text-zinc-900 shadow-lg sm:p-4">
         <Card.Header className="flex flex-col items-center gap-3 pb-2 pt-6 text-center sm:pt-8">
           <div className="flex h-24 w-full max-w-[19rem] items-center justify-center overflow-hidden rounded-2xl bg-white px-4 shadow-md ring-1 ring-zinc-200/80">

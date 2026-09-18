@@ -60,6 +60,7 @@ test('main header shares direct Google join and has no pre-auth role picker', ()
   assert.match(header, /beginGoogleSignIn\('\/onboarding'\)/);
   assert.doesNotMatch(header, /<Modal|choose\(onOpenDriverModal\)|choose\(onOpenAddModal\)/);
   assert.match(header, /dashboardPath \?\? '\/signin'/);
+  assert.match(header, /userData\.user \? '\/workspaces' : null/);
 });
 
 test('legacy onboarding explicitly switches sessions instead of looping through authenticated fastpath', () => {

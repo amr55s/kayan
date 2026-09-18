@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { MarketplaceCart } from '@/components/marketplace/cart-view';
+import { MarketplaceNotice } from '@/components/marketplace/marketplace-notice';
 import {
   applyMarketplaceCartCouponAction,
   removeMarketplaceCartCouponAction,
@@ -49,16 +50,8 @@ export default async function MarketplaceCartPage({
 
   return (
     <>
-      {notice ? (
-        <p role="status" className="mb-5 border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-900">
-          {notice}
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="mb-5 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-900">
-          {error}
-        </p>
-      ) : null}
+      {notice ? <MarketplaceNotice tone="success">{notice}</MarketplaceNotice> : null}
+      {error ? <MarketplaceNotice tone="danger">{error}</MarketplaceNotice> : null}
       <MarketplaceCart
         model={result.model}
         updateLineAction={updateMarketplaceCartItemAction}

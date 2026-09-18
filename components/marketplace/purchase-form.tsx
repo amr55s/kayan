@@ -5,6 +5,7 @@ import { Input } from '@heroui/react/input';
 import { Label } from '@heroui/react/label';
 import { RadioGroup } from '@heroui/react/radio-group';
 import { Radio } from '@heroui/react/radio';
+import { Minus, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { formatMarketplaceMoney } from './format';
 import type {
@@ -73,21 +74,43 @@ export function MarketplacePurchaseForm({
         <Label.Root htmlFor="marketplace-quantity" className={styles.label}>
           الكمية
         </Label.Root>
-        <Input.Root
-          id="marketplace-quantity"
-          name="quantity"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={Math.max(1, availableLimit)}
-          value={String(quantity)}
-          className={styles.quantityInput}
-          onChange={(event) => {
-            const next = Number.parseInt(event.target.value, 10);
-            if (!Number.isFinite(next)) return;
-            setQuantity(Math.min(Math.max(1, next), Math.max(1, availableLimit)));
-          }}
-        />
+        <div className={styles.quantityStepper}>
+          <Button.Root
+            type="button"
+            isIconOnly
+            className={styles.iconButton}
+            aria-label="تقليل الكمية"
+            isDisabled={quantity <= 1 || !purchasable}
+            onPress={() => setQuantity((current) => Math.max(1, current - 1))}
+          >
+            <Minus className="size-4" aria-hidden="true" />
+          </Button.Root>
+          <Input.Root
+            id="marketplace-quantity"
+            name="quantity"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={Math.max(1, availableLimit)}
+            value={String(quantity)}
+            className={styles.quantityInput}
+            onChange={(event) => {
+              const next = Number.parseInt(event.target.value, 10);
+              if (!Number.isFinite(next)) return;
+              setQuantity(Math.min(Math.max(1, next), Math.max(1, availableLimit)));
+            }}
+          />
+          <Button.Root
+            type="button"
+            isIconOnly
+            className={styles.iconButton}
+            aria-label="زيادة الكمية"
+            isDisabled={quantity >= availableLimit || !purchasable}
+            onPress={() => setQuantity((current) => Math.min(Math.max(1, availableLimit), current + 1))}
+          >
+            <Plus className="size-4" aria-hidden="true" />
+          </Button.Root>
+        </div>
       </div>
 
       <strong className={styles.price}>

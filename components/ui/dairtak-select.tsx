@@ -9,22 +9,39 @@ type DairtakSelectProps = {
   name: string;
   label: string;
   defaultValue?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
   options: readonly { value: string; label: string }[];
   className?: string;
+  isRequired?: boolean;
 };
 
 /** HeroUI handles focus/typeahead; the hidden input keeps standard GET forms. */
-export function DairtakSelect({ name, label, defaultValue = '', options, className }: DairtakSelectProps) {
-  const [value, setValue] = useState(defaultValue);
+export function DairtakSelect({
+  name,
+  label,
+  defaultValue = '',
+  value: valueProp,
+  onValueChange,
+  options,
+  className,
+  isRequired,
+}: DairtakSelectProps) {
+  const [uncontrolledValue, setUncontrolledValue] = useState(defaultValue);
+  const value = valueProp !== undefined ? valueProp : uncontrolledValue;
   const selectedIndex = options.findIndex((option) => option.value === value);
 
   return (
     <Select
       fullWidth
+      isRequired={isRequired}
       value={selectedIndex >= 0 ? String(selectedIndex) : null}
       onChange={(key) => {
         const option = options[Number(key)];
-        if (key !== null && !Array.isArray(key) && option) setValue(option.value);
+        if (key !== null && !Array.isArray(key) && option) {
+          if (valueProp === undefined) setUncontrolledValue(option.value);
+          onValueChange?.(option.value);
+        }
       }}
       className={className}
     >

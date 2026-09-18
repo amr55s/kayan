@@ -8,6 +8,7 @@ import { handleGoogleOAuthCallback } from '@/lib/auth/callback-flow';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 import { createClient } from '@/lib/supabase/server';
 import { resolveOAuthSiteOrigin } from '@/lib/auth/oauth-origin';
+import { ensureMarketplaceCustomerProfile } from '@/lib/commerce/ensure-customer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -53,10 +54,7 @@ export async function GET(request: Request) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) throw error;
       },
-      ensureCustomer: async () => {
-        const { data, error } = await (supabase as any).rpc('ensure_marketplace_customer');
-        if (error || !data) throw error || new Error('customer_profile_missing');
-      },
+      ensureCustomer: () => ensureMarketplaceCustomerProfile(supabase as never),
       claimGuestCart: claimMarketplaceGuestCart,
       openConversation: (intent) => openMarketplaceConversationAction(
         { status: 'idle' },

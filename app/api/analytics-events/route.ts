@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isMissingDatabaseRoutine } from '@/lib/supabase/missing-routine';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 
 export const runtime = 'nodejs';
@@ -136,7 +137,14 @@ export async function POST(request: Request) {
     const visitorHash = createHash('sha256')
       .update(`${parsed.data.visitorId}:${secret}`)
       .digest('hex');
-    const admin = createAdminClient();
+
+    let admin;
+    try {
+      admin = createAdminClient();
+    } catch {
+      return new Response(null, { status: 204 });
+    }
+
     const { error } = await (admin as any).rpc('record_site_analytics_v2', {
       p_visitor_hash: visitorHash,
       p_event_name: parsed.data.eventName,
@@ -146,7 +154,7 @@ export async function POST(request: Request) {
       p_campaign_key: parsed.data.campaignKey,
       p_limit: 120,
     });
-    if (error) {
+    if (error && !isMissingDatabaseRoutine(error)) {
       logSafeServerFailure('warn', 'analytics_record_failed', { failure: error, requestId });
     }
     return new Response(null, { status: 204 });

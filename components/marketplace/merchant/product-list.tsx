@@ -1,4 +1,5 @@
 import { DairtakLink } from '@/components/ui/dairtak-link';
+import { DairtakSelect } from '@/components/ui/dairtak-select';
 import Image from 'next/image';
 import { Archive, PackageOpen, Search, Send } from 'lucide-react';
 import { Button } from '@heroui/react/button';
@@ -132,32 +133,22 @@ export function MerchantProductList({
             className={styles.field}
           />
         </div>
-        <label className={styles.fieldGroup} htmlFor="merchant-catalog-status">
-          <span className={styles.label}>حالة النشر</span>
-          <select
-            id="merchant-catalog-status"
+        <div className={styles.fieldGroup}>
+          <DairtakSelect
+            label="حالة النشر"
             name="status"
             defaultValue={viewModel.filters.status}
-            className={styles.select}
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.fieldGroup} htmlFor="merchant-catalog-stock">
-          <span className={styles.label}>المخزون</span>
-          <select
-            id="merchant-catalog-stock"
+            options={statusOptions}
+          />
+        </div>
+        <div className={styles.fieldGroup}>
+          <DairtakSelect
+            label="المخزون"
             name="stock"
             defaultValue={viewModel.filters.stock}
-            className={styles.select}
-          >
-            {stockOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-        </label>
+            options={stockOptions}
+          />
+        </div>
         <Button.Root type="submit" className={styles.primaryButton}>
           <Search size={16} aria-hidden="true" />
           تطبيق

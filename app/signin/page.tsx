@@ -46,7 +46,7 @@ export default async function SignInPage({
   }
 
   return (
-    <main id="main-content" className="flex min-h-screen items-center justify-center bg-[var(--kayan-surface)] px-4 py-10">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-[var(--dairtak-bg)] px-4 py-10">
       <section className="soft-card w-full max-w-md p-6 sm:p-8" aria-labelledby="signin-title">
         <Link href="/" aria-label="العودة إلى ديرتك" className="mx-auto flex h-20 max-w-[250px] items-center justify-center overflow-hidden rounded-2xl bg-white px-3 ring-1 ring-zinc-200">
           <BrandLogo variant="full" className="h-auto w-full" priority />

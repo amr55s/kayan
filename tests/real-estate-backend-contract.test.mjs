@@ -39,7 +39,8 @@ test('approval is atomic and the subtype is private except for approved public r
 
 test('real-estate reads degrade gracefully before the additive migration and readiness requires its marker', () => {
   assert.match(queries, /place_real_estate\(\*\)/u);
-  assert.match(queries, /if \(result\.error\)[\s\S]*\.select\('\*'\)/u);
+  assert.match(queries, /PUBLIC_PLACE_COLUMNS/u);
+  assert.match(queries, /if \(!result\.error\) return mapPlaces\(result\.data\)/u);
   assert.match(releaseMarker, /'version', '20260830115034'/u);
   assert.match(releaseMarker, /reviewed_real_estate_listings/u);
   const activeMarker = read('supabase/migrations/20260831060617_onboarding_release_marker.sql');

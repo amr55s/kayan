@@ -25,6 +25,8 @@ test('Performance: Core marketplace shells and views remain pure Server Componen
 test('Performance: Subpath imports are used for tree-shakeable HeroUI primitives', () => {
   const files = [
     'components/marketplace/marketplace-shell.tsx',
+    'components/marketplace/marketplace-nav.tsx',
+    'components/marketplace/marketplace-notice.tsx',
     'components/marketplace/role-shell.tsx',
     'components/marketplace/state-panel.tsx',
     'components/marketplace/product-card.tsx',

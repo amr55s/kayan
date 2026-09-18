@@ -1,5 +1,4 @@
 import { createPublicClient } from './public';
-import { createAdminClient } from './admin';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 import type { Driver, Place, StoreCoupon } from '@/types';
 import type { RealEstateDetailsDraft } from '@/lib/listings/config';
@@ -39,13 +38,19 @@ async function settle<T>(work: Promise<T>): Promise<QueryOutcome<T>> {
   }
 }
 
+function queryTimeoutError(): Error & { code: string } {
+  const error = new Error('query_timeout') as Error & { code: string };
+  error.code = 'query_timeout';
+  return error;
+}
+
 async function withTimeout<T>(
   promise: PromiseLike<T> | Promise<T>,
   timeoutMs = 8_000,
 ): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('انتهت مهلة تحميل ديرتك.')), timeoutMs);
+    timeoutId = setTimeout(() => reject(queryTimeoutError()), timeoutMs);
   });
 
   try {
@@ -114,41 +119,51 @@ export function mergePublicDrivers(
   });
 }
 
-async function fetchPlaces(): Promise<Place[]> {
-  const supabase = createPublicClient();
-  let result: any = await withTimeout(
-    supabase
-      .from('places')
-      .select('*, store_coupons(*), place_real_estate(*)')
-      .order('is_featured', { ascending: false })
-      .order('created_at', { ascending: false }),
-  );
+const PUBLIC_PLACE_COLUMNS = [
+  'id',
+  'title',
+  'category',
+  'description',
+  'images',
+  'is_featured',
+  'created_at',
+  'address',
+  'map_url',
+  'view_count',
+  'recommend_count',
+].join(', ');
 
-  // Keep the directory available during a staged deployment where the app
-  // reaches production a few seconds before the additive coupon migration.
-  if (result.error) {
-    result = await withTimeout(
+async function queryPlaces(
+  supabase: ReturnType<typeof createPublicClient>,
+  columns: string,
+): Promise<{ data: unknown; error: unknown }> {
+  try {
+    return await withTimeout(
       supabase
         .from('places')
-        .select('*')
+        .select(columns)
         .order('is_featured', { ascending: false })
         .order('created_at', { ascending: false }),
     );
+  } catch (error) {
+    return { data: null, error };
   }
+}
 
-  if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []).map((row: Place & {
+function mapPlaces(rows: unknown): Place[] {
+  return ((rows ?? []) as Array<Place & {
     store_coupons?: StoreCoupon[];
     place_real_estate?: Array<{
       area_sqm: number | null; bathrooms: number | null; floor: number | null;
       furnishing: string | null; offer_type: string; price_egp: number;
       property_type: string; rooms: number | null;
     }>;
-  }) => {
+  }>).map((row) => {
     const { store_coupons: coupons, place_real_estate: realEstateRows, ...place } = row;
     const realEstate = realEstateRows?.[0];
     return {
       ...place,
+      phone: place.phone ?? '',
       coupons: (coupons ?? []).sort((left, right) =>
         Number(right.is_featured) - Number(left.is_featured)
         || left.display_order - right.display_order,
@@ -169,21 +184,74 @@ async function fetchPlaces(): Promise<Place[]> {
   });
 }
 
-async function fetchLegacyDrivers(): Promise<LegacyDriverRow[]> {
-  const supabase = createAdminClient();
-  const result: any = await withTimeout(
-    (supabase as any).rpc('list_public_legacy_drivers'),
-  );
+async function fetchPlaces(): Promise<Place[]> {
+  const supabase = createPublicClient();
+  const attempts = [
+    `${PUBLIC_PLACE_COLUMNS}, store_coupons(*), place_real_estate(*)`,
+    `${PUBLIC_PLACE_COLUMNS}, store_coupons(*)`,
+    PUBLIC_PLACE_COLUMNS,
+  ];
+  let lastError: unknown;
+  for (const columns of attempts) {
+    const result = await queryPlaces(supabase, columns);
+    if (!result.error) return mapPlaces(result.data);
+    lastError = result.error;
+  }
+  throw lastError instanceof Error ? lastError : new Error('places_query_failed');
+}
 
-  if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []) as LegacyDriverRow[];
+function maskPublicDriverContacts<T extends { phone?: string | null; whatsapp?: string | null }>(
+  row: T,
+): T {
+  return {
+    ...row,
+    phone: '',
+    whatsapp: null,
+  };
+}
+
+async function fetchLegacyDrivers(): Promise<LegacyDriverRow[]> {
+  try {
+    const supabase = createPublicClient();
+    try {
+      const rpcResult: any = await withTimeout(
+        (supabase as any).rpc('list_public_legacy_drivers'),
+      );
+      if (!rpcResult.error) {
+        return (rpcResult.data ?? []) as LegacyDriverRow[];
+      }
+    } catch {
+      // Fall through to the published drivers table.
+    }
+
+    const tableResult: any = await withTimeout(
+      supabase
+        .from('drivers')
+        .select('id, name, vehicle_type, is_active, active_until, created_at')
+        .order('created_at', { ascending: false }),
+    );
+    if (!tableResult.error) {
+      return ((tableResult.data ?? []) as LegacyDriverRow[]).map(maskPublicDriverContacts);
+    }
+  } catch {
+    // An empty public directory is preferable to failing the homepage.
+  }
+  return [];
 }
 
 async function fetchRegisteredDrivers(): Promise<RegisteredDriverRow[]> {
-  const supabase = createAdminClient();
-  const result = await withTimeout(supabase.rpc('list_public_registered_drivers'));
-  if (result.error) throw new Error(result.error.message);
-  return (result.data ?? []) as RegisteredDriverRow[];
+  const supabase = createPublicClient();
+  try {
+    const result: any = await withTimeout(
+      supabase.rpc('list_public_registered_drivers'),
+    );
+    if (!result.error) {
+      return (result.data ?? []) as RegisteredDriverRow[];
+    }
+  } catch {
+    // Missing or timed-out registered-driver RPC is optional on older schemas.
+  }
+  return [];
 }
 
 export async function fetchPublicDrivers(): Promise<Driver[]> {
@@ -217,16 +285,14 @@ export async function fetchHomePageData(): Promise<{
     errors.push('الأماكن');
   }
   if (legacyResult.status === 'rejected') {
-    logSafeServerFailure('error', 'public_legacy_drivers_query_failed', {
-      failure: legacyResult.reason,
+    logSafeServerFailure('warn', 'public_legacy_drivers_unavailable', {
+      failure: 'drivers_unavailable',
     });
-    errors.push('الكباتن المسجلون سريعاً');
   }
   if (registeredResult.status === 'rejected') {
-    logSafeServerFailure('error', 'public_registered_drivers_query_failed', {
-      failure: registeredResult.reason,
+    logSafeServerFailure('warn', 'public_registered_drivers_unavailable', {
+      failure: 'drivers_unavailable',
     });
-    errors.push('كباتن نظام التشغيل');
   }
 
   return {

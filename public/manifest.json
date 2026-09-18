@@ -36,6 +36,12 @@
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
     },
     {
+      "name": "متجر ديرتك",
+      "short_name": "المتجر",
+      "url": "/marketplace",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
       "name": "دليل الاستخدام",
       "short_name": "الدليل",
       "url": "/guide",

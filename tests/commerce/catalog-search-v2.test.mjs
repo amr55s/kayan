@@ -37,4 +37,8 @@ test('catalog UI preserves every filter and does not expose page-number paginati
   }
   assert.match(catalog, /nextCursor/u);
   assert.doesNotMatch(catalog, /visiblePages|pageCount/u);
+  assert.match(page, /addToCartAction=\{addMarketplaceCartItemAction\}/u);
+  const loader = await readFile(new URL('../../lib/commerce/catalog.ts', import.meta.url), 'utf8');
+  assert.match(loader, /isMissingDatabaseRoutine\(error\)/u);
+  assert.match(loader, /list_marketplace_catalog_v2/u);
 });

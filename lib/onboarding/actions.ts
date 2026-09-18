@@ -3,12 +3,13 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { saveMyOnboardingDraft, OnboardingConflictError } from './repository';
+import { saveMyOnboardingDraft, OnboardingConflictError, OnboardingUnavailableError } from './repository';
+import { isMissingDatabaseRoutine } from '@/lib/supabase/missing-routine';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 import type { OnboardingDraft, SaveOnboardingDraftInput } from './types';
 
 export type DraftSaveResult = { success: true; draft: OnboardingDraft }
-  | { success: false; code: 'conflict' | 'session' | 'failed'; message: string };
+  | { success: false; code: 'conflict' | 'session' | 'failed' | 'schema'; message: string };
 
 export async function saveOnboardingDraftAction(input: SaveOnboardingDraftInput): Promise<DraftSaveResult> {
   try {
@@ -19,6 +20,13 @@ export async function saveOnboardingDraftAction(input: SaveOnboardingDraftInput)
   } catch (error) {
     if (error instanceof OnboardingConflictError) {
       return { success: false, code: 'conflict', message: 'توجد نسخة أحدث من مسودتك في تبويب آخر. لم نستبدلها بتعديلات هذا التبويب.' };
+    }
+    if (error instanceof OnboardingUnavailableError) {
+      return {
+        success: false,
+        code: 'schema',
+        message: 'حفظ المسودة غير متاح على قاعدة البيانات الحالية. تعديلاتك ما زالت في هذه الصفحة؛ أعد المحاولة بعد تطبيق ترحيلات الأنشطة.',
+      };
     }
     logSafeServerFailure('warn', 'onboarding_draft_save_failed', { failure: error });
     return { success: false, code: 'failed', message: 'لم تُحفظ آخر التعديلات. تحقق من الاتصال ثم أعد المحاولة.' };
@@ -42,6 +50,8 @@ export async function submitOnboardingDraftAction(input: { draftId: string; expe
         ? 'المسودة تغيرت في تبويب آخر. افتح أحدث نسخة قبل الإرسال.'
         : error.message.includes('onboarding_incomplete')
           ? 'راجع البيانات المطلوبة والصور قبل الإرسال.'
+          : isMissingDatabaseRoutine(error)
+            ? 'إرسال الطلب غير متاح على قاعدة البيانات الحالية. تقدر تتصفح الدليل لحين تطبيق ترحيلات الأنشطة.'
           : 'تعذر إرسال الطلب الآن. مسودتك محفوظة ويمكنك المحاولة مرة أخرى.';
       return { success: false, message };
     }

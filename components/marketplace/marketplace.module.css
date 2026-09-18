@@ -13,20 +13,6 @@
   backdrop-filter: blur(24px);
 }
 
-.skipLink {
-  position: fixed;
-  inset-block-start: 0.5rem;
-  inset-inline-start: 1rem;
-  z-index: 150;
-  transform: translateY(-160%);
-  border-radius: var(--dairtak-control-radius);
-  background: var(--kayan-black);
-  color: var(--kayan-white);
-  padding: 0.75rem 1rem;
-}
-
-.skipLink:focus { transform: none; }
-
 .marketplaceNav {
   display: flex;
   gap: 0.375rem;
@@ -336,6 +322,7 @@
 .dangerButton,
 .iconButton {
   display: inline-flex;
+  min-width: 2.75rem;
   min-height: 2.875rem;
   align-items: center;
   justify-content: center;
@@ -491,6 +478,16 @@
   color: var(--kayan-muted);
   font-size: 0.75rem;
   font-weight: 650;
+}
+
+a.storeName {
+  text-decoration: none;
+}
+
+a.storeName:hover {
+  color: var(--dairtak-orange-deep);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .productTitleLink {
@@ -830,7 +827,8 @@
 
 .cartLine {
   display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr);
+  grid-template-columns: 5rem minmax(0, 1fr) auto;
+  align-items: start;
   gap: 0.85rem;
   padding: 1rem;
   border-block-end: 1px solid #f4f4f5;
@@ -874,12 +872,48 @@
   margin-block-start: 0.75rem;
 }
 
+.quantityStepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.quantityValue {
+  min-width: 1.75rem;
+  color: var(--kayan-black);
+  font-size: 0.95rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
 .quantityInput {
-  width: 5rem;
+  width: 4.25rem;
   min-height: 2.75rem;
   border: 1px solid #d4d4d8;
   border-radius: var(--dairtak-control-radius);
-  padding-inline: 0.6rem;
+  padding-inline: 0.4rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.quantityStepper .iconButton {
+  padding-inline: 0;
+}
+
+.breadcrumbs {
+  margin-block-end: 1rem;
+}
+
+.relatedSection {
+  margin-block-start: 2.5rem;
+}
+
+.relatedTitle {
+  margin: 0 0 1rem;
+  color: var(--kayan-black);
+  font-size: 1.15rem;
+  font-weight: 850;
 }
 
 .summaryHeader {
@@ -1073,6 +1107,10 @@
   .cartLine {
     grid-template-columns: 6rem minmax(0, 1fr) auto;
     align-items: center;
+  }
+
+  .cartLine .price {
+    white-space: nowrap;
   }
 
   .formGrid {

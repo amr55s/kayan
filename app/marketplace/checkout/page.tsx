@@ -1,5 +1,6 @@
 import { MarketplaceCodCheckout } from '@/components/marketplace/checkout-form';
 import { redirect } from 'next/navigation';
+import { MarketplaceNotice } from '@/components/marketplace/marketplace-notice';
 import { MarketplaceStatePanel } from '@/components/marketplace/state-panel';
 import { TurnstileWidget } from '@/components/security/TurnstileWidget';
 import { submitMarketplaceCheckoutAction } from '@/app/marketplace/actions';
@@ -73,11 +74,7 @@ export default async function MarketplaceCheckoutPage({
 
   return (
     <>
-      {error ? (
-        <p role="alert" className="mb-5 border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-900">
-          {error}
-        </p>
-      ) : null}
+      {error ? <MarketplaceNotice tone="danger">{error}</MarketplaceNotice> : null}
       <MarketplaceCodCheckout
         key={crypto.randomUUID()}
         model={model}

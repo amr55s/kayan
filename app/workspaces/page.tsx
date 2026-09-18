@@ -18,8 +18,7 @@ export default async function WorkspacesPage() {
     listMyActivityWorkspaces(), readMyOnboardingDrafts(),
     client.from('account_requests').select('workspace_id,status,rejection_reason').eq('auth_user_id', user.id),
   ]);
-  if (requests.error) throw new Error('workspace_requests_unavailable');
-  const requestRows = requests.data;
+  const requestRows = requests.error ? [] : requests.data;
   return <><Header /><main id="main-content" className={`dairtak-theme ${styles.page}`}>
     <div className={styles.intro}><h1>مساحات عملك في ديرتك</h1><p>كل نشاط له حالته وصلاحياته. تقدر تشتري وتتواصل بحسابك، حتى أثناء مراجعة نشاط جديد.</p></div>
     <WorkspaceGuide userId={user.id} />

@@ -1,3 +1,4 @@
+import { addMarketplaceCartItemAction } from '@/app/marketplace/actions';
 import { MarketplaceCatalog } from '@/components/marketplace/catalog-view';
 import { fetchMarketplaceCatalog } from '@/lib/commerce/catalog';
 import { createSelectedStoreChatEntry } from '@/lib/commerce/store-chat';
@@ -62,5 +63,11 @@ export default async function MarketplacePage({
     if (storeChat && recovery) storeChat = { ...storeChat, recovery };
   }
 
-  return <MarketplaceCatalog model={model} storeChat={storeChat} />;
+  return (
+    <MarketplaceCatalog
+      model={model}
+      storeChat={storeChat}
+      addToCartAction={addMarketplaceCartItemAction}
+    />
+  );
 }

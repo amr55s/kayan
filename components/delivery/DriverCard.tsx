@@ -101,35 +101,33 @@ export function DriverCard({
         </div>
 
         <div className="grid grid-cols-2 gap-1.5 rounded-[18px] border border-zinc-100 bg-zinc-50 p-1.5">
-          <Button
-            as="a"
+          <a
             href={formatWhatsAppUrl(
               driver.whatsapp || driver.phone,
               'السلام عليكم، محتاج توصيل طلب دليفري',
             )}
             target="_blank"
             rel="noopener noreferrer"
-            onPress={() => trackSiteEvent('whatsapp_click', {
+            onClick={() => trackSiteEvent('whatsapp_click', {
               targetType: 'driver',
               targetKey: driver.id,
             })}
-            startContent={<MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />}
-            className="min-h-11 border border-zinc-200 bg-white text-xs font-bold text-zinc-800 shadow-sm hover:bg-zinc-100"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2 text-xs font-bold text-zinc-800 shadow-sm hover:bg-zinc-100"
           >
+            <MessageCircle className="size-4 text-[var(--dairtak-orange)]" aria-hidden="true" />
             واتساب
-          </Button>
-          <Button
-            as="a"
+          </a>
+          <a
             href={`tel:${formatPhoneForTel(driver.phone)}`}
-            onPress={() => trackSiteEvent('phone_click', {
+            onClick={() => trackSiteEvent('phone_click', {
               targetType: 'driver',
               targetKey: driver.id,
             })}
-            startContent={<Phone className="size-4" aria-hidden="true" />}
-            className="min-h-11 bg-zinc-950 text-xs font-black text-white hover:bg-zinc-800"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-zinc-950 px-2 text-xs font-black text-white hover:bg-zinc-800"
           >
+            <Phone className="size-4" aria-hidden="true" />
             اتصال
-          </Button>
+          </a>
         </div>
       </CardBody>
     </Card>
