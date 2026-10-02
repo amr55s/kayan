@@ -135,6 +135,22 @@ const orderDetailSchema = orderSummarySchema.extend({
     default_defect_deadline: timestamp.nullable(),
   }),
   return_requests: z.array(returnRequestSchema).max(100),
+  // Present once the wallet fee model is migrated; absent on older schemas.
+  accepted: z.boolean().optional(),
+  delivery_zone_name: z.string().max(180).nullable().optional(),
+  store_contact: z.object({
+    phone: z.string().max(20), whatsapp: z.string().max(20).nullable(),
+  }).nullable().optional(),
+  platform_fee: z.object({
+    type: z.enum(['order_fee', 'free_order', 'subscription_order']),
+    amount_piastres: databaseMoney,
+  }).nullable().optional(),
+  platform_fee_quote: z.object({
+    fee_piastres: databaseMoney,
+    free_orders_remaining: z.number().int().nonnegative(),
+    subscription_active: z.boolean(),
+    balance_piastres: databaseMoney,
+  }).nullable().optional(),
 });
 
 export type MarketplaceOrderSummary = {
@@ -222,6 +238,18 @@ export type MarketplaceOrderDetail = MarketplaceOrderSummary & {
       restockQuantity: number;
     }>;
   }>;
+  /** False while the store has not accepted yet; customer details stay hidden from it. */
+  accepted: boolean;
+  deliveryZoneName: string | null;
+  /** The store's phone, released to the customer once the order is accepted. */
+  storeContact: { phone: string; whatsapp: string | null } | null;
+  platformFee: { type: 'order_fee' | 'free_order' | 'subscription_order'; amountMinor: number } | null;
+  platformFeeQuote: {
+    feeMinor: number;
+    freeOrdersRemaining: number;
+    subscriptionActive: boolean;
+    balanceMinor: number;
+  } | null;
 };
 
 export class MarketplaceOperationsError extends Error {
@@ -361,6 +389,19 @@ export async function getMyMarketplaceOrder(orderId: string): Promise<Marketplac
         restockQuantity: item.restock_quantity,
       })),
     })),
+    accepted: value.accepted ?? value.status !== 'pending_confirmation',
+    deliveryZoneName: value.delivery_zone_name ?? null,
+    storeContact: value.store_contact ?? null,
+    platformFee: value.platform_fee ? {
+      type: value.platform_fee.type,
+      amountMinor: databaseMinorToNumber(value.platform_fee.amount_piastres),
+    } : null,
+    platformFeeQuote: value.platform_fee_quote ? {
+      feeMinor: databaseMinorToNumber(value.platform_fee_quote.fee_piastres),
+      freeOrdersRemaining: value.platform_fee_quote.free_orders_remaining,
+      subscriptionActive: value.platform_fee_quote.subscription_active,
+      balanceMinor: databaseMinorToNumber(value.platform_fee_quote.balance_piastres),
+    } : null,
   };
 }
 

@@ -159,16 +159,21 @@ export async function transitionMarketplaceOrderAction(formData: FormData): Prom
         ? 'delivery_proof_required'
         : /cod_amount_mismatch/u.test(message)
           ? 'cod_amount_mismatch'
-          : /invalid_or_unauthorized|order_access_required/u.test(message)
-            ? 'transition_not_allowed'
-            : 'service_unavailable';
+          : /wallet_balance_insufficient/u.test(message)
+            ? 'wallet_balance_insufficient'
+            : /inventory_reservation_unavailable|inventory_commit_failed/u.test(message)
+              ? 'inventory_unavailable'
+              : /invalid_or_unauthorized|order_access_required/u.test(message)
+                ? 'transition_not_allowed'
+                : 'service_unavailable';
     redirect(resultUrl(parsed.data.returnTo, 'error', code));
   }
   revalidatePath('/account/orders');
   revalidatePath('/merchant/marketplace/orders');
   revalidatePath('/admin/marketplace/orders');
   revalidatePath('/driver/marketplace');
-  redirect(resultUrl(parsed.data.returnTo, 'notice', 'status_updated'));
+  revalidatePath('/merchant/marketplace/wallet');
+  redirect(resultUrl(parsed.data.returnTo, 'notice', parsed.data.next === 'confirmed' ? 'order_accepted' : 'status_updated'));
 }
 
 export async function createPartialMarketplaceReturnAction(formData: FormData): Promise<void> {

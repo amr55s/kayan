@@ -11,6 +11,7 @@ import {
   reorderMyMarketplaceStoreMedia,
   undoMyMarketplaceStoreMediaDeletion,
 } from '@/lib/commerce/operational-setup';
+import { saveMyStoreContact, WalletError } from '@/lib/commerce/wallet';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -287,5 +288,21 @@ export async function deactivateMerchantMarketplaceCouponAction(form: FormData):
       p_idempotency_key: key(form),
     });
   } catch (error) { destination = `/merchant/marketplace/coupons?store=${encodeURIComponent(storeId)}&error=${errorCode(error)}`; }
+  refresh(); redirect(destination);
+}
+
+export async function saveStoreContactAction(form: FormData): Promise<void> {
+  const storeId = text(form, 'storeId');
+  const base = `/merchant/marketplace/settings?store=${encodeURIComponent(storeId)}`;
+  let destination = `${base}&notice=contact_saved#contact`;
+  try {
+    if (!UUID.test(storeId)) throw new MarketplaceSetupError('invalid_input');
+    await saveMyStoreContact({ storeId, phone: text(form, 'phone'), whatsapp: nullable(text(form, 'whatsapp')) });
+  } catch (error) {
+    const code = error instanceof WalletError
+      ? (error.code === 'access_denied' ? 'access_denied' : error.code === 'invalid_input' ? 'invalid_input' : 'service_unavailable')
+      : errorCode(error);
+    destination = `${base}&error=${code}#contact`;
+  }
   refresh(); redirect(destination);
 }

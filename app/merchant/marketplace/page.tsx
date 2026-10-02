@@ -9,6 +9,8 @@ import {
 import { fetchMerchantProductList } from '@/lib/commerce/merchant-products';
 import { listMyManageableMerchants } from '@/lib/commerce/operational-setup';
 import { createMarketplaceStoreAction } from '@/app/merchant/marketplace/setup-actions';
+import { StoreLaunchChecklist } from '@/components/marketplace/merchant/launch-checklist';
+import { getMyStoreLaunchChecklist } from '@/lib/commerce/wallet';
 
 const productStatuses = new Set<MerchantProductStatus>(['draft', 'pending_review', 'active', 'rejected', 'archived']);
 const stockStatuses = new Set<MerchantStockStatus>(['in_stock', 'low_stock', 'out_of_stock', 'not_tracked']);
@@ -56,8 +58,11 @@ export default async function MerchantMarketplacePage({
     return <StoreOnboardingPanel merchants={merchants} action={createMarketplaceStoreAction} />;
   }
 
+  const checklist = await getMyStoreLaunchChecklist(viewModel.store.id);
+
   return (
     <>
+      {checklist ? <StoreLaunchChecklist storeId={viewModel.store.id} checklist={checklist} /> : null}
       {notice ? <MarketplaceNotice tone="success">{notice}</MarketplaceNotice> : null}
       {error ? <MarketplaceNotice tone="danger">{error}</MarketplaceNotice> : null}
       <MerchantProductList

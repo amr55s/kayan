@@ -54,6 +54,7 @@ export const orderEventTypeLabel = fallback(orderEventTypeLabels);
 /** Every `?notice=` / `?error=` code the operations actions can redirect with. */
 const operationsMessages: Record<string, string> = {
   status_updated: 'تم تحديث حالة الطلب.',
+  order_accepted: 'تم قبول الطلب. بيانات العميل ظاهرة الآن لتتواصل معه وترتب التوصيل.',
   review_saved: 'تم حفظ تقييمك.',
   return_requested: 'تم إرسال طلب الإرجاع للمراجعة.',
   return_approved: 'تمت الموافقة على طلب الإرجاع.',
@@ -80,6 +81,8 @@ const operationsMessages: Record<string, string> = {
   delivery_proof_required: 'يجب رفع إثبات التسليم قبل إغلاق الطلب.',
   cod_amount_mismatch: 'مبلغ التحصيل لا يطابق قيمة الطلب.',
   transition_not_allowed: 'هذا الإجراء غير متاح لحالة الطلب الحالية.',
+  wallet_balance_insufficient: 'رصيد المحفظة لا يكفي لرسم قبول هذا الطلب. اشحن الرصيد ثم اقبل الطلب.',
+  inventory_unavailable: 'انتهى حجز المخزون لهذا الطلب أو لم تعد الكمية متاحة.',
   verified_purchase_required: 'التقييم متاح فقط بعد تسليم المنتج.',
   review_already_exists: 'تم تسجيل تقييم لهذا المنتج بالفعل. حدّث الصفحة لعرضه.',
   service_unavailable: 'تعذر تنفيذ العملية الآن. حاول مرة أخرى.',

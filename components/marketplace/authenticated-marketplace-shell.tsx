@@ -16,6 +16,7 @@ const roleNavigation: Record<MarketplaceRole, MarketplaceNavigationItem[]> = {
     { href: '/merchant/marketplace', label: 'المنتجات' },
     { href: '/merchant/marketplace/new', label: 'منتج جديد' },
     { href: '/merchant/marketplace/orders', label: 'الطلبات' },
+    { href: '/merchant/marketplace/wallet', label: 'المحفظة' },
     { href: '/merchant/marketplace/excel', label: 'Excel' },
     { href: '/merchant/marketplace/coupons', label: 'الكوبونات' },
     { href: '/merchant/marketplace/settings', label: 'إعداد المتجر' },
@@ -29,6 +30,7 @@ const roleNavigation: Record<MarketplaceRole, MarketplaceNavigationItem[]> = {
   ],
   admin: [
     { href: '/admin', label: 'إدارة المنصة' },
+    { href: '/admin/marketplace/dashboard', label: 'لوحة المتابعة' },
     { href: '/admin/marketplace/chat', label: 'مراقبة الرسائل' },
   ],
 };

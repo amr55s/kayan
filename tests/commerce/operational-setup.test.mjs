@@ -71,6 +71,9 @@ test('operational UI imports HeroUI v3 directly and has no prohibited contact fl
   assert.match(panels, /from '@heroui\/react\/button'/u);
   assert.match(panels, /from '@heroui\/react\/input'/u);
   assert.doesNotMatch(panels, /heroui-compat/u);
-  assert.doesNotMatch(`${panels}\n${merchantActions}`, /whatsapp|wa\.me|telegram/iu);
+  // The store's own number is collected here, but only released to a customer
+  // whose order the store accepted; the setup UI itself never links out.
+  assert.doesNotMatch(`${panels}\n${merchantActions}`, /wa\.me|telegram|href=\{?[`'"]tel:/iu);
+  assert.match(panels, /يظهر للعميل فقط بعد أن تقبل طلبه/u);
   assert.doesNotMatch(panels, /gradient/iu);
 });

@@ -78,7 +78,7 @@ test('public marketplace shell shows cart count and admin marketplace index redi
   assert.match(layout, /loadMarketplaceCart/);
   assert.match(layout, /cartCount=\{cartCount\}/);
   assert.match(shell, /cartCount/);
-  assert.match(adminIndex, /redirect\('\/admin\/marketplace\/orders'\)/);
+  assert.match(adminIndex, /redirect\('\/admin\/marketplace\/dashboard'\)/);
   assert.match(proxy, /'\/account\/:path\*'/);
   assert.match(proxy, /'\/marketplace\/cart'/);
   assert.match(proxy, /'\/marketplace\/checkout'/);

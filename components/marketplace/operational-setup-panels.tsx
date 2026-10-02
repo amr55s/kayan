@@ -4,6 +4,7 @@ import { Button } from '@heroui/react/button';
 import { Input } from '@heroui/react/input';
 import { Label } from '@heroui/react/label';
 import { minorToEgp } from '@/lib/commerce/money';
+import type { StoreContact } from '@/lib/commerce/wallet';
 import type {
   MarketplaceCoupon,
   MarketplaceDeliveryConfiguration,
@@ -25,6 +26,7 @@ export const setupMessages: Record<string, string> = {
   delivery_saved: 'تم حفظ تغطية التوصيل.', coupon_saved: 'تم حفظ الكوبون.',
   branch_saved: 'تم حفظ بيانات الفرع.', branch_deactivated: 'تم إيقاف الفرع.',
   branch_delivery_saved: 'تم حفظ رسوم ووقت توصيل الفرع.',
+  contact_saved: 'تم حفظ رقم التواصل. يظهر للعميل بعد قبولك لطلبه.',
   coupon_deactivated: 'تم إيقاف الكوبون.', zone_saved: 'تم حفظ منطقة التوصيل.',
   zone_status_saved: 'تم تحديث حالة منطقة التوصيل.',
 };
@@ -79,19 +81,31 @@ function StoreSwitcher({ stores, selected, path }: { stores: MarketplaceStore[];
   return <nav className={styles.switcher} aria-label="اختيار المتجر">{stores.map((store) => <Link key={store.id} href={`${path}?store=${encodeURIComponent(store.id)}`} data-active={store.id === selected.id}>{store.name}</Link>)}</nav>;
 }
 
-export function MerchantStoreSettingsPanel({ stores, merchants, selected, delivery, branches, actions }: {
+export function MerchantStoreSettingsPanel({ stores, merchants, selected, delivery, branches, contact, actions }: {
   stores: MarketplaceStore[]; merchants: Array<{ id: string; name: string }>; selected: MarketplaceStore;
   delivery: MarketplaceDeliveryConfiguration; branches: MarketplaceStoreBranch[];
+  contact: StoreContact;
   actions: {
     create: FormAction; update: FormAction; submit: FormAction; saveDelivery: FormAction;
     saveBranch: FormAction; deleteBranch: FormAction; saveBranchDelivery: FormAction;
     reorderImages: FormAction; deleteImage: FormAction; undoDeleteImage: FormAction;
+    saveContact: FormAction;
   };
 }) {
   return <div className={styles.page}>
     <StoreSwitcher stores={stores} selected={selected} path="/merchant/marketplace/settings" />
     <section className={styles.section}><div className={styles.sectionHeader}><div><h2>بيانات {selected.name}</h2><p>الحالة: <span className={styles.badge}>{selected.status}</span></p>{selected.pending_revision ? <p role="status" className={styles.notice}>التعديلات الحساسة والصور قيد مراجعة الإدارة. النسخة المنشورة الحالية ما زالت ظاهرة للعملاء.</p> : null}{selected.moderation_notes ? <p>{selected.moderation_notes}</p> : null}</div></div><StoreForm merchants={merchants} action={actions.update} store={selected} />
       {selected.status === 'draft' ? <form action={actions.submit} className={styles.actions}><input type="hidden" name="storeId" value={selected.id} /><input type="hidden" name="idempotencyKey" value={randomUUID()} /><Button.Root className={styles.secondary} type="submit">إرسال المتجر للمراجعة</Button.Root></form> : null}
+    </section>
+    <section className={styles.section} id="contact"><div className={styles.sectionHeader}><div><h2>رقم التواصل مع العملاء</h2><p>يظهر للعميل فقط بعد أن تقبل طلبه، ليتواصل معك مباشرة بخصوص الطلب والتوصيل.</p></div></div>
+      <form action={actions.saveContact}>
+        <input type="hidden" name="storeId" value={selected.id} />
+        <div className={styles.grid}>
+          <TextField id="store-contact-phone" name="phone" label="رقم الهاتف" type="tel" dir="ltr" required defaultValue={contact?.phone ?? ''} />
+          <TextField id="store-contact-whatsapp" name="whatsapp" label="رقم واتساب (إن اختلف)" type="tel" dir="ltr" defaultValue={contact?.whatsapp ?? ''} />
+        </div>
+        <div className={styles.actions}><Button.Root type="submit" className={styles.primary}>حفظ رقم التواصل</Button.Root></div>
+      </form>
     </section>
     <StoreImageManager store={selected} actions={{
       reorder: actions.reorderImages,
@@ -106,12 +120,12 @@ export function MerchantStoreSettingsPanel({ stores, merchants, selected, delive
       deleteAction={actions.deleteBranch}
       saveDeliveryAction={actions.saveBranchDelivery}
     />
-    <section className={styles.section}><div className={styles.sectionHeader}><div><h2>مناطق وتكلفة التوصيل</h2><p>فعّل منطقة واحدة على الأقل وحدد الرسوم والحد الأدنى ووقت الوصول.</p></div></div>
+    <section className={styles.section} id="delivery"><div className={styles.sectionHeader}><div><h2>مناطق وتكلفة التوصيل</h2><p>التوصيل مسؤوليتك: بمندوبك أو كابتن من دليل ديرتك أو شركة شحن. فعّل منطقة واحدة على الأقل وحدد الرسوم والحد الأدنى ووقت الوصول.</p></div></div>
       {delivery.zones.length ? <div className={styles.list}>{delivery.zones.map((zone) => <form action={actions.saveDelivery} className={styles.card} key={zone.zone_id}>
         <input type="hidden" name="storeId" value={selected.id} /><input type="hidden" name="zoneId" value={zone.zone_id} /><input type="hidden" name="expectedStoreUpdatedAt" value={delivery.store_updated_at} /><input type="hidden" name="expectedConfigUpdatedAt" value={zone.updated_at ?? ''} /><input type="hidden" name="idempotencyKey" value={randomUUID()} />
         <h3>{zone.name_ar}</h3><p>{zone.city} · <bdi dir="ltr">{zone.code}</bdi>{!zone.zone_is_active ? ' · موقوفة من الإدارة' : ''}</p>
         <div className={styles.gridThree}>
-          <label className={styles.field}><span>طريقة التوصيل</span><select name="deliveryMode" className={styles.select} defaultValue={zone.delivery_mode ?? (selected.delivery_mode === 'self' ? 'self' : 'platform')}><option value="platform">توصيل المنصة</option><option value="self">توصيل المتجر</option></select></label>
+          <input type="hidden" name="deliveryMode" value="self" />
           <TextField id={`delivery-${zone.zone_id}-fee`} name="feeEgp" label="الرسوم (جنيه)" type="number" min="0" max="100000" step="0.01" defaultValue={zone.fee_piastres == null ? '0.00' : minorToEgp(Number(zone.fee_piastres))} required />
           <TextField id={`delivery-${zone.zone_id}-minimum`} name="minimumOrderEgp" label="الحد الأدنى (جنيه)" type="number" min="0" step="0.01" defaultValue={zone.minimum_order_piastres == null ? '0.00' : minorToEgp(Number(zone.minimum_order_piastres))} required />
           <TextField id={`delivery-${zone.zone_id}-free`} name="freeThresholdEgp" label="توصيل مجاني من (اختياري)" type="number" min="0.01" step="0.01" defaultValue={zone.free_delivery_threshold_piastres == null ? '' : minorToEgp(Number(zone.free_delivery_threshold_piastres))} />
@@ -137,8 +151,7 @@ function BranchFields({ store, branch }: { store: MarketplaceStore; branch?: Mar
       <label className={styles.field}><span>الحالة</span><select name="status" className={styles.select} defaultValue={branch?.status ?? 'active'}><option value="active">نشط</option><option value="inactive">متوقف</option></select></label>
     </div>
     <div className={styles.gridThree}>
-      <label className={styles.checkbox}><input type="checkbox" name="deliveryModes" value="platform" defaultChecked={branch?.delivery_modes.includes('platform') ?? true} /> توصيل المنصة</label>
-      <label className={styles.checkbox}><input type="checkbox" name="deliveryModes" value="self" defaultChecked={branch?.delivery_modes.includes('self') ?? false} /> توصيل المتجر</label>
+      <input type="hidden" name="deliveryModes" value="self" />
       <label className={styles.checkbox}><input type="checkbox" name="isDefault" defaultChecked={branch?.is_default ?? false} /> الفرع الافتراضي</label>
     </div>
   </>;
@@ -151,7 +164,8 @@ function BranchDeliveryForm({ storeId, branch, zones, action, config }: {
   action: FormAction;
   config?: MarketplaceStoreBranch['zones'][number];
 }) {
-  const availableModes = branch.delivery_modes;
+  // Stores arrange their own delivery; platform couriers are not offered.
+  const availableModes = ['self'] as const;
   const zone = config ? zones.find((item) => item.zone_id === config.zone_id) : null;
   const prefix = `branch-delivery-${branch.id}-${config?.zone_id ?? 'new'}-${config?.delivery_mode ?? 'new'}`;
   return <form action={action} className={styles.card}>
@@ -164,8 +178,7 @@ function BranchDeliveryForm({ storeId, branch, zones, action, config }: {
     <div className={styles.gridThree}>
       <label className={styles.field}><span>منطقة التوصيل</span><select name="zoneId" className={styles.select} defaultValue={config?.zone_id} disabled={Boolean(config)}>{zones.map((item) => <option value={item.zone_id} key={item.zone_id}>{item.name_ar} — {item.city}</option>)}</select></label>
       {config ? <input type="hidden" name="zoneId" value={config.zone_id} /> : null}
-      <label className={styles.field}><span>طريقة التوصيل</span><select name="deliveryMode" className={styles.select} defaultValue={config?.delivery_mode ?? availableModes[0]} disabled={Boolean(config)}>{availableModes.map((mode) => <option value={mode} key={mode}>{mode === 'platform' ? 'توصيل المنصة' : 'توصيل المتجر'}</option>)}</select></label>
-      {config ? <input type="hidden" name="deliveryMode" value={config.delivery_mode} /> : null}
+      <input type="hidden" name="deliveryMode" value={config?.delivery_mode ?? availableModes[0]} />
       <TextField id={`${prefix}-fee`} name="feeEgp" label="الرسوم (جنيه)" type="number" min="0" max="100000" step="0.01" required defaultValue={config ? minorToEgp(Number(config.fee_piastres)) : '0.00'} />
       <TextField id={`${prefix}-minimum`} name="minimumOrderEgp" label="الحد الأدنى (جنيه)" type="number" min="0" step="0.01" required defaultValue={config ? minorToEgp(Number(config.minimum_order_piastres)) : '0.00'} />
       <TextField id={`${prefix}-free`} name="freeThresholdEgp" label="توصيل مجاني من" type="number" min="0.01" step="0.01" defaultValue={config?.free_delivery_threshold_piastres == null ? '' : minorToEgp(Number(config.free_delivery_threshold_piastres))} />
