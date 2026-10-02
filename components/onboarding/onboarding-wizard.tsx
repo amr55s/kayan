@@ -1,5 +1,6 @@
 'use client';
 
+import { validateOnboardingBasics, validateOnboardingContent, validateOnboardingForSubmit } from '@/lib/onboarding/step-validation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -150,6 +151,11 @@ export function OnboardingWizard({ kind, initialDraft, identity, places }: {
   async function nextStep() {
     if (recovery || !recoveryChecked) return;
     setError('');
+    // Catch what the database would refuse while the applicant is still on the step that owns it.
+    const problem = snapshot.step === 2 ? validateOnboardingBasics(kind, current.current.data)
+      : snapshot.step === 3 ? validateOnboardingContent(kind, current.current.data)
+        : snapshot.step === 4 ? validateOnboardingForSubmit(kind, current.current.data) : null;
+    if (problem) { setError(problem); return; }
     setBusy(true);
     try {
       if (snapshot.step < 4) {
@@ -275,7 +281,7 @@ export function OnboardingWizard({ kind, initialDraft, identity, places }: {
               <div><dt>النشاط</dt><dd>{activityTitle(kind)}</dd></div>
               <div><dt>الاسم</dt><dd>{data.displayName || 'لم يُكتب بعد'}</dd></div>
               <div><dt>التواصل</dt><dd dir="ltr">{data.phone || 'لم يُكتب بعد'}</dd></div>
-              {kind !== 'driver' ? <><div><dt>اسم النشاط</dt><dd>{data.placeMode === 'existing' ? places.find(place => place.id === data.existingPlaceId)?.title ?? 'المكان غير محدد' : data.name || 'لم يُكتب بعد'}</dd></div><div><dt>الوصف</dt><dd>{data.description || '—'}</dd></div></> : <div><dt>وسيلة التوصيل</dt><dd>{data.vehicleType || 'غير محددة'}</dd></div>}
+              {kind !== 'driver' ? <><div><dt>اسم النشاط</dt><dd>{data.placeMode === 'existing' ? places.find(place => place.id === data.existingPlaceId)?.title ?? 'المكان غير محدد' : data.name || 'لم يُكتب بعد'}</dd></div><div><dt>الوصف</dt><dd>{data.description || '—'}</dd></div>{data.placeMode === 'existing' ? null : <div><dt>العنوان</dt><dd>{data.address || 'لم يُكتب بعد'}</dd></div>}</> : <div><dt>وسيلة التوصيل</dt><dd>{data.vehicleType || 'غير محددة'}</dd></div>}
               {kind === 'store' || kind === 'restaurant' ? <div><dt>أول منتج</dt><dd>{data.product ? `${data.product.name} · ${data.product.priceEgp} ج.م (مسودة)` : 'مؤجل حتى تجهيز الكتالوج'}</dd></div> : null}
               {kind === 'real_estate' ? <><div><dt>العرض</dt><dd>{data.realEstate?.offerType === 'sale' ? 'بيع' : 'إيجار'}</dd></div><div><dt>السعر</dt><dd>{data.realEstate?.priceEgp || 'غير محدد'} ج.م</dd></div></> : null}
               <div><dt>الصور</dt><dd>{data.mediaIds?.length ?? 0} صور خاصة</dd></div>

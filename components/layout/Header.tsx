@@ -1,5 +1,6 @@
 'use client';
 
+import { SignOutButton } from '@/components/auth/SignOutButton';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@heroui/react/button';
 import { useOverlayState } from '@heroui/react';
@@ -139,6 +140,14 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </Link>
           </div>
+          {dashboardPath ? (
+            <div className="hidden lg:block">
+              <SignOutButton
+                label="خروج"
+                className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-950 disabled:cursor-wait disabled:opacity-60 sm:px-3"
+              />
+            </div>
+          ) : null}
           <div>
             <Button
               onPress={() => { void join(); }}
@@ -211,6 +220,12 @@ export const Header: React.FC<HeaderProps> = ({
                 {dashboardPath ? <LayoutDashboard className="size-5" aria-hidden="true" /> : <LogIn className="size-5" aria-hidden="true" />}
                 {dashboardPath ? 'مساحات عملي' : 'تسجيل الدخول'}
               </Link>
+              {dashboardPath ? (
+                <SignOutButton
+                  iconClassName="size-5"
+                  className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 text-sm font-bold text-zinc-800 hover:bg-zinc-100 disabled:cursor-wait disabled:opacity-60"
+                />
+              ) : null}
             </nav>
 
             <section className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
