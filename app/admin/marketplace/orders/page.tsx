@@ -7,6 +7,7 @@ import {
   ModerationQueue,
   SupportThreads,
 } from '@/components/commerce-operations/operations-panels';
+import { OperationsFeedback } from '@/components/commerce-operations/operations-copy';
 import styles from '@/components/commerce-operations/commerce-operations.module.css';
 import { requireMarketplaceAdminRole } from '@/lib/admin/marketplace-memberships';
 import {
@@ -22,7 +23,8 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminMarketplaceOrdersPage() {
+export default async function AdminMarketplaceOrdersPage({ searchParams }: { searchParams: Promise<{ notice?: string; error?: string }> }) {
+  const query = await searchParams;
   const { roles } = await requireMarketplaceAdminRole(
     ['operations', 'support', 'finance', 'catalog_reviewer'],
     { nextPath: '/admin/marketplace/orders' },
@@ -45,10 +47,11 @@ export default async function AdminMarketplaceOrdersPage() {
   const returnTo = '/admin/marketplace/orders';
   return <main id="main-content" className={styles.page}>
     <header className={styles.header}><div><p className={styles.eyebrow}>إدارة المنصة</p><h1 className={styles.title}>عمليات السوق</h1><p className={styles.subtitle}>كل عضو يرى أدوات الدور المسند إليه فقط.</p></div><nav aria-label="إدارة السوق"><Link href="/account/notifications">الإشعارات</Link>{superAdmin ? <> · <Link href="/admin/marketplace/setup">إعدادات السوق</Link> · <Link href="/admin/marketplace/memberships">صلاحيات الإدارة</Link></> : null}</nav></header>
+    <OperationsFeedback notice={query.notice} error={query.error} />
     {canReview ? <ModerationQueue items={moderation.items} returnTo={returnTo} /> : null}
     {canReview ? <CategoryProposalQueue items={categoryProposals} categories={categories} returnTo={returnTo} /> : null}
     {canFinance ? <><AdminCommissionStatements items={commissions.items} /><CashOperations collections={collections.items} reconciliations={reconciliations.items} role="admin" returnTo={returnTo} detailBase="/admin/marketplace/reconciliations" /></> : null}
     {canSupport ? <SupportThreads items={support.items} detailBase="/admin/marketplace/support" /> : null}
-    {canOperate ? <><h2>الطلبات</h2><MarketplaceOrderList orders={orders} detailBase="/admin/marketplace/orders" /></> : null}
+    {canOperate ? <><h2 className={styles.sectionTitle}>الطلبات</h2><MarketplaceOrderList orders={orders} detailBase="/admin/marketplace/orders" /></> : null}
   </main>;
 }

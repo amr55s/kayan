@@ -3,6 +3,11 @@
 import { Badge } from '@heroui/react/badge';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  formatMarketplaceCount,
+  formatMarketplaceQuantity,
+  MARKETPLACE_ITEM_NOUN,
+} from './format';
 import type { MarketplaceNavigationItem } from './view-models';
 import styles from './marketplace.module.css';
 
@@ -37,8 +42,8 @@ export function MarketplaceNav({ items }: { items: MarketplaceNavigationItem[] }
           >
             <span>{item.label}</span>
             {typeof item.badge === 'number' && item.badge > 0 ? (
-              <Badge.Root aria-label={`${item.badge} عناصر`}>
-                <Badge.Label className={styles.badge}>{item.badge}</Badge.Label>
+              <Badge.Root aria-label={formatMarketplaceQuantity(item.badge, MARKETPLACE_ITEM_NOUN)}>
+                <Badge.Label className={styles.badge}>{formatMarketplaceCount(item.badge)}</Badge.Label>
               </Badge.Root>
             ) : null}
           </Link>

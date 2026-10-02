@@ -13,15 +13,20 @@ import { MarketplaceStatePanel } from './state-panel';
 import { ChatEntryButton } from './chat/chat-entry-button';
 import type { ChatRecoveryCode } from './chat/chat-entry-state';
 import type { ChatLoginIntent } from '@/lib/auth/safe-next';
+import {
+  formatMarketplaceCount,
+  formatMarketplaceQuantity,
+  MARKETPLACE_PRODUCT_NOUN,
+} from './format';
 import type {
+  MarketplaceAddToCartAction,
   MarketplaceCatalogViewModel,
-  MarketplaceFormAction,
 } from './view-models';
 import styles from './marketplace.module.css';
 
 type MarketplaceCatalogProps = {
   model: MarketplaceCatalogViewModel;
-  addToCartAction?: MarketplaceFormAction;
+  addToCartAction?: MarketplaceAddToCartAction;
   storeChat?: {
     intent: ChatLoginIntent;
     returnTo: string;
@@ -100,13 +105,13 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
             <Button
               onPress={() => mobileDrawerState.open()}
               className={styles.mobileFilterButton}
-              aria-label={`تصفية المنتجات${activeCount > 0 ? `، ${activeCount} فلاتر نشطة` : ''}`}
+              aria-label={`تصفية المنتجات${activeCount > 0 ? `، ${formatMarketplaceCount(activeCount)} فلاتر نشطة` : ''}`}
             >
               <Filter className="size-4" aria-hidden="true" />
               <span>تصفية المنتجات</span>
               {activeCount > 0 ? (
-                <Badge.Root aria-label={`${activeCount} فلاتر نشطة`}>
-                  <Badge.Label className={styles.badge}>{activeCount}</Badge.Label>
+                <Badge.Root aria-label={`${formatMarketplaceCount(activeCount)} فلاتر نشطة`}>
+                  <Badge.Label className={styles.badge}>{formatMarketplaceCount(activeCount)}</Badge.Label>
                 </Badge.Root>
               ) : null}
             </Button>
@@ -119,7 +124,7 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
 
           <p className={styles.resultSummary} aria-live="polite">
             {model.products.length > 0
-              ? `تم تحميل ${model.products.length} منتج مطابق${model.hasMore ? ' — توجد نتائج أخرى' : ''}`
+              ? `${formatMarketplaceQuantity(model.products.length, MARKETPLACE_PRODUCT_NOUN)}${model.hasMore ? ' في هذه الصفحة — توجد نتائج أخرى' : ''}`
               : 'لا توجد منتجات مطابقة'}
           </p>
 
@@ -160,7 +165,7 @@ export function MarketplaceCatalog({ model, addToCartAction, storeChat }: Market
             <Drawer.Dialog aria-label="تصفية نتائج المنتجات" dir="rtl">
               <Drawer.Header className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
                 <Drawer.Heading className="text-base font-black text-zinc-950">
-                  تصفية المنتجات {activeCount > 0 ? `(${activeCount})` : ''}
+                  تصفية المنتجات {activeCount > 0 ? `(${formatMarketplaceCount(activeCount)})` : ''}
                 </Drawer.Heading>
                 <Button
                   isIconOnly

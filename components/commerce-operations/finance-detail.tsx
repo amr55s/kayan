@@ -6,16 +6,19 @@ import type { MarketplaceCommissionStatementDetail, MarketplaceReconciliationDet
 import { transitionCommissionStatementAction } from '@/lib/commerce/operations-actions';
 import styles from './commerce-operations.module.css';
 import { PrintStatementButton } from './print-statement-button';
+import { OperationsFeedback, codCollectionStatusLabel, commissionEntryTypeLabel, commissionStatusLabel, reconciliationStatusLabel } from './operations-copy';
 
 const money = (amount: string | number) => formatMarketplaceMoney({ amountMinor: Number(amount), currency: 'EGP' });
 
 export function ReconciliationDetailView({ batch }: { batch: MarketplaceReconciliationDetail }) {
-  return <main className={styles.page}><header className={styles.header}><div><p className={styles.eyebrow}>تسوية نقدية</p><h1 className={styles.title}>{batch.status}</h1><p className={styles.subtitle}>المتوقع {money(batch.expected_total_piastres)} · المرسل {money(batch.submitted_total_piastres)}</p></div></header><section className={styles.list}>{batch.items.map((item) => <article className={styles.cardContent} key={item.collection_id}><div className={styles.row}><span>طلب <bdi dir="ltr">{item.order_code}</bdi></span><strong>{money(item.submitted_amount_piastres)}</strong></div><p className={styles.meta}>{item.collection_status}</p></article>)}</section>{batch.notes ? <p>{batch.notes}</p> : null}</main>;
+  return <main className={styles.page}><header className={styles.header}><div><p className={styles.eyebrow}>تسوية نقدية</p><h1 className={styles.title}>{reconciliationStatusLabel(batch.status)}</h1><p className={styles.subtitle}>المتوقع {money(batch.expected_total_piastres)} · المرسل {money(batch.submitted_total_piastres)}</p></div></header><section className={styles.list}>{batch.items.map((item) => <article className={styles.cardContent} key={item.collection_id}><div className={styles.row}><span>طلب <bdi dir="ltr">{item.order_code}</bdi></span><strong>{money(item.submitted_amount_piastres)}</strong></div><p className={styles.meta}>{codCollectionStatusLabel(item.collection_status)}</p></article>)}</section>{batch.notes ? <p>{batch.notes}</p> : null}</main>;
 }
 
-export function CommissionDetailView({ statement, admin = false }: {
+export function CommissionDetailView({ statement, admin = false, notice, error }: {
   statement: MarketplaceCommissionStatementDetail;
   admin?: boolean;
+  notice?: string;
+  error?: string;
 }) {
   const transitions = statement.status === 'draft'
     ? ['issued', 'void']
@@ -29,11 +32,12 @@ export function CommissionDetailView({ statement, admin = false }: {
   const exportBase = `/api/marketplace/commissions/${encodeURIComponent(statement.id)}/export`;
 
   return <main className={`${styles.page} ${styles.statementPage}`}>
+    <div className={styles.noPrint}><OperationsFeedback notice={notice} error={error} /></div>
     <header className={styles.header}>
       <div>
         <p className={styles.eyebrow}>كشف عمولة</p>
         <h1 className={styles.title}>{statement.period_start} — {statement.period_end}</h1>
-        <p className={styles.subtitle}>الحالة {statement.status} · الإجمالي {money(statement.gross_piastres)} · المستحق {money(statement.total_due_piastres)}</p>
+        <p className={styles.subtitle}>الحالة: {commissionStatusLabel(statement.status)} · الإجمالي {money(statement.gross_piastres)} · المستحق {money(statement.total_due_piastres)}</p>
       </div>
       <div className={`${styles.actions} ${styles.noPrint}`}>
         <Link className={styles.button} href={`${exportBase}?format=xlsx`}><Download size={16} aria-hidden="true" />تنزيل XLSX</Link>
@@ -56,7 +60,7 @@ export function CommissionDetailView({ statement, admin = false }: {
 
     <section className={styles.statementEntries} aria-labelledby="statement-entries-title">
       <h2 id="statement-entries-title">تفاصيل القيود</h2>
-      {statement.entries.length ? <div className={styles.tableScroll}><table className={styles.statementTable}><thead><tr><th>التاريخ</th><th>نوع القيد</th><th>الطلب</th><th>إجمالي المبيعات</th><th>العمولة</th></tr></thead><tbody>{statement.entries.map((entry) => <tr key={entry.id}><td><time dateTime={entry.recognized_at}>{entry.recognized_at.slice(0, 16).replace('T', ' ')}</time></td><td>{entry.entry_type}</td><td><bdi dir="ltr">{entry.order_id ?? '—'}</bdi></td><td>{money(entry.gross_piastres)}</td><td>{money(entry.commission_piastres)}</td></tr>)}</tbody></table></div> : <p className={styles.meta}>لا توجد قيود مرتبطة بهذا الكشف.</p>}
+      {statement.entries.length ? <div className={styles.tableScroll}><table className={styles.statementTable}><thead><tr><th>التاريخ</th><th>نوع القيد</th><th>الطلب</th><th>إجمالي المبيعات</th><th>العمولة</th></tr></thead><tbody>{statement.entries.map((entry) => <tr key={entry.id}><td><time dateTime={entry.recognized_at}>{entry.recognized_at.slice(0, 16).replace('T', ' ')}</time></td><td>{commissionEntryTypeLabel(entry.entry_type)}</td><td><bdi dir="ltr">{entry.order_id ?? '—'}</bdi></td><td>{money(entry.gross_piastres)}</td><td>{money(entry.commission_piastres)}</td></tr>)}</tbody></table></div> : <p className={styles.meta}>لا توجد قيود مرتبطة بهذا الكشف.</p>}
     </section>
 
     {statement.notes ? <section className={styles.statementNotes}><h2>ملاحظات</h2><p>{statement.notes}</p></section> : null}

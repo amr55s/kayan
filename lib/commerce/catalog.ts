@@ -203,8 +203,12 @@ export async function fetchMarketplaceCatalog(input: {
     const minor = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
     return Number.isSafeInteger(minor) ? { input: normalized, minor } : { input: '', minor: null };
   };
-  const minPrice = parsePrice(input.minPrice);
-  const maxPrice = parsePrice(input.maxPrice);
+  let minPrice = parsePrice(input.minPrice);
+  let maxPrice = parsePrice(input.maxPrice);
+  // A reversed range (shared link, manual URL) means the range between the two values.
+  if (minPrice.minor != null && maxPrice.minor != null && minPrice.minor > maxPrice.minor) {
+    [minPrice, maxPrice] = [maxPrice, minPrice];
+  }
   const minRating = Number.isInteger(input.minRating) && input.minRating! >= 1 && input.minRating! <= 5
     ? input.minRating!
     : null;

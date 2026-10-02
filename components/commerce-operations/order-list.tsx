@@ -1,4 +1,3 @@
-import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
 import { Chip } from '@heroui/react/chip';
 import { EmptyState } from '@heroui/react/empty-state';
@@ -39,10 +38,8 @@ export function MarketplaceOrderList({
             </div>
             <div className={styles.row}>
               <strong>{formatMarketplaceMoney({ amountMinor: order.grandTotalMinor, currency: 'EGP' })}</strong>
-              <Link href={`${detailBase}/${order.id}`}>
-                <Button.Root className={styles.link}>
-                  عرض التفاصيل
-                </Button.Root>
+              <Link href={`${detailBase}/${order.id}`} className={styles.link}>
+                عرض التفاصيل
               </Link>
             </div>
           </Card.Content>

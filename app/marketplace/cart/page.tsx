@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { MARKETPLACE_CART_ERROR_COPY } from '@/components/marketplace/cart-copy';
 import { MarketplaceCart } from '@/components/marketplace/cart-view';
 import { MarketplaceNotice } from '@/components/marketplace/marketplace-notice';
 import {
@@ -20,14 +21,8 @@ const notices: Record<string, string> = {
 };
 
 const errors: Record<string, string> = {
-  cart_expired: 'انتهت السلة السابقة. أضف المنتجات المطلوبة مرة أخرى.',
-  coupon_invalid: 'كود الخصم غير صالح لهذه السلة أو انتهت صلاحيته.',
-  invalid_item: 'بيانات المنتج غير صالحة. ارجع إلى صفحة المنتج وحاول مرة أخرى.',
-  item_limit: 'وصلت السلة إلى الحد الأقصى لعدد المنتجات.',
+  ...MARKETPLACE_CART_ERROR_COPY,
   merge_deferred: 'تعذر دمج سلة الزائر الآن. منتجات حسابك ما زالت متاحة، وسنحاول الدمج مرة أخرى لاحقًا.',
-  quantity_invalid: 'الكمية المطلوبة غير صالحة أو تتجاوز الحد المتاح.',
-  service_unavailable: 'تعذر تحديث السلة الآن. حاول مرة أخرى بعد قليل.',
-  variant_unavailable: 'الخيار المطلوب غير متوفر بالكمية المحددة.',
 };
 
 function single(value: string | string[] | undefined): string {

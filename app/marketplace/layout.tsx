@@ -24,7 +24,8 @@ async function loadCartCount() {
   }
 }
 
-export default async function MarketplaceLayout({ children }: { children: ReactNode }) {
-  const cartCount = await loadCartCount();
+export default function MarketplaceLayout({ children }: { children: ReactNode }) {
+  // Not awaited: the shell and page render immediately and the badge streams in.
+  const cartCount = loadCartCount();
   return <MarketplaceShell cartCount={cartCount}>{children}</MarketplaceShell>;
 }

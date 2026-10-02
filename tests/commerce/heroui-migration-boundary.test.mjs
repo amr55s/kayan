@@ -31,7 +31,7 @@ test('Batch 2: Customer marketplace components use HeroUI compound primitives', 
   const checkoutForm = read('components/marketplace/checkout-form.tsx');
 
   assert.match(productCard, /from '@heroui\/react\/card'/);
-  assert.match(productCard, /from '@heroui\/react\/button'/);
+  assert.match(read('components/marketplace/add-to-cart.tsx'), /from '@heroui\/react\/button'/);
   assert.match(productDetails, /from '@heroui\/react\/separator'/);
   assert.match(productDetails, /from '@heroui\/react\/card'/);
   assert.match(productDetails, /from '@heroui\/react\/breadcrumbs'/);

@@ -5,7 +5,7 @@ import { MarketplaceStatePanel } from '@/components/marketplace/state-panel';
 import { TurnstileWidget } from '@/components/security/TurnstileWidget';
 import { submitMarketplaceCheckoutAction } from '@/app/marketplace/actions';
 import { loadMarketplaceCheckout } from '@/lib/commerce/checkout';
-import { requireServerEnv } from '@/lib/env/server';
+import { logSafeServerFailure } from '@/lib/observability/server-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,14 +60,31 @@ export default async function MarketplaceCheckoutPage({
   }
 
   const error = errors[single(params.error)];
-  const model = checkout.model.requiresAuthentication
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim();
+  if (!checkout.model.requiresAuthentication && !turnstileSiteKey) {
+    // The order RPC is never reachable without the human check, so fail closed
+    // with a recoverable page instead of crashing into the error boundary.
+    logSafeServerFailure('error', 'marketplace_checkout_captcha_unconfigured', {
+      failure: 'captcha_site_key_missing',
+    });
+    return (
+      <MarketplaceStatePanel
+        kind="error"
+        title="إتمام الطلب غير متاح مؤقتًا"
+        description="سلتك محفوظة كما هي. نعمل على إعادة تفعيل تأكيد الطلبات، حاول مرة أخرى بعد قليل أو تواصل مع المتجر مباشرة."
+        actionHref="/marketplace/cart"
+        actionLabel="العودة إلى السلة"
+      />
+    );
+  }
+  const model = checkout.model.requiresAuthentication || !turnstileSiteKey
     ? checkout.model
     : {
         ...checkout.model,
         captchaSlot: (
           <TurnstileWidget
             action="marketplace_checkout"
-            siteKey={requireServerEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY')}
+            siteKey={turnstileSiteKey}
           />
         ),
       };
