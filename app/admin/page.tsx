@@ -6,6 +6,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { loadBehaviorAnalytics } from '@/lib/analytics/admin';
 import { logSafeServerFailure } from '@/lib/observability/server-log';
 import { fetchHomePageData } from '@/lib/supabase/queries';
+import { cairoDateKey } from '@/lib/marketing/playbook';
+import { getServerTimestamp } from '@/lib/server-time';
 import type { Place, StoreCoupon } from '@/types';
 
 export const maxDuration = 60;
@@ -233,6 +235,7 @@ export default async function AdminDashboard() {
         marketingChannels={marketingChannels ?? []}
         marketingCampaigns={enrichedCampaigns}
         marketingDrivers={marketingHomeData.drivers}
+        marketingToday={cairoDateKey(new Date(adminRenderedAt || getServerTimestamp()))}
       />
     </>
   );

@@ -31,6 +31,7 @@ export type BehaviorAnalyticsSummary = {
   daily: Array<{ date: string; views: number; visitors: number }>;
   topActions: Array<{ name: string; count: number }>;
   topPlaces: Array<{ placeId: string; opens: number; actions: number }>;
+  placeEngagement: Record<string, { opens: number; actions: number }>;
   topDrivers: Array<{ driverId: string; opens: number; actions: number }>;
   campaignEvents: Array<{
     campaignKey: string;
@@ -55,6 +56,7 @@ const emptySummary: BehaviorAnalyticsSummary = {
   daily: [],
   topActions: [],
   topPlaces: [],
+  placeEngagement: {},
   topDrivers: [],
   campaignEvents: [],
 };
@@ -205,6 +207,7 @@ export async function loadBehaviorAnalytics(): Promise<BehaviorAnalyticsSummary>
             right.actions + right.opens - (left.actions + left.opens),
         )
         .slice(0, 8),
+      placeEngagement: Object.fromEntries(placeTotals),
       topDrivers: Array.from(driverTotals, ([driverId, totals]) => ({ driverId, ...totals }))
         .sort(
           (left, right) =>
