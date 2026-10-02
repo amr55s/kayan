@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import { Header } from '@/components/layout/Header';
 import { MarketplaceNav } from './marketplace-nav';
 import type { MarketplaceNavigationItem } from './view-models';
@@ -16,7 +16,8 @@ const defaultNavigation: MarketplaceNavigationItem[] = [
 type MarketplaceShellProps = {
   children: ReactNode;
   navigation?: MarketplaceNavigationItem[];
-  cartCount?: number;
+  /** A promise streams the badge in, so the cart lookup never delays the page. */
+  cartCount?: number | Promise<number>;
 };
 
 function withCartBadge(
@@ -29,18 +30,33 @@ function withCartBadge(
   ));
 }
 
+async function NavWithCartBadge({
+  navigation,
+  cartCount,
+}: {
+  navigation: MarketplaceNavigationItem[];
+  cartCount: number | Promise<number>;
+}) {
+  return <MarketplaceNav items={withCartBadge(navigation, await cartCount)} />;
+}
+
 export function MarketplaceShell({
   children,
   navigation = defaultNavigation,
   cartCount,
 }: MarketplaceShellProps) {
-  const items = withCartBadge(navigation, cartCount);
   return (
     <div className={`dairtak-theme ${styles.shell}`}>
       <Header />
 
       <main id="main-content" className={styles.page}>
-        <MarketplaceNav items={items} />
+        {cartCount === undefined ? (
+          <MarketplaceNav items={navigation} />
+        ) : (
+          <Suspense fallback={<MarketplaceNav items={navigation} />}>
+            <NavWithCartBadge navigation={navigation} cartCount={cartCount} />
+          </Suspense>
+        )}
         {children}
       </main>
 

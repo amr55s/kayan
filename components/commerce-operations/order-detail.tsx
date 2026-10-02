@@ -1,10 +1,12 @@
 import { Card } from '@heroui/react/card';
 import { randomUUID } from 'node:crypto';
 import Image from 'next/image';
-import { formatMarketplaceMoney } from '@/components/marketplace/format';
+import Link from 'next/link';
+import { formatMarketplaceCount, formatMarketplaceMoney } from '@/components/marketplace/format';
 import { createMarketplaceSupportThreadAction, createPartialMarketplaceReturnAction, receivePartialMarketplaceReturnAction, reviewPartialMarketplaceReturnAction, submitMarketplaceReviewAction, transitionMarketplaceOrderAction } from '@/lib/commerce/operations-actions';
 import type { MarketplaceOrderDetail, MarketplaceOrderStatus } from '@/lib/commerce/operations';
 import { marketplaceStatusLabels } from './order-status';
+import { OperationsFeedback, orderEventTypeLabel } from './operations-copy';
 import { DeliveryProofUploader } from './delivery-proof-uploader';
 import { ChatEntryButton } from '@/components/marketplace/chat/chat-entry-button';
 import styles from './commerce-operations.module.css';
@@ -52,29 +54,49 @@ function transitions(order: MarketplaceOrderDetail, role: Role): Transition[] {
   return result;
 }
 
-function message(code?: string) {
-  const messages: Record<string, string> = {
-    return_requested: 'تم إرسال طلب الإرجاع للمراجعة.',
-    return_approved: 'تمت الموافقة على طلب الإرجاع.',
-    return_rejected: 'تم رفض طلب الإرجاع مع حفظ السبب.',
-    return_received: 'تم تسجيل استلام المرتجع وتطبيق التسوية المالية والمخزنية.',
-    return_quantity_exceeded: 'الكمية المطلوبة تتجاوز الكمية المتبقية القابلة للإرجاع.',
-    return_category_excluded: 'سياسة فئة هذا المنتج لا تسمح بهذا النوع من الإرجاع.',
-    return_request_failed: 'تعذر إنشاء طلب الإرجاع. راجع السبب والكميات والمدة المتاحة.',
-    return_review_failed: 'تعذر حفظ قرار الإرجاع.',
-    return_receive_failed: 'تعذر استلام المرتجع أو تسويته.',
-    status_updated: 'تم تحديث حالة الطلب.',
-    review_saved: 'تم حفظ تقييمك.',
-    reason_required: 'اكتب سبب الإجراء أولاً.',
-    return_window_expired: 'انتهت مدة الإرجاع المتاحة لهذا الطلب.',
-    delivery_proof_required: 'يجب رفع إثبات التسليم قبل إغلاق الطلب.',
-    cod_amount_mismatch: 'مبلغ التحصيل لا يطابق قيمة الطلب.',
-    transition_not_allowed: 'هذا الإجراء غير متاح لحالة الطلب الحالية.',
-    verified_purchase_required: 'التقييم متاح فقط بعد تسليم المنتج.',
-    review_already_exists: 'تم تسجيل تقييم لهذا المنتج بالفعل. حدّث الصفحة لعرضه.',
-    service_unavailable: 'تعذر تنفيذ العملية الآن. حاول مرة أخرى.',
+const progressSteps: MarketplaceOrderStatus[] = [
+  'pending_confirmation', 'confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered',
+];
+const progressStepLabels: Partial<Record<MarketplaceOrderStatus, string>> = {
+  pending_confirmation: 'تم الطلب', confirmed: 'تأكيد المتجر', preparing: 'التجهيز',
+  ready_for_pickup: 'جاهز', out_for_delivery: 'في الطريق', delivered: 'تم التسليم',
+};
+
+/** What the person looking at the order should expect or do next. */
+function nextStepHint(order: MarketplaceOrderDetail, role: Role): string | null {
+  const selfDelivery = order.deliveryMode === 'self';
+  if (role === 'customer') {
+    const hints: Partial<Record<MarketplaceOrderStatus, string>> = {
+      pending_confirmation: 'وصل طلبك للمتجر وننتظر تأكيده. يمكنك إلغاء الطلب قبل التأكيد.',
+      confirmed: 'أكد المتجر طلبك وسيبدأ تجهيزه.',
+      preparing: 'المتجر يجهّز طلبك الآن.',
+      ready_for_pickup: selfDelivery ? 'طلبك جاهز وسيخرج مع مندوب المتجر.' : 'طلبك جاهز وننتظر استلام الكابتن له.',
+      out_for_delivery: 'طلبك في الطريق. جهّز المبلغ نقدًا للدفع عند الاستلام.',
+      delivered: 'تم تسليم الطلب. يمكنك تقييم المنتجات أو طلب إرجاع خلال المدة المتاحة.',
+      delivery_failed: 'تعذر توصيل الطلب. تواصل مع المتجر من رسائل الطلب لترتيب إعادة التوصيل.',
+      cancelled: 'أُلغي هذا الطلب ولن يُحصَّل منك أي مبلغ.',
+      rejected: 'اعتذر المتجر عن تنفيذ هذا الطلب ولن يُحصَّل منك أي مبلغ.',
+      issue: 'سُجّلت مشكلة على الطلب وفريق الدعم يتابعها.',
+    };
+    return hints[order.status] ?? null;
+  }
+  if (role === 'driver') {
+    const hints: Partial<Record<MarketplaceOrderStatus, string>> = {
+      ready_for_pickup: 'استلم الطلب من المتجر ثم اضغط «استلام الطلب».',
+      out_for_delivery: 'سلّم الطلب وحصّل المبلغ نقدًا، ثم ارفع إثبات التسليم لتتمكن من تأكيد التسليم.',
+      delivered: 'تم التسليم. أضف المبلغ المحصَّل إلى تسويتك النقدية من لوحة الكابتن.',
+    };
+    return hints[order.status] ?? null;
+  }
+  const hints: Partial<Record<MarketplaceOrderStatus, string>> = {
+    pending_confirmation: 'طلب جديد بانتظار قرارك: أكّده أو ارفضه مع ذكر السبب.',
+    confirmed: 'ابدأ تجهيز الطلب.',
+    preparing: 'عند انتهاء التجهيز علّم الطلب «جاهز للاستلام».',
+    ready_for_pickup: selfDelivery ? 'سلّم الطلب لمندوبك ثم علّمه «خرج للتوصيل».' : 'الطلب معروض على كباتن ديرتك وسيستلمه أول من يقبله.',
+    out_for_delivery: selfDelivery ? 'بعد التسليم وتحصيل المبلغ اضغط «تأكيد التسليم».' : 'الكابتن في الطريق إلى العميل.',
+    delivered: 'اكتمل الطلب وتُحتسب عمولة المنصة عليه في كشف العمولات.',
   };
-  return code ? messages[code] : undefined;
+  return hints[order.status] ?? null;
 }
 
 export function MarketplaceOrderDetailView({ order, role, returnTo, notice, error }: {
@@ -96,6 +118,7 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
         ? '/admin/marketplace/chat'
         : '/account/chat';
   const mayChatAboutOrder = role !== 'driver' || order.status === 'out_for_delivery';
+  const addressExtras = [order.address.building && `مبنى ${order.address.building}`, order.address.floor && `الدور ${order.address.floor}`, order.address.apartment && `شقة ${order.address.apartment}`, order.address.landmark].filter(Boolean);
   const createReturnPanel = role === 'customer' && order.status === 'delivered' && returnableItems.length > 0 ? (
     <section className={styles.panel} aria-labelledby="partial-return-title">
       <h2 id="partial-return-title">طلب إرجاع جزئي</h2>
@@ -111,7 +134,7 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
         <div className={styles.items}>{returnableItems.map((item) => {
           const remaining = item.quantity - item.returnedQuantity;
           return <article className={styles.item} key={item.id}>
-            <div><strong>{item.productName}</strong><p className={styles.meta}>المتاح: {remaining} · تغيير الرأي حتى {formatDeadline(item.changeOfMindDeadline)} · العيوب حتى {formatDeadline(item.defectDeadline)}</p></div>
+            <div><strong>{item.productName}</strong><p className={styles.meta}>المتاح: {formatMarketplaceCount(remaining)} · تغيير الرأي حتى {formatDeadline(item.changeOfMindDeadline)} · العيوب حتى {formatDeadline(item.defectDeadline)}</p></div>
             <input type="hidden" name="returnItemId" value={item.id} />
             <label className={styles.label}>الكمية<input className={styles.field} name="returnQuantity" type="number" min="0" max={remaining} defaultValue="0" inputMode="numeric" /></label>
           </article>;
@@ -132,7 +155,7 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
           </div>
           <ul>{request.items.map((returnItem) => {
             const orderItem = order.items.find((item) => item.id === returnItem.orderItemId);
-            return <li key={returnItem.orderItemId}>{orderItem?.productName ?? 'منتج'} — الكمية: {returnItem.quantity}</li>;
+            return <li key={returnItem.orderItemId}>{orderItem?.productName ?? 'منتج'} — الكمية: {formatMarketplaceCount(returnItem.quantity)}</li>;
           })}</ul>
           {request.status === 'received' ? <strong>المبلغ المسترد: {formatMarketplaceMoney({ amountMinor: request.refundAmountMinor, currency: 'EGP' })}</strong> : null}
           {canManageReturns && request.status === 'requested' ? <div className={styles.actions}>
@@ -166,22 +189,42 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
       ))}</div>
     </section>
   ) : null;
+  const listHref = returnTo.slice(0, returnTo.lastIndexOf('/'));
+  const progressIndex = progressSteps.indexOf(order.status);
+  const hint = nextStepHint(order, role);
+  const actionsPanel = availableTransitions.length > 0 ? <section aria-labelledby="actions-title" className={styles.panel}><h2 id="actions-title">الإجراءات المتاحة</h2><div className={styles.actions}>
+    {availableTransitions.map((transition) => <form action={transitionMarketplaceOrderAction} className={styles.form} key={transition.next}>
+      <input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="next" value={transition.next} /><input type="hidden" name="returnTo" value={returnTo} />
+      {transition.next === 'delivered' ? <input type="hidden" name="collectedAmountMinor" value={String(order.grandTotalMinor)} /> : null}
+      {transition.next === 'delivered' ? <p className={styles.meta}>المبلغ المطلوب تحصيله نقدًا: <strong>{formatMarketplaceMoney({ amountMinor: order.grandTotalMinor, currency: 'EGP' })}</strong></p> : null}
+      {transition.needsReason ? <label className={styles.label}>السبب<textarea className={styles.field} name="reason" required maxLength={1000} rows={2} /></label> : null}
+      <button className={`${styles.button} ${transition.danger ? styles.danger : ''}`} type="submit">{transition.label}</button>
+    </form>)}
+  </div></section> : null;
   return (
     <div className={styles.page}>
-      {createReturnPanel}
-      {returnHistoryPanel}
-      {message(notice) ? <p role="status" className={styles.notice}>{message(notice)}</p> : null}
-      {message(error) ? <p role="alert" className={styles.error}>{message(error)}</p> : null}
+      <Link href={listHref} className={styles.backLink}>→ العودة إلى الطلبات</Link>
+      <OperationsFeedback notice={notice} error={error} />
       <header className={styles.header}>
-        <div><p className={styles.eyebrow}>{order.storeName}</p><h1 className={styles.title}>طلب <bdi dir="ltr">{order.publicCode}</bdi></h1><p className={styles.subtitle}>الدفع نقدًا عند الاستلام · {marketplaceStatusLabels[order.status]}</p></div>
+        <div><p className={styles.eyebrow}>{order.storeName}</p><h1 className={styles.title}>طلب <bdi dir="ltr">{order.publicCode}</bdi></h1><p className={styles.subtitle}>الدفع نقدًا عند الاستلام · {order.deliveryMode === 'self' ? 'توصيل المتجر' : 'توصيل ديرتك'}</p></div>
         <span className={styles.status}>{marketplaceStatusLabels[order.status]}</span>
       </header>
+
+      {progressIndex >= 0 ? <ol className={styles.progress} aria-label="مراحل الطلب">
+        {progressSteps.map((step, index) => <li key={step} className={`${styles.progressStep} ${index <= progressIndex ? styles.progressDone : ''}`} aria-current={index === progressIndex ? 'step' : undefined}>
+          <span className={styles.progressDot} aria-hidden="true" />
+          <span>{progressStepLabels[step]}</span>
+        </li>)}
+      </ol> : null}
+      {hint ? <p className={styles.hint}>{hint}</p> : null}
+
+      {role !== 'customer' ? actionsPanel : null}
 
       <Card.Root className={styles.card}><Card.Content className={styles.cardContent}>
         <div className={styles.items}>
           {order.items.map((item) => <article key={item.id} className={styles.item}>
             {item.imageUrl ? <Image className={styles.image} src={item.imageUrl} alt={item.productName} width={64} height={64} /> : <div className={styles.image} aria-hidden="true" />}
-            <div><strong>{item.productName}</strong>{item.variantName ? <p className={styles.meta}>{item.variantName}</p> : null}<p className={styles.meta}>الكمية: {item.quantity}</p></div>
+            <div><strong>{item.productName}</strong>{item.variantName ? <p className={styles.meta}>{item.variantName}</p> : null}<p className={styles.meta}>الكمية: {formatMarketplaceCount(item.quantity)}{item.returnedQuantity > 0 ? ` · أُرجع ${formatMarketplaceCount(item.returnedQuantity)}` : ''}</p></div>
             <strong>{formatMarketplaceMoney({ amountMinor: item.lineTotalMinor, currency: 'EGP' })}</strong>
           </article>)}
         </div>
@@ -189,7 +232,7 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
           <div className={styles.summaryLine}><span>المنتجات</span><strong>{formatMarketplaceMoney({ amountMinor: order.subtotalMinor, currency: 'EGP' })}</strong></div>
           {order.discountMinor > 0 ? <div className={styles.summaryLine}><span>الخصم</span><strong>− {formatMarketplaceMoney({ amountMinor: order.discountMinor, currency: 'EGP' })}</strong></div> : null}
           <div className={styles.summaryLine}><span>التوصيل</span><strong>{formatMarketplaceMoney({ amountMinor: order.deliveryFeeMinor, currency: 'EGP' })}</strong></div>
-          <div className={styles.summaryLine}><span>الإجمالي عند الاستلام</span><strong>{formatMarketplaceMoney({ amountMinor: order.grandTotalMinor, currency: 'EGP' })}</strong></div>
+          <div className={`${styles.summaryLine} ${styles.summaryTotal}`}><span>الإجمالي عند الاستلام</span><strong>{formatMarketplaceMoney({ amountMinor: order.grandTotalMinor, currency: 'EGP' })}</strong></div>
         </div>
       </Card.Content></Card.Root>
 
@@ -197,50 +240,46 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
         <h2>بيانات الاستلام</h2>
         {order.address.recipientName ? <p><strong>المستلم:</strong> {order.address.recipientName}</p> : null}
         <p><strong>العنوان:</strong> {order.address.addressLine}</p>
-        {[order.address.building && `مبنى ${order.address.building}`, order.address.floor && `الدور ${order.address.floor}`, order.address.apartment && `شقة ${order.address.apartment}`, order.address.landmark].filter(Boolean).length > 0 ? <p className={styles.meta}>{[order.address.building && `مبنى ${order.address.building}`, order.address.floor && `الدور ${order.address.floor}`, order.address.apartment && `شقة ${order.address.apartment}`, order.address.landmark].filter(Boolean).join(' · ')}</p> : null}
+        {addressExtras.length > 0 ? <p className={styles.meta}>{addressExtras.join(' · ')}</p> : null}
         {showRecipientPhone && order.address.recipientPhone ? <p><strong>رقم التواصل للتسليم:</strong> <bdi dir="ltr">{order.address.recipientPhone}</bdi></p> : null}
         {order.deliveryNotes ? <p><strong>ملاحظات:</strong> {order.deliveryNotes}</p> : null}
       </Card.Content></Card.Root> : null}
+      {order.delivery?.driverName && role !== 'driver' ? <p className={styles.meta}>الكابتن: {order.delivery.driverName}</p> : null}
 
       {role === 'driver' && order.deliveryMode === 'platform' && order.status === 'out_for_delivery' && !order.delivery?.proofAvailable
         ? <DeliveryProofUploader orderId={order.id} /> : null}
-          {order.delivery?.proofAvailable && order.delivery.proofAssetId
-        ? <p><a className={styles.link} href={`/api/media/assets/${order.delivery.proofAssetId}/view`} target="_blank" rel="noreferrer">عرض إثبات التسليم الخاص</a></p>
-            : null}
+      {order.delivery?.proofAvailable && order.delivery.proofAssetId
+        ? <p><a className={`${styles.link} ${styles.secondary}`} href={`/api/media/assets/${order.delivery.proofAssetId}/view`} target="_blank" rel="noreferrer">عرض إثبات التسليم الخاص</a></p>
+        : null}
 
-          {mayChatAboutOrder ? <section className={styles.panel} aria-labelledby="order-chat-title">
-            <h2 id="order-chat-title">رسائل الطلب</h2>
-            <p className={styles.subtitle}>تواصل داخل المنصة بخصوص هذا الطلب، مع حفظ سجل الرسائل للمراجعة عند الحاجة.</p>
-            <ChatEntryButton
-              intent={{ kind: 'order', orderId: order.id }}
-              returnTo={returnTo}
-              loginHref={`/signin?next=${encodeURIComponent(returnTo)}`}
-              isAuthenticated
-              chatRoute={chatRoute}
-              label="فتح محادثة الطلب"
-            />
-          </section> : null}
+      {role === 'customer' ? actionsPanel : null}
+      {createReturnPanel}
+      {returnHistoryPanel}
 
-      {role !== 'driver' ? <section className={styles.panel} aria-labelledby="support-title"><h2 id="support-title">تحتاج مساعدة؟</h2><form className={styles.form} action={createMarketplaceSupportThreadAction}><input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="storeId" value={order.storeId} /><input type="hidden" name="returnTo" value={returnTo} /><label className={styles.label}>الموضوع<input className={styles.field} name="subject" required minLength={3} maxLength={160} /></label><label className={styles.label}>الرسالة<textarea className={styles.field} name="message" required maxLength={5000} rows={3} /></label><button className={styles.button}>فتح محادثة دعم داخل الموقع</button></form></section> : null}
-
-      {availableTransitions.length > 0 ? <section aria-labelledby="actions-title" className={styles.cardContent}><h2 id="actions-title">الإجراءات المتاحة</h2><div className={styles.actions}>
-        {availableTransitions.map((transition) => <form action={transitionMarketplaceOrderAction} className={styles.form} key={transition.next}>
-          <input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="next" value={transition.next} /><input type="hidden" name="returnTo" value={returnTo} />
-          {transition.next === 'delivered' ? <input type="hidden" name="collectedAmountMinor" value={String(order.grandTotalMinor)} /> : null}
-          {transition.needsReason ? <label className={styles.label}>السبب<textarea className={styles.field} name="reason" required maxLength={1000} rows={2} /></label> : null}
-          <button className={`${styles.button} ${transition.danger ? styles.danger : ''}`} type="submit">{transition.label}</button>
-        </form>)}
-      </div></section> : null}
-
-      {role === 'customer' && order.status === 'delivered' ? <section aria-labelledby="reviews-title"><h2 id="reviews-title">تقييم المنتجات</h2><p className={styles.subtitle}>لن يظهر قسم التقييم على المنتج قبل وجود تقييمات منشورة.</p><div className={styles.reviewGrid}>{order.items.map((item) => item.review ? <div className={styles.form} key={item.id}><strong>{item.productName}</strong><p>تم حفظ تقييمك: {item.review.rating} من 5</p>{item.review.title ? <p className={styles.meta}>{item.review.title}</p> : null}</div> : <form action={submitMarketplaceReviewAction} className={styles.form} key={item.id}>
+      {role === 'customer' && order.status === 'delivered' ? <section className={styles.panel} aria-labelledby="reviews-title"><h2 id="reviews-title">تقييم المنتجات</h2><p className={styles.subtitle}>تقييمك يساعد باقي المتسوقين ويظهر على صفحة المنتج.</p><div className={styles.reviewGrid}>{order.items.map((item) => item.review ? <div className={styles.form} key={item.id}><strong>{item.productName}</strong><p>تم حفظ تقييمك: {formatMarketplaceCount(item.review.rating)} من ٥</p>{item.review.title ? <p className={styles.meta}>{item.review.title}</p> : null}</div> : <form action={submitMarketplaceReviewAction} className={styles.form} key={item.id}>
         <strong>{item.productName}</strong><input type="hidden" name="orderItemId" value={item.id} /><input type="hidden" name="returnTo" value={returnTo} />
-        <label className={styles.label}>التقييم<select className={styles.field} name="rating" required defaultValue="5"><option value="5">5 — ممتاز</option><option value="4">4 — جيد جدًا</option><option value="3">3 — جيد</option><option value="2">2 — مقبول</option><option value="1">1 — سيئ</option></select></label>
+        <label className={styles.label}>التقييم<select className={styles.field} name="rating" required defaultValue="5"><option value="5">٥ — ممتاز</option><option value="4">٤ — جيد جدًا</option><option value="3">٣ — جيد</option><option value="2">٢ — مقبول</option><option value="1">١ — سيئ</option></select></label>
         <label className={styles.label}>عنوان مختصر<input className={styles.field} name="title" maxLength={120} /></label>
         <label className={styles.label}>تفاصيل التقييم<textarea className={styles.field} name="body" maxLength={2000} rows={3} /></label>
         <button className={styles.button} type="submit">حفظ التقييم</button>
       </form>)}</div></section> : null}
 
-      {order.events.length > 0 ? <section aria-labelledby="timeline-title"><h2 id="timeline-title">سجل الطلب</h2><ol className={styles.timeline}>{order.events.map((event) => <li key={event.id} className={styles.timelineItem}><strong>{event.toStatus ? marketplaceStatusLabels[event.toStatus] : event.type}</strong><p className={styles.meta}>{new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.createdAt))}</p></li>)}</ol></section> : null}
+      {mayChatAboutOrder ? <section className={styles.panel} aria-labelledby="order-chat-title">
+        <h2 id="order-chat-title">رسائل الطلب</h2>
+        <p className={styles.subtitle}>تواصل داخل المنصة بخصوص هذا الطلب، مع حفظ سجل الرسائل للمراجعة عند الحاجة.</p>
+        <ChatEntryButton
+          intent={{ kind: 'order', orderId: order.id }}
+          returnTo={returnTo}
+          loginHref={`/signin?next=${encodeURIComponent(returnTo)}`}
+          isAuthenticated
+          chatRoute={chatRoute}
+          label="فتح محادثة الطلب"
+        />
+      </section> : null}
+
+      {role !== 'driver' ? <section className={styles.panel} aria-labelledby="support-title"><h2 id="support-title">تحتاج مساعدة؟</h2><details className={styles.disclosure}><summary>فتح محادثة مع دعم ديرتك بخصوص هذا الطلب</summary><form className={styles.form} action={createMarketplaceSupportThreadAction}><input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="storeId" value={order.storeId} /><input type="hidden" name="returnTo" value={returnTo} /><label className={styles.label}>الموضوع<input className={styles.field} name="subject" required minLength={3} maxLength={160} /></label><label className={styles.label}>الرسالة<textarea className={styles.field} name="message" required maxLength={5000} rows={3} /></label><button className={styles.button}>إرسال إلى الدعم</button></form></details></section> : null}
+
+      {order.events.length > 0 ? <section className={styles.panel} aria-labelledby="timeline-title"><h2 id="timeline-title">سجل الطلب</h2><ol className={styles.timeline}>{order.events.map((event) => <li key={event.id} className={styles.timelineItem}><strong>{event.toStatus ? marketplaceStatusLabels[event.toStatus] : orderEventTypeLabel(event.type)}</strong><p className={styles.meta}>{new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.createdAt))}</p></li>)}</ol></section> : null}
     </div>
   );
 }

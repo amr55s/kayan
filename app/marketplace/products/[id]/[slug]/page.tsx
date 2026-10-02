@@ -91,8 +91,16 @@ export default async function MarketplaceProductPage({ params, searchParams }: P
   if (slug !== product.slug) redirect(marketplaceProductHref(product));
   const returnTo = marketplaceProductHref(product);
   const intent = { kind: 'presale', storeId: product.store.id, productId: product.id } as const;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // The session lookup and the related-products query are independent: run them together.
+  const [user, relatedProducts] = await Promise.all([
+    createClient()
+      .then((supabase) => supabase.auth.getUser())
+      .then(({ data }) => data.user),
+    fetchRelatedMarketplaceProducts({
+      storeSlug: product.store.slug,
+      excludeProductId: product.id,
+    }).catch((): Awaited<ReturnType<typeof fetchRelatedMarketplaceProducts>> => []),
+  ]);
   const recoveryValue = (await searchParams)?.chat_recovery;
   const chatRecovery = recoveryValue === 'authentication_required'
     || recoveryValue === 'rate_limited'
@@ -101,15 +109,6 @@ export default async function MarketplaceProductPage({ params, searchParams }: P
     ? recoveryValue
     : null;
   const structuredData = productJsonLd(product);
-  let relatedProducts: Awaited<ReturnType<typeof fetchRelatedMarketplaceProducts>> = [];
-  try {
-    relatedProducts = await fetchRelatedMarketplaceProducts({
-      storeSlug: product.store.slug,
-      excludeProductId: product.id,
-    });
-  } catch {
-    relatedProducts = [];
-  }
   return (
     <>
       <script

@@ -9,10 +9,35 @@ test('catalog listing wires add-to-cart and only submits a default in-stock vari
   const page = read('app/marketplace/page.tsx');
   const card = read('components/marketplace/product-card.tsx');
   assert.match(page, /addToCartAction=\{addMarketplaceCartItemAction\}/);
-  assert.match(card, /canAddToCart/);
+  const addToCart = read('components/marketplace/add-to-cart.tsx');
   assert.match(card, /defaultVariantId && product\.isInStock/);
-  assert.match(card, /name="variantId"/);
+  assert.match(card, /<AddToCartCardForm/);
+  assert.match(addToCart, /name="variantId"/);
   assert.match(card, /marketplaceStoreHref\(product\.store\.slug\)/);
+});
+
+test('adding to the cart confirms in place instead of leaving the page', () => {
+  const actions = read('app/marketplace/actions.ts');
+  const addToCart = read('components/marketplace/add-to-cart.tsx');
+  const purchaseForm = read('components/marketplace/purchase-form.tsx');
+  const addAction = actions.slice(
+    actions.indexOf('export async function addMarketplaceCartItemAction'),
+    actions.indexOf('export async function', actions.indexOf('export async function addMarketplaceCartItemAction') + 1),
+  );
+  assert.doesNotMatch(addAction, /redirect\(/);
+  assert.match(addAction, /status: 'added'/);
+  assert.match(addAction, /status: 'error', code: cartErrorCode\(error\)/);
+  assert.match(addToCart, /useActionState\(action, idle\)/);
+  assert.match(addToCart, /role="status"/);
+  assert.match(addToCart, /role="alert"/);
+  assert.match(addToCart, /href="\/marketplace\/cart"/);
+  assert.match(purchaseForm, /<AddToCartFeedback state=\{state\} showCheckout \/>/);
+});
+
+test('a reversed price range is read as the range between both values', () => {
+  const catalog = read('lib/commerce/catalog.ts');
+  assert.match(catalog, /minPrice\.minor > maxPrice\.minor/);
+  assert.match(catalog, /\[minPrice, maxPrice\] = \[maxPrice, minPrice\]/);
 });
 
 test('product details expose store breadcrumbs, store link, and related products', () => {

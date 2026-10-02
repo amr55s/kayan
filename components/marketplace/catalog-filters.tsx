@@ -3,13 +3,14 @@
 import { useRouter } from 'next/navigation';
 import { DairtakLink } from '@/components/ui/dairtak-link';
 import { DairtakSelect } from '@/components/ui/dairtak-select';
-import { RotateCcw, Search } from 'lucide-react';
+import { Check, RotateCcw, Search } from 'lucide-react';
 import { Button } from '@heroui/react/button';
 import { Checkbox } from '@heroui/react/checkbox';
 import { Input } from '@heroui/react/input';
 import { Label } from '@heroui/react/label';
 import type { MarketplaceCatalogViewModel } from './view-models';
 import { countActiveCatalogFilters } from './catalog-filter-state';
+import { formatMarketplaceCount } from './format';
 import styles from './marketplace.module.css';
 
 export { countActiveCatalogFilters };
@@ -47,6 +48,14 @@ export function CatalogFilters({
       }
     }
 
+    // A reversed range would silently match nothing; read it as the range the shopper meant.
+    const minPrice = Number(params.get('min_price'));
+    const maxPrice = Number(params.get('max_price'));
+    if (params.has('min_price') && params.has('max_price') && minPrice > maxPrice) {
+      params.set('min_price', String(maxPrice));
+      params.set('max_price', String(minPrice));
+    }
+
     onApply?.();
     const queryString = params.toString();
     router.push(queryString ? `/marketplace?${queryString}` : '/marketplace');
@@ -82,7 +91,7 @@ export function CatalogFilters({
           label="الفئة"
           name="category"
           defaultValue={model.selectedCategory ?? ''}
-          options={[{ value: '', label: 'كل الفئات' }, ...model.categories.map((category) => ({ value: category.slug, label: `${category.name}${typeof category.productCount === 'number' ? ` (${category.productCount})` : ''}` }))]}
+          options={[{ value: '', label: 'كل الفئات' }, ...model.categories.map((category) => ({ value: category.slug, label: `${category.name}${typeof category.productCount === 'number' ? ` (${formatMarketplaceCount(category.productCount)})` : ''}` }))]}
         />
       </div>
 
@@ -91,7 +100,7 @@ export function CatalogFilters({
           label="المتجر"
           name="store"
           defaultValue={model.selectedStore ?? ''}
-          options={[{ value: '', label: 'كل المتاجر' }, ...model.stores.map((store) => ({ value: store.slug, label: `${store.name} (${store.productCount})` }))]}
+          options={[{ value: '', label: 'كل المتاجر' }, ...model.stores.map((store) => ({ value: store.slug, label: `${store.name} (${formatMarketplaceCount(store.productCount)})` }))]}
         />
       </div>
 
@@ -138,7 +147,7 @@ export function CatalogFilters({
           label="الحد الأدنى للتقييم"
           name="rating"
           defaultValue={model.minRating ? String(model.minRating) : ''}
-          options={[{ value: '', label: 'كل التقييمات' }, ...[4, 3, 2, 1].map((rating) => ({ value: String(rating), label: `${rating} نجوم فأكثر` }))]}
+          options={[{ value: '', label: 'كل التقييمات' }, ...[4, 3, 2, 1].map((rating) => ({ value: String(rating), label: rating === 1 ? 'نجمة واحدة فأكثر' : rating === 2 ? 'نجمتان فأكثر' : `${formatMarketplaceCount(rating)} نجوم فأكثر` }))]}
         />
       </div>
 
@@ -150,7 +159,9 @@ export function CatalogFilters({
           className={styles.checkboxLabel}
         >
           <Checkbox.Content>
-            <Checkbox.Control />
+            <Checkbox.Control className={styles.checkboxControl}>
+              <Checkbox.Indicator><Check size={12} aria-hidden="true" /></Checkbox.Indicator>
+            </Checkbox.Control>
             <span>المتوفر في المخزن فقط</span>
           </Checkbox.Content>
         </Checkbox.Root>

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { Button } from '@heroui/react/button';
 import { Input } from '@heroui/react/input';
@@ -7,9 +7,11 @@ import { RadioGroup } from '@heroui/react/radio-group';
 import { Radio } from '@heroui/react/radio';
 import { Minus, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { formatMarketplaceMoney } from './format';
+import { AddToCartFeedback, useAddToCart } from './add-to-cart';
+import { formatMarketplaceCount, formatMarketplaceMoney } from './format';
 import type {
-  MarketplaceFormAction,
+  MarketplaceAddToCartAction,
+  MarketplaceAddToCartState,
   MarketplaceMoney,
   MarketplaceVariantOption,
 } from './view-models';
@@ -21,8 +23,12 @@ type MarketplacePurchaseFormProps = {
   variants: MarketplaceVariantOption[];
   maxQuantityPerOrder: number;
   isInStock: boolean;
-  addToCartAction?: MarketplaceFormAction;
+  addToCartAction?: MarketplaceAddToCartAction;
 };
+
+async function unavailableAction(): Promise<MarketplaceAddToCartState> {
+  return { status: 'error', code: 'service_unavailable' };
+}
 
 export function MarketplacePurchaseForm({
   productId,
@@ -35,16 +41,19 @@ export function MarketplacePurchaseForm({
   const firstAvailable = variants.find((variant) => variant.isInStock) ?? variants[0];
   const [variantId, setVariantId] = useState(firstAvailable?.id ?? '');
   const [quantity, setQuantity] = useState(1);
+  const [state, formAction, isPending] = useAddToCart(addToCartAction ?? unavailableAction);
   const selectedVariant = variants.find((variant) => variant.id === variantId) ?? firstAvailable;
   const availableLimit = selectedVariant?.availableQuantity == null
     ? maxQuantityPerOrder
     : Math.min(maxQuantityPerOrder, Math.max(0, selectedVariant.availableQuantity));
   const purchasable = isInStock && (selectedVariant?.isInStock ?? true) && availableLimit > 0;
+  const unitPrice = selectedVariant?.price ?? basePrice;
+  const lowStock = purchasable && availableLimit <= 5;
 
   return (
-    <form className={styles.purchaseForm} action={addToCartAction}>
+    <form className={styles.purchaseForm} action={formAction}>
       <input type="hidden" name="productId" value={productId} />
-      {variants.length > 0 ? (
+      {variants.length > 1 ? (
         <RadioGroup
           name="variantId"
           value={variantId}
@@ -55,20 +64,32 @@ export function MarketplacePurchaseForm({
           className={styles.selectWrap}
         >
           <Label className={styles.label}>الخيارات المتاحة</Label>
-          <div className="grid gap-2">
+          <div className={styles.variantList}>
             {variants.map((variant) => (
-              <Radio key={variant.id} value={variant.id} isDisabled={!variant.isInStock}>
+              <Radio
+                key={variant.id}
+                value={variant.id}
+                isDisabled={!variant.isInStock}
+                className={styles.variantOption}
+              >
                 <Radio.Content>
                   <Radio.Control>
                     <Radio.Indicator />
                   </Radio.Control>
-                  <span>{variant.label} — {formatMarketplaceMoney(variant.price)}{variant.isInStock ? '' : ' (غير متوفر)'}</span>
+                  <span className={styles.variantLabel}>
+                    <span>{variant.label}</span>
+                    <span className={styles.variantPrice}>
+                      {variant.isInStock ? formatMarketplaceMoney(variant.price) : 'غير متوفر'}
+                    </span>
+                  </span>
                 </Radio.Content>
               </Radio>
             ))}
           </div>
         </RadioGroup>
-      ) : null}
+      ) : (
+        <input type="hidden" name="variantId" value={variantId} />
+      )}
 
       <div className={styles.selectWrap}>
         <Label.Root htmlFor="marketplace-quantity" className={styles.label}>
@@ -93,6 +114,7 @@ export function MarketplacePurchaseForm({
             min={1}
             max={Math.max(1, availableLimit)}
             value={String(quantity)}
+            disabled={!purchasable}
             className={styles.quantityInput}
             onChange={(event) => {
               const next = Number.parseInt(event.target.value, 10);
@@ -110,23 +132,35 @@ export function MarketplacePurchaseForm({
           >
             <Plus className="size-4" aria-hidden="true" />
           </Button.Root>
+          {lowStock ? (
+            <span className={styles.lowStock}>
+              {availableLimit === 1
+                ? 'آخر قطعة متاحة'
+                : `متبقي ${formatMarketplaceCount(availableLimit)} فقط`}
+            </span>
+          ) : null}
         </div>
       </div>
 
-      <strong className={styles.price}>
-        {formatMarketplaceMoney(selectedVariant?.price ?? basePrice)}
-      </strong>
+      <div className={styles.purchaseTotal} aria-live="polite">
+        <span>الإجمالي</span>
+        <strong className={styles.price}>
+          {formatMarketplaceMoney({
+            amountMinor: unitPrice.amountMinor * quantity,
+            currency: unitPrice.currency,
+          })}
+        </strong>
+      </div>
       <Button.Root
         type="submit"
         fullWidth
-        isDisabled={!purchasable || !addToCartAction}
+        isPending={isPending}
+        isDisabled={!purchasable || !addToCartAction || isPending}
         className={styles.primaryButton}
       >
-        {purchasable ? 'أضف إلى السلة' : 'غير متوفر حاليًا'}
+        {!purchasable ? 'غير متوفر حاليًا' : isPending ? 'جارٍ الإضافة…' : 'أضف إلى السلة'}
       </Button.Root>
-      {!addToCartAction ? (
-        <p className={styles.muted}>إضافة المنتج ستتاح بعد ربط السلة بحسابك.</p>
-      ) : null}
+      <AddToCartFeedback state={state} showCheckout />
     </form>
   );
 }

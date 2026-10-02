@@ -55,3 +55,22 @@
   .statementTable tr { break-inside: avoid; }
   .summaryGrid > div { background: #fff; border-color: #000; }
 }
+
+.backLink { display: inline-flex; min-height: 44px; align-items: center; color: #52525b; font-size: .88rem; font-weight: 700; text-decoration: none; }
+.backLink:hover { color: #d95500; text-decoration: underline; text-underline-offset: .2em; }
+.summaryTotal { border-top: 1px solid #e4e4e7; padding-top: .6rem; font-size: 1.05rem; }
+.progress { list-style: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .25rem; margin: 0 0 1rem; padding: 0; }
+.progressStep { position: relative; display: grid; justify-items: center; gap: .35rem; color: #71717a; font-size: .78rem; font-weight: 700; text-align: center; }
+.progressStep::before { content: ''; position: absolute; top: .45rem; inset-inline: -50% 50%; height: 2px; background: #e4e4e7; }
+.progressStep:first-child::before { display: none; }
+.progressDot { position: relative; z-index: 1; width: 1rem; height: 1rem; border: 2px solid #d4d4d8; border-radius: 50%; background: #fff; }
+.progressDone { color: #18181b; }
+.progressDone::before { background: #ff7a1a; }
+.progressDone .progressDot { border-color: #ff7a1a; background: #ff7a1a; }
+.progressStep[aria-current='step'] .progressDot { box-shadow: 0 0 0 4px #ffe4d1; }
+.hint { border-inline-start: 3px solid #ff7a1a; background: #fff7f0; color: #7c2d12; padding: .75rem 1rem; margin: 0 0 1rem; line-height: 1.7; }
+.disclosure > summary { display: inline-flex; min-height: 44px; align-items: center; color: #18181b; font-weight: 800; cursor: pointer; }
+.disclosure[open] > summary { margin-bottom: .65rem; }
+.sectionTitle { margin: 1.5rem 0 .75rem; font-size: 1.15rem; font-weight: 800; }
+.headerLinks { display: flex; flex-wrap: wrap; gap: .5rem; }
+@media (max-width: 640px) { .progress { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: .85rem; } .progressStep:nth-child(4)::before { display: none; } .actions > form { width: 100%; } }

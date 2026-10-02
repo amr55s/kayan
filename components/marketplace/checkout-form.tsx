@@ -11,7 +11,11 @@ import { TextArea } from '@heroui/react/textarea';
 import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
-import { formatMarketplaceMoney } from './format';
+import {
+  formatMarketplaceMoney,
+  formatMarketplaceQuantity,
+  MARKETPLACE_ITEM_NOUN,
+} from './format';
 import type {
   MarketplaceCheckoutViewModel,
   MarketplaceDeliveryZone,
@@ -302,7 +306,7 @@ export function MarketplaceCodCheckout({
             <div className={styles.checkoutGroups}>
               {model.groups.map((group) => (
                 <div key={group.storeId} className={styles.checkoutGroup}>
-                  <span>{group.storeName} · {group.itemCount} عنصر</span>
+                  <span>{group.storeName} · {formatMarketplaceQuantity(group.itemCount, MARKETPLACE_ITEM_NOUN)}</span>
                   <strong>{formatMarketplaceMoney(group.subtotal)}</strong>
                 </div>
               ))}

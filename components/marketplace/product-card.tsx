@@ -1,24 +1,28 @@
 import { DairtakLink } from '@/components/ui/dairtak-link';
-import { Button } from '@heroui/react/button';
 import { Card } from '@heroui/react/card';
 import { Chip } from '@heroui/react/chip';
 import Image from 'next/image';
 import Link from 'next/link';
+import { AddToCartCardForm } from './add-to-cart';
 import {
+  formatMarketplaceCount,
   formatMarketplaceMoney,
+  formatMarketplaceQuantity,
+  formatMarketplaceRating,
+  MARKETPLACE_REVIEW_NOUN,
   marketplaceDiscountPercentage,
   marketplaceProductHref,
   marketplaceStoreHref,
 } from './format';
 import type {
-  MarketplaceFormAction,
+  MarketplaceAddToCartAction,
   MarketplaceProductSummary,
 } from './view-models';
 import styles from './marketplace.module.css';
 
 type MarketplaceProductCardProps = {
   product: MarketplaceProductSummary;
-  addToCartAction?: MarketplaceFormAction;
+  addToCartAction?: MarketplaceAddToCartAction;
 };
 
 export function MarketplaceProductCard({
@@ -29,11 +33,10 @@ export function MarketplaceProductCard({
   const discount = marketplaceDiscountPercentage(product.price, product.compareAtPrice);
   const showRating = Boolean(product.rating && product.rating.count > 0);
   const defaultVariantId = product.defaultVariantId;
-  const canAddToCart = Boolean(addToCartAction && defaultVariantId && product.isInStock);
 
   return (
     <Card.Root className={styles.productCard}>
-      <Link href={productHref} className={styles.productImageLink} tabIndex={-1}>
+      <Link href={productHref} className={styles.productImageLink} tabIndex={-1} aria-hidden="true">
         {product.primaryImage ? (
           <Image
             src={product.primaryImage.url}
@@ -47,13 +50,21 @@ export function MarketplaceProductCard({
         ) : (
           <span className={styles.imageFallback}>لا توجد صورة للمنتج</span>
         )}
-        {product.badge ? (
+        {product.badge || discount ? (
           <span className={styles.tagRow}>
-            <Chip.Root size="sm" variant="primary">
-              <Chip.Label className={styles.tag}>{product.badge}</Chip.Label>
-            </Chip.Root>
+            {discount ? (
+              <span className={styles.discountTag}>خصم {formatMarketplaceCount(discount)}٪</span>
+            ) : null}
+            {product.badge ? (
+              <Chip.Root size="sm" variant="primary">
+                <Chip.Label className={styles.tag}>{product.badge}</Chip.Label>
+              </Chip.Root>
+            ) : null}
           </span>
         ) : null}
+        {product.isInStock ? null : (
+          <span className={styles.soldOutOverlay}>غير متوفر حاليًا</span>
+        )}
       </Link>
 
       <Card.Header className={styles.cardHeader}>
@@ -66,48 +77,36 @@ export function MarketplaceProductCard({
         {showRating && product.rating ? (
           <span
             className={styles.rating}
-            aria-label={`التقييم ${product.rating.average.toFixed(1)} من 5 بناءً على ${product.rating.count} تقييم`}
+            aria-label={`التقييم ${formatMarketplaceRating(product.rating.average)} من ٥ بناءً على ${formatMarketplaceQuantity(product.rating.count, MARKETPLACE_REVIEW_NOUN)}`}
           >
             <span className={styles.stars} aria-hidden="true">★</span>
-            <bdi dir="ltr">{product.rating.average.toFixed(1)}</bdi>
-            <span>({product.rating.count})</span>
+            <span aria-hidden="true">{formatMarketplaceRating(product.rating.average)}</span>
+            <span aria-hidden="true">({formatMarketplaceCount(product.rating.count)})</span>
           </span>
         ) : null}
         <span className={styles.priceRow}>
           <span className={styles.price}>{formatMarketplaceMoney(product.price)}</span>
           {product.compareAtPrice && discount ? (
-            <>
-              <span className={styles.comparePrice}>
-                {formatMarketplaceMoney(product.compareAtPrice)}
-              </span>
-              <span className={styles.discount}>خصم {discount}%</span>
-            </>
+            <span className={styles.comparePrice}>
+              <span className="sr-only">السعر قبل الخصم </span>
+              {formatMarketplaceMoney(product.compareAtPrice)}
+            </span>
           ) : null}
         </span>
       </Card.Header>
 
       <Card.Footer className={styles.cardFooter}>
-        <span
-          className={`${styles.statusLine} ${product.isInStock ? '' : styles.outOfStock}`}
-        >
-          {product.isInStock ? product.fulfillmentLabel ?? 'متاح للطلب' : 'غير متوفر حاليًا'}
-        </span>
-        {canAddToCart && defaultVariantId ? (
-          <form action={addToCartAction}>
-            <input type="hidden" name="productId" value={product.id} />
-            <input type="hidden" name="variantId" value={defaultVariantId} />
-            <input type="hidden" name="quantity" value="1" />
-            <Button
-              type="submit"
-              className={styles.primaryButton}
-            >
-              أضف إلى السلة
-            </Button>
-          </form>
+        {addToCartAction && defaultVariantId && product.isInStock ? (
+          <AddToCartCardForm
+            action={addToCartAction}
+            productId={product.id}
+            variantId={defaultVariantId}
+            productName={product.name}
+          />
         ) : (
           <DairtakLink href={productHref} className={styles.secondaryButton}>
-              عرض التفاصيل
-            </DairtakLink>
+            عرض التفاصيل
+          </DairtakLink>
         )}
       </Card.Footer>
     </Card.Root>

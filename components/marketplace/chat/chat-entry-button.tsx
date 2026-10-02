@@ -4,7 +4,7 @@ import { Button } from '@heroui/react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useActionState, useEffect } from 'react';
-import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { MessageCircle } from 'lucide-react';
 import { openMarketplaceConversationAction } from '@/lib/commerce/chat/actions';
 import { retryMarketplaceConversationAction } from '@/lib/commerce/chat/recovery-action';
 import type { ChatLoginIntent } from '@/lib/auth/safe-next';
@@ -47,16 +47,14 @@ export function ChatEntryButton({
 
   if (!isAuthenticated) {
     return (
-      <div className="grid w-full gap-2" dir="rtl">
-        <GoogleSignInButton
-          next={returnTo}
-          intent={intent}
-          label="المتابعة باستخدام Google للتواصل"
-          helper="سنفتح المحادثة ثم نرجعك إلى الصفحة نفسها. إذا أغلقت Google يمكنك إعادة المحاولة دون فقد وجهتك."
-        />
+      <div className="grid w-full gap-1.5" dir="rtl">
         <Link href={loginHref} className={styles.secondaryButton}>
-          فتح صفحة تسجيل الدخول
+          <MessageCircle className="size-4 shrink-0" aria-hidden="true" />
+          {label}
         </Link>
+        <p className="m-0 text-center text-xs leading-5 text-zinc-600">
+          يلزم تسجيل الدخول أولًا، ثم نرجعك إلى هذه الصفحة.
+        </p>
       </div>
     );
   }

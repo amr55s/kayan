@@ -188,3 +188,23 @@ export type MarketplaceNavigationItem = {
 export type MarketplaceRole = 'customer' | 'merchant' | 'admin' | 'driver';
 
 export type MarketplaceFormAction = (formData: FormData) => void | Promise<void>;
+
+export type MarketplaceCartErrorCode =
+  | 'cart_expired'
+  | 'coupon_invalid'
+  | 'invalid_item'
+  | 'item_limit'
+  | 'quantity_invalid'
+  | 'service_unavailable'
+  | 'variant_unavailable';
+
+/** Adding to the cart keeps the shopper on the page they are browsing. */
+export type MarketplaceAddToCartState =
+  | { status: 'idle' }
+  | { status: 'added'; itemCount: number }
+  | { status: 'error'; code: MarketplaceCartErrorCode };
+
+export type MarketplaceAddToCartAction = (
+  state: MarketplaceAddToCartState,
+  formData: FormData,
+) => Promise<MarketplaceAddToCartState>;

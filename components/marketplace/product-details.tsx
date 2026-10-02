@@ -4,7 +4,11 @@ import { Chip } from '@heroui/react/chip';
 import { Separator } from '@heroui/react/separator';
 import Link from 'next/link';
 import {
+  formatMarketplaceCount,
   formatMarketplaceMoney,
+  formatMarketplaceQuantity,
+  formatMarketplaceRating,
+  MARKETPLACE_REVIEW_NOUN,
   marketplaceDiscountPercentage,
   marketplaceProductHref,
   marketplaceStoreHref,
@@ -14,7 +18,7 @@ import { MarketplaceProductGallery } from './product-gallery';
 import { MarketplacePurchaseForm } from './purchase-form';
 import { ChatEntryButton } from './chat/chat-entry-button';
 import type {
-  MarketplaceFormAction,
+  MarketplaceAddToCartAction,
   MarketplaceProductDetailsViewModel,
   MarketplaceProductSummary,
 } from './view-models';
@@ -30,7 +34,7 @@ export function MarketplaceProductDetails({
   relatedProducts = [],
 }: {
   product: MarketplaceProductDetailsViewModel;
-  addToCartAction?: MarketplaceFormAction;
+  addToCartAction?: MarketplaceAddToCartAction;
   isAuthenticated: boolean;
   chatLoginHref: string;
   chatRecovery?: ChatRecoveryCode | null;
@@ -75,22 +79,23 @@ export function MarketplaceProductDetails({
           {showRating && product.rating ? (
             <span
               className={styles.rating}
-              aria-label={`التقييم ${product.rating.average.toFixed(1)} من 5 بناءً على ${product.rating.count} تقييم`}
+              aria-label={`التقييم ${formatMarketplaceRating(product.rating.average)} من ٥ بناءً على ${formatMarketplaceQuantity(product.rating.count, MARKETPLACE_REVIEW_NOUN)}`}
             >
               <span className={styles.stars} aria-hidden="true">★</span>
-              <bdi dir="ltr">{product.rating.average.toFixed(1)}</bdi>
-              <span>{product.rating.count} تقييم</span>
+              <span aria-hidden="true">{formatMarketplaceRating(product.rating.average)}</span>
+              <span aria-hidden="true">· {formatMarketplaceQuantity(product.rating.count, MARKETPLACE_REVIEW_NOUN)}</span>
             </span>
           ) : null}
 
           <div className={styles.priceRow}>
-            <strong className={styles.price}>{formatMarketplaceMoney(product.price)}</strong>
+            <strong className={styles.detailsPrice}>{formatMarketplaceMoney(product.price)}</strong>
             {product.compareAtPrice && discount ? (
               <>
                 <span className={styles.comparePrice}>
+                  <span className="sr-only">السعر قبل الخصم </span>
                   {formatMarketplaceMoney(product.compareAtPrice)}
                 </span>
-                <span className={styles.discount}>وفّر {discount}%</span>
+                <span className={styles.discountTag}>وفّر {formatMarketplaceCount(discount)}٪</span>
               </>
             ) : null}
           </div>
@@ -106,6 +111,13 @@ export function MarketplaceProductDetails({
             addToCartAction={addToCartAction}
           />
 
+          {product.deliveryNote || product.returnPolicyNote ? (
+            <ul className={styles.assuranceList}>
+              {product.deliveryNote ? <li>{product.deliveryNote}</li> : null}
+              {product.returnPolicyNote ? <li>{product.returnPolicyNote}</li> : null}
+            </ul>
+          ) : null}
+
           <ChatEntryButton
             intent={{ kind: 'presale', storeId: product.store.id, productId: product.id }}
             returnTo={marketplaceProductHref(product)}
@@ -114,11 +126,6 @@ export function MarketplaceProductDetails({
             recovery={chatRecovery}
             label="اسأل المتجر عن هذا المنتج"
           />
-
-          {product.deliveryNote ? <p className={styles.notice}>{product.deliveryNote}</p> : null}
-          {product.returnPolicyNote ? (
-            <p className={styles.muted}>{product.returnPolicyNote}</p>
-          ) : null}
 
           {product.description ? (
             <section aria-labelledby="product-description-title">

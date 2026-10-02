@@ -36,8 +36,13 @@ export async function verifyTurnstileToken(input: {
   const token = input.token.trim();
   if (!token || token.length > MAX_TOKEN_LENGTH) return { ok: false, code: 'invalid_token' };
 
+  // A missing secret is an operator outage, not a visitor error: fail closed
+  // with the recoverable "unavailable" outcome instead of throwing.
+  const secret = process.env.TURNSTILE_SECRET_KEY?.trim();
+  if (!secret) return { ok: false, code: 'verification_unavailable' };
+
   const body = new URLSearchParams({
-    secret: requireServerEnv('TURNSTILE_SECRET_KEY'),
+    secret,
     response: token,
     idempotency_key: crypto.randomUUID(),
   });

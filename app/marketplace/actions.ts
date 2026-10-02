@@ -22,14 +22,16 @@ import {
   MarketplaceCheckoutError,
   submitMarketplaceCheckout,
 } from '@/lib/commerce/checkout';
+import type {
+  MarketplaceAddToCartState,
+  MarketplaceCartErrorCode,
+} from '@/components/marketplace/view-models';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
-function cartErrorLocation(error: unknown): string {
-  if (!(error instanceof MarketplaceCartError)) {
-    return '/marketplace/cart?error=service_unavailable';
-  }
-  const codes: Record<MarketplaceCartError['code'], string> = {
+function cartErrorCode(error: unknown): MarketplaceCartErrorCode {
+  if (!(error instanceof MarketplaceCartError)) return 'service_unavailable';
+  const codes: Record<MarketplaceCartError['code'], MarketplaceCartErrorCode> = {
     cart_item_limit_reached: 'item_limit',
     cart_not_found: 'cart_expired',
     coupon_invalid: 'coupon_invalid',
@@ -37,7 +39,11 @@ function cartErrorLocation(error: unknown): string {
     service_unavailable: 'service_unavailable',
     variant_unavailable: 'variant_unavailable',
   };
-  return `/marketplace/cart?error=${codes[error.code]}`;
+  return codes[error.code];
+}
+
+function cartErrorLocation(error: unknown): string {
+  return `/marketplace/cart?error=${cartErrorCode(error)}`;
 }
 
 function refreshCartPages() {
@@ -46,16 +52,24 @@ function refreshCartPages() {
   revalidatePath('/checkout');
 }
 
-export async function addMarketplaceCartItemAction(formData: FormData): Promise<void> {
+/**
+ * Adds without navigating away: the shopper keeps browsing and the shell's
+ * cart badge refreshes in place. Works without JavaScript as a normal post.
+ */
+export async function addMarketplaceCartItemAction(
+  _previous: MarketplaceAddToCartState,
+  formData: FormData,
+): Promise<MarketplaceAddToCartState> {
   const parsed = parseAddCartItemFormData(formData);
-  if (!parsed.success) redirect('/marketplace/cart?error=invalid_item');
+  if (!parsed.success) return { status: 'error', code: 'invalid_item' };
   try {
-    await addMarketplaceCartItem(parsed.data.variantId, parsed.data.quantity);
+    const cart = await addMarketplaceCartItem(parsed.data.variantId, parsed.data.quantity);
+    refreshCartPages();
+    revalidatePath('/marketplace', 'layout');
+    return { status: 'added', itemCount: cart.itemCount };
   } catch (error) {
-    redirect(cartErrorLocation(error));
+    return { status: 'error', code: cartErrorCode(error) };
   }
-  refreshCartPages();
-  redirect('/marketplace/cart?notice=added');
 }
 
 export async function updateMarketplaceCartItemAction(formData: FormData): Promise<void> {

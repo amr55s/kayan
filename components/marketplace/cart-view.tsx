@@ -7,7 +7,13 @@ import { Separator } from '@heroui/react/separator';
 import { Minus, Plus } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { formatMarketplaceMoney, marketplaceProductHref } from './format';
+import {
+  formatMarketplaceCount,
+  formatMarketplaceMoney,
+  formatMarketplaceQuantity,
+  MARKETPLACE_ITEM_NOUN,
+  marketplaceProductHref,
+} from './format';
 import { MarketplaceStatePanel } from './state-panel';
 import type {
   MarketplaceCartLineViewModel,
@@ -81,7 +87,7 @@ function CartLine({
                   <Minus className="size-4" aria-hidden="true" />
                 </Button.Root>
               </form>
-              <span className={styles.quantityValue} aria-live="polite">{line.quantity}</span>
+              <span className={styles.quantityValue} aria-live="polite">{formatMarketplaceCount(line.quantity)}</span>
               <form action={updateLineAction}>
                 <input type="hidden" name="variantId" value={line.variantId} />
                 <input type="hidden" name="quantity" value={String(Math.min(line.maxQuantity, line.quantity + 1))} />
@@ -97,7 +103,7 @@ function CartLine({
               </form>
             </div>
           ) : (
-            <span className={styles.muted}>الكمية: {line.quantity}</span>
+            <span className={styles.muted}>الكمية: {formatMarketplaceCount(line.quantity)}</span>
           )}
 
           {removeLineAction ? (
@@ -145,7 +151,7 @@ export function MarketplaceCart({
         <div>
           <p className={styles.eyebrow}>السلة</p>
           <h1 id="cart-title" className={styles.title}>مراجعة طلبك</h1>
-          <p className={styles.subtitle}>{model.itemCount} عنصر في السلة</p>
+          <p className={styles.subtitle}>{formatMarketplaceQuantity(model.itemCount, MARKETPLACE_ITEM_NOUN)} في السلة</p>
         </div>
       </header>
 
