@@ -103,7 +103,7 @@ test('signed flow inspection preserves exact intent shapes, phase, expiry, and t
   );
 });
 
-test('two tabs serialize fixed-key PKCE without overwriting the first signed intent', async () => {
+test('an unfinished attempt never locks sign-in: the newest attempt replaces it', async () => {
   const { startGoogleOAuthFlow } = requireModule(oauthFlow, 'oauth-flow');
   const cookie = memoryCookie();
   let oauthStarts = 0;
@@ -132,10 +132,13 @@ test('two tabs serialize fixed-key PKCE without overwriting the first signed int
   );
 
   assert.equal(first.success, true);
-  assert.equal(second.success, false);
-  assert.equal(second.code, 'oauth_in_progress');
-  assert.equal(oauthStarts, 1);
-  assert.equal(cookie.value, firstCookie, 'tab B must not overwrite tab A intent');
+  assert.equal(second.success, true, 'a second attempt must start instead of reporting a lock');
+  assert.equal(oauthStarts, 2);
+  assert.notEqual(cookie.value, firstCookie, 'the newest attempt owns the signed flow');
+  assert.equal(
+    intentCookie.inspectChatIntentCookie(cookie.value, { secret, now: issuedAt }).flow.flowId,
+    flowB,
+  );
 
   cookie.delete();
   authenticated = true;
@@ -144,7 +147,7 @@ test('two tabs serialize fixed-key PKCE without overwriting the first signed int
     { ...common, randomFlowId: () => flowB },
   );
   assert.deepEqual(sharedSessionRetry, { success: true, url: '/marketplace?store=b' });
-  assert.equal(oauthStarts, 1, 'an existing shared session must not start another PKCE flow');
+  assert.equal(oauthStarts, 2, 'an existing shared session must not start another PKCE flow');
 });
 
 test('stale and cancelled flows can be replaced but active recovery cannot be overwritten', async () => {
@@ -690,7 +693,7 @@ test('anonymous checkout/chat gates and oauth-in-progress guidance are behaviora
   );
   assert.deepEqual(oauthFlow.oauthInProgressFeedback(), {
     code: 'oauth_in_progress',
-    message: 'هناك محاولة تسجيل دخول جارية في تبويب آخر. أكملها أو ألغها هناك، ثم أعد المحاولة هنا.',
+    message: 'نُكمل تجهيز حسابك من محاولة الدخول السابقة. انتظر لحظات ثم أعد المحاولة.',
   });
 });
 

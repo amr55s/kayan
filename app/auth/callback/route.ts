@@ -69,9 +69,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(result.redirectTo);
   } catch (error) {
     logSafeServerFailure('error', 'google_sign_in_callback_failed', { failure: error });
-    return NextResponse.json(
-      { error: 'authentication_unavailable' },
-      { status: 503 },
-    );
+    // Land on the sign-in page with an explanation instead of a raw error body.
+    // The destination is this request's own origin, so it cannot be redirected elsewhere.
+    return NextResponse.redirect(new URL('/signin?error=oauth_callback', new URL(request.url).origin));
   }
 }

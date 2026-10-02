@@ -17,7 +17,7 @@ export type GoogleOAuthStartResult =
 export function oauthInProgressFeedback() {
   return {
     code: 'oauth_in_progress' as const,
-    message: 'هناك محاولة تسجيل دخول جارية في تبويب آخر. أكملها أو ألغها هناك، ثم أعد المحاولة هنا.',
+    message: 'نُكمل تجهيز حسابك من محاولة الدخول السابقة. انتظر لحظات ثم أعد المحاولة.',
   };
 }
 
@@ -47,7 +47,10 @@ export async function startGoogleOAuthFlow(
     secret: dependencies.secret,
     now: dependencies.now(),
   });
-  if (current.status === 'valid' && current.flow.phase !== 'cancelled') {
+  // Only the post-login recovery steps hold the flow. An unfinished trip to
+  // Google must never lock the visitor out: a new attempt replaces it, and the
+  // abandoned tab's callback fails its flow check and asks them to start again.
+  if (current.status === 'valid' && (current.flow.phase === 'recovery' || current.flow.phase === 'profile_recovery')) {
     return { success: false, ...oauthInProgressFeedback() };
   }
 

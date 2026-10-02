@@ -38,7 +38,7 @@ function transitions(order: MarketplaceOrderDetail, role: Role): Transition[] {
   const merchantLike = role === 'merchant' || role === 'admin';
   if (['return_requested', 'return_approved'].includes(order.status)) return result;
   if (merchantLike && order.status === 'pending_confirmation') {
-    result.push({ next: 'confirmed', label: 'تأكيد الطلب' }, { next: 'rejected', label: 'رفض الطلب', needsReason: true, danger: true });
+    result.push({ next: 'confirmed', label: 'قبول الطلب' }, { next: 'rejected', label: 'رفض الطلب', needsReason: true, danger: true });
   }
   if (merchantLike && order.status === 'confirmed') result.push({ next: 'preparing', label: 'بدء التجهيز' });
   if (merchantLike && order.status === 'preparing') result.push({ next: 'ready_for_pickup', label: 'جاهز للاستلام' });
@@ -68,7 +68,7 @@ function nextStepHint(order: MarketplaceOrderDetail, role: Role): string | null 
   if (role === 'customer') {
     const hints: Partial<Record<MarketplaceOrderStatus, string>> = {
       pending_confirmation: 'وصل طلبك للمتجر وننتظر تأكيده. يمكنك إلغاء الطلب قبل التأكيد.',
-      confirmed: 'أكد المتجر طلبك وسيبدأ تجهيزه.',
+      confirmed: 'قبل المتجر طلبك وسيبدأ تجهيزه. يمكنك التواصل معه مباشرة من بيانات المتجر بالأسفل.',
       preparing: 'المتجر يجهّز طلبك الآن.',
       ready_for_pickup: selfDelivery ? 'طلبك جاهز وسيخرج مع مندوب المتجر.' : 'طلبك جاهز وننتظر استلام الكابتن له.',
       out_for_delivery: 'طلبك في الطريق. جهّز المبلغ نقدًا للدفع عند الاستلام.',
@@ -89,14 +89,26 @@ function nextStepHint(order: MarketplaceOrderDetail, role: Role): string | null 
     return hints[order.status] ?? null;
   }
   const hints: Partial<Record<MarketplaceOrderStatus, string>> = {
-    pending_confirmation: 'طلب جديد بانتظار قرارك: أكّده أو ارفضه مع ذكر السبب.',
+    pending_confirmation: 'طلب جديد بانتظار قرارك. بيانات العميل وعنوانه تظهر لك فور القبول.',
     confirmed: 'ابدأ تجهيز الطلب.',
     preparing: 'عند انتهاء التجهيز علّم الطلب «جاهز للاستلام».',
-    ready_for_pickup: selfDelivery ? 'سلّم الطلب لمندوبك ثم علّمه «خرج للتوصيل».' : 'الطلب معروض على كباتن ديرتك وسيستلمه أول من يقبله.',
+    ready_for_pickup: selfDelivery ? 'سلّم الطلب لمندوبك أو لكابتن من دليل ديرتك، ثم علّمه «خرج للتوصيل».' : 'الطلب معروض على كباتن ديرتك وسيستلمه أول من يقبله.',
     out_for_delivery: selfDelivery ? 'بعد التسليم وتحصيل المبلغ اضغط «تأكيد التسليم».' : 'الكابتن في الطريق إلى العميل.',
-    delivered: 'اكتمل الطلب وتُحتسب عمولة المنصة عليه في كشف العمولات.',
+    delivered: 'اكتمل الطلب.',
   };
   return hints[order.status] ?? null;
+}
+
+/** Egyptian mobile (01xxxxxxxxx) as the international number WhatsApp expects. */
+function whatsappHref(phone: string): string {
+  return `https://wa.me/2${phone.replace(/\D/gu, '')}`;
+}
+
+function ContactLinks({ phone, whatsapp }: { phone: string; whatsapp?: string | null }) {
+  return <span className={styles.contactLinks}>
+    <a className={`${styles.link} ${styles.secondary}`} href={`tel:${phone}`}>اتصال <bdi dir="ltr">{phone}</bdi></a>
+    <a className={`${styles.link} ${styles.secondary}`} href={whatsappHref(whatsapp ?? phone)} target="_blank" rel="noreferrer">واتساب</a>
+  </span>;
 }
 
 export function MarketplaceOrderDetailView({ order, role, returnTo, notice, error }: {
@@ -108,6 +120,21 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
 }) {
   const availableTransitions = transitions(order, role);
   const showRecipientPhone = role !== 'merchant' || order.deliveryMode === 'self';
+  const merchantLike = role === 'merchant' || role === 'admin';
+  const quote = merchantLike && order.status === 'pending_confirmation' ? order.platformFeeQuote : null;
+  const feeQuotePanel = quote ? <div className={styles.feeQuote}>
+    {quote.subscriptionActive
+      ? <p><strong>اشتراكك فعّال:</strong> قبول هذا الطلب بدون رسوم.</p>
+      : quote.freeOrdersRemaining > 0
+        ? <p><strong>هذا الطلب مجاني.</strong> متبقٍ لك {formatMarketplaceCount(quote.freeOrdersRemaining)} من الطلبات المجانية.</p>
+        : <>
+          <p>رسم قبول هذا الطلب: <strong>{formatMarketplaceMoney({ amountMinor: quote.feeMinor, currency: 'EGP' })}</strong> · رصيدك: <strong>{formatMarketplaceMoney({ amountMinor: quote.balanceMinor, currency: 'EGP' })}</strong></p>
+          {quote.balanceMinor < quote.feeMinor
+            ? <p role="alert" className={styles.feeQuoteWarning}>الرصيد لا يكفي لقبول الطلب. <Link href="/merchant/marketplace/wallet">اشحن المحفظة</Link> ثم ارجع لقبوله.</p>
+            : null}
+        </>}
+    <p className={styles.meta}>الرسم يُخصم عند القبول فقط؛ الرفض أو إلغاء العميل قبل القبول بلا رسوم.</p>
+  </div> : null;
   const returnableItems = order.items.filter((item) => item.returnedQuantity < item.quantity);
   const canManageReturns = role === 'merchant' || role === 'admin';
   const chatRoute = role === 'merchant'
@@ -192,7 +219,7 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
   const listHref = returnTo.slice(0, returnTo.lastIndexOf('/'));
   const progressIndex = progressSteps.indexOf(order.status);
   const hint = nextStepHint(order, role);
-  const actionsPanel = availableTransitions.length > 0 ? <section aria-labelledby="actions-title" className={styles.panel}><h2 id="actions-title">الإجراءات المتاحة</h2><div className={styles.actions}>
+  const actionsPanel = availableTransitions.length > 0 ? <section aria-labelledby="actions-title" className={styles.panel}><h2 id="actions-title">الإجراءات المتاحة</h2>{feeQuotePanel}<div className={styles.actions}>
     {availableTransitions.map((transition) => <form action={transitionMarketplaceOrderAction} className={styles.form} key={transition.next}>
       <input type="hidden" name="orderId" value={order.id} /><input type="hidden" name="next" value={transition.next} /><input type="hidden" name="returnTo" value={returnTo} />
       {transition.next === 'delivered' ? <input type="hidden" name="collectedAmountMinor" value={String(order.grandTotalMinor)} /> : null}
@@ -206,7 +233,7 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
       <Link href={listHref} className={styles.backLink}>→ العودة إلى الطلبات</Link>
       <OperationsFeedback notice={notice} error={error} />
       <header className={styles.header}>
-        <div><p className={styles.eyebrow}>{order.storeName}</p><h1 className={styles.title}>طلب <bdi dir="ltr">{order.publicCode}</bdi></h1><p className={styles.subtitle}>الدفع نقدًا عند الاستلام · {order.deliveryMode === 'self' ? 'توصيل المتجر' : 'توصيل ديرتك'}</p></div>
+        <div><p className={styles.eyebrow}>{order.storeName}</p><h1 className={styles.title}>طلب <bdi dir="ltr">{order.publicCode}</bdi></h1><p className={styles.subtitle}>الدفع نقدًا عند الاستلام · {order.deliveryMode === 'self' ? 'التوصيل عن طريق المتجر' : 'توصيل ديرتك'}{order.deliveryZoneName ? ` · ${order.deliveryZoneName}` : ''}</p></div>
         <span className={styles.status}>{marketplaceStatusLabels[order.status]}</span>
       </header>
 
@@ -241,9 +268,24 @@ export function MarketplaceOrderDetailView({ order, role, returnTo, notice, erro
         {order.address.recipientName ? <p><strong>المستلم:</strong> {order.address.recipientName}</p> : null}
         <p><strong>العنوان:</strong> {order.address.addressLine}</p>
         {addressExtras.length > 0 ? <p className={styles.meta}>{addressExtras.join(' · ')}</p> : null}
-        {showRecipientPhone && order.address.recipientPhone ? <p><strong>رقم التواصل للتسليم:</strong> <bdi dir="ltr">{order.address.recipientPhone}</bdi></p> : null}
+        {showRecipientPhone && order.address.recipientPhone ? <p><strong>{role === 'customer' ? 'رقمك للتواصل:' : 'رقم العميل:'}</strong> {role === 'customer' ? <bdi dir="ltr">{order.address.recipientPhone}</bdi> : <ContactLinks phone={order.address.recipientPhone} />}</p> : null}
         {order.deliveryNotes ? <p><strong>ملاحظات:</strong> {order.deliveryNotes}</p> : null}
       </Card.Content></Card.Root> : null}
+      {order.address.redacted && !order.accepted && role !== 'customer' ? <Card.Root className={styles.card}><Card.Content className={styles.cardContent}>
+        <h2>بيانات الاستلام</h2>
+        {order.deliveryZoneName ? <p><strong>منطقة التوصيل:</strong> {order.deliveryZoneName}</p> : null}
+        <p className={styles.meta}>اسم العميل ورقمه وعنوانه التفصيلي تظهر هنا بعد قبول الطلب.</p>
+      </Card.Content></Card.Root> : null}
+      {role === 'customer' && order.accepted && order.storeContact ? <Card.Root className={styles.card}><Card.Content className={styles.cardContent}>
+        <h2>تواصل مع المتجر</h2>
+        <p className={styles.meta}>قبل المتجر طلبك. تواصل معه مباشرة لترتيب التوصيل أو لأي استفسار.</p>
+        <ContactLinks phone={order.storeContact.phone} whatsapp={order.storeContact.whatsapp} />
+      </Card.Content></Card.Root> : null}
+      {merchantLike && order.platformFee ? <p className={styles.meta}>
+        {order.platformFee.type === 'order_fee'
+          ? <>رسم المنصة على هذا الطلب: <strong>{formatMarketplaceMoney({ amountMinor: order.platformFee.amountMinor, currency: 'EGP' })}</strong></>
+          : order.platformFee.type === 'free_order' ? 'هذا الطلب ضمن طلباتك المجانية — بدون رسوم.' : 'هذا الطلب ضمن اشتراكك — بدون رسوم.'}
+      </p> : null}
       {order.delivery?.driverName && role !== 'driver' ? <p className={styles.meta}>الكابتن: {order.delivery.driverName}</p> : null}
 
       {role === 'driver' && order.deliveryMode === 'platform' && order.status === 'out_for_delivery' && !order.delivery?.proofAvailable

@@ -46,11 +46,11 @@ export default async function AdminMarketplaceOrdersPage({ searchParams }: { sea
   ]);
   const returnTo = '/admin/marketplace/orders';
   return <main id="main-content" className={styles.page}>
-    <header className={styles.header}><div><p className={styles.eyebrow}>إدارة المنصة</p><h1 className={styles.title}>عمليات السوق</h1><p className={styles.subtitle}>كل عضو يرى أدوات الدور المسند إليه فقط.</p></div><nav aria-label="إدارة السوق"><Link href="/account/notifications">الإشعارات</Link>{superAdmin ? <> · <Link href="/admin/marketplace/setup">إعدادات السوق</Link> · <Link href="/admin/marketplace/memberships">صلاحيات الإدارة</Link></> : null}</nav></header>
+    <header className={styles.header}><div><p className={styles.eyebrow}>إدارة المنصة</p><h1 className={styles.title}>عمليات السوق</h1><p className={styles.subtitle}>كل عضو يرى أدوات الدور المسند إليه فقط.</p></div><nav aria-label="إدارة السوق"><Link href="/admin/marketplace/dashboard">لوحة المتابعة</Link>{canFinance ? <> · <Link href="/admin/marketplace/wallets">المحافظ والرسوم</Link></> : null} · <Link href="/account/notifications">الإشعارات</Link>{superAdmin ? <> · <Link href="/admin/marketplace/setup">إعدادات السوق</Link> · <Link href="/admin/marketplace/memberships">صلاحيات الإدارة</Link></> : null}</nav></header>
     <OperationsFeedback notice={query.notice} error={query.error} />
     {canReview ? <ModerationQueue items={moderation.items} returnTo={returnTo} /> : null}
     {canReview ? <CategoryProposalQueue items={categoryProposals} categories={categories} returnTo={returnTo} /> : null}
-    {canFinance ? <><AdminCommissionStatements items={commissions.items} /><CashOperations collections={collections.items} reconciliations={reconciliations.items} role="admin" returnTo={returnTo} detailBase="/admin/marketplace/reconciliations" /></> : null}
+    {canFinance && (commissions.items.length > 0 || collections.items.length > 0 || reconciliations.items.length > 0) ? <><AdminCommissionStatements items={commissions.items} /><CashOperations collections={collections.items} reconciliations={reconciliations.items} role="admin" returnTo={returnTo} detailBase="/admin/marketplace/reconciliations" /></> : null}
     {canSupport ? <SupportThreads items={support.items} detailBase="/admin/marketplace/support" /> : null}
     {canOperate ? <><h2 className={styles.sectionTitle}>الطلبات</h2><MarketplaceOrderList orders={orders} detailBase="/admin/marketplace/orders" /></> : null}
   </main>;

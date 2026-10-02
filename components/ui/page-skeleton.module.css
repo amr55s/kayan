@@ -1,0 +1,95 @@
+.page {
+  display: grid;
+  width: min(1180px, calc(100% - 2rem));
+  gap: 0.9rem;
+  margin: 0 auto;
+  padding: 2rem 0 4rem;
+}
+
+.embedded {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.block {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.7rem;
+  background: #ececee;
+}
+
+.block::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  content: '';
+  transform: translateX(-100%);
+  animation: page-skeleton-shimmer 1.3s ease-in-out infinite;
+}
+
+.title {
+  width: min(22rem, 70%);
+  height: 2.2rem;
+}
+
+.line {
+  width: min(32rem, 90%);
+  height: 0.9rem;
+}
+
+.strip {
+  height: 3rem;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: 0.6rem;
+}
+
+.tile {
+  height: 5.5rem;
+}
+
+.panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 0.75rem;
+}
+
+.panel {
+  height: 12rem;
+}
+
+.table {
+  height: 14rem;
+}
+
+.rows {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.row {
+  height: 5.5rem;
+}
+
+@keyframes page-skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .block::after {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    width: min(100% - 1rem, 1180px);
+    padding-top: 1rem;
+  }
+}

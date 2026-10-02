@@ -284,7 +284,8 @@ export function MarketplaceCodCheckout({
 
               <div className={styles.codBox}>
                 <strong className={styles.codTitle}>الدفع نقدًا عند الاستلام</strong>
-                <p className={styles.codText}>لا نطلب بيانات بطاقة. ادفع المبلغ المؤكد عند استلام الطلب.</p>
+                <p className={styles.codText}>لا نطلب بيانات بطاقة. ادفع المبلغ المؤكد للمتجر عند استلام الطلب.</p>
+                <p className={styles.codText}>بعد قبول المتجر لطلبك يظهر لك رقمه للتواصل المباشر، ويوصّل لك المتجر الطلب بنفسه.</p>
                 <p className={styles.codText}>
                   لحماية الحساب في أول طلب: الحد الأقصى 2,000 جنيه و10 وحدات، ويسمح بطلب واحد مفتوح حتى أول تسليم ناجح.
                 </p>

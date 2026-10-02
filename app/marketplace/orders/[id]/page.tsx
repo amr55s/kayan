@@ -60,7 +60,7 @@ export default async function MarketplaceOrderPage({
         <div>
           <p className={styles.eyebrow}>طلبك</p>
           <h1 id="order-title" className={styles.title}>رقم المتابعة <bdi dir="ltr">{orderGroup.publicCode}</bdi></h1>
-          <p className={styles.subtitle}>الدفع نقدًا عند الاستلام. ستظهر حالة كل متجر داخل هذه الصفحة.</p>
+          <p className={styles.subtitle}>وصل طلبك للمتجر. عند قبوله يظهر لك رقم المتجر داخل صفحة الطلب لتتواصلا مباشرة وترتّبا التوصيل، والدفع نقدًا عند الاستلام.</p>
         </div>
         <Link href="/marketplace">
           <Button.Root className={styles.secondaryButton}>
