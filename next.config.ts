@@ -35,6 +35,10 @@ const imageSources = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['exceljs', 'sharp'],
+  // sharp opens the card fonts by path, which file tracing cannot see.
+  outputFileTracingIncludes: {
+    '/api/marketing-card': ['./assets/fonts/*.ttf'],
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '4mb',

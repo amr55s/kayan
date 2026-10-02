@@ -9,10 +9,10 @@ import { fetchPublicDrivers } from '@/lib/supabase/queries';
 import {
   marketingIdeas,
   marketingCardTitle,
-  marketingTemplateLabels,
   marketingUrl,
   SITE_URL,
 } from '@/lib/marketing/content';
+import type { DailyThemeKey } from '@/lib/marketing/playbook';
 import type { Driver, MarketingTemplateKey, Place } from '@/types';
 
 export const runtime = 'nodejs';
@@ -34,7 +34,25 @@ const querySchema = z.object({
   ]).default('general_site'),
   ref: z.string().regex(/^[a-z0-9_-]{8,64}$/i).optional(),
   preview: z.literal('1').optional(),
+  theme: z.enum([
+    'spotlight',
+    'fresh',
+    'category',
+    'merchant_invite',
+    'community',
+    'weekend',
+    'ambassador',
+  ]).optional(),
+  format: z.enum(['square', 'story']).default('square'),
 });
+
+// Fixed copy only: the card endpoint is public, so callers pick a theme rather
+// than supplying their own text.
+const placeThemeSubtitles: Partial<Record<DailyThemeKey, string>> = {
+  spotlight: 'محل الأسبوع على ديرتك',
+  fresh: 'جديد على ديرتك',
+  weekend: 'اقتراح الويك إند',
+};
 
 const renderLimits = new Map<string, { startedAt: number; attempts: number }>();
 
@@ -74,6 +92,56 @@ function splitTitle(value: string, maxLength = 28): [string, string?] {
     first = `${first} ${words.shift()}`.trim();
   }
   return [first || value.slice(0, maxLength), words.join(' ').slice(0, maxLength)];
+}
+
+// The serverless runtime ships no Arabic system font, so text is drawn from
+// bundled font files instead of SVG <text> (which would render empty boxes).
+const CARD_FONT_FILES = {
+  400: join(process.cwd(), 'assets', 'fonts', 'DairtakCard-400.ttf'),
+  700: join(process.cwd(), 'assets', 'fonts', 'DairtakCard-700.ttf'),
+} as const;
+
+type CardText = {
+  text: string;
+  size: number;
+  weight: 400 | 700;
+  color: string;
+  /** Anchor point and baseline in the 1080-wide design space. */
+  x: number;
+  baseline: number;
+  anchor: 'end' | 'middle';
+  maxWidth: number;
+};
+
+async function textLayer(spec: CardText, scale: number): Promise<OverlayOptions | null> {
+  if (!spec.text.trim()) return null;
+  const size = Math.max(1, Math.round(spec.size * scale));
+  let { data, info } = await sharp({
+    text: {
+      text: `<span foreground="${spec.color}">${escapeXml(spec.text)}</span>`,
+      font: `Dairtak Card ${spec.weight === 700 ? 'Bold ' : ''}${size}`,
+      fontfile: CARD_FONT_FILES[spec.weight],
+      rgba: true,
+      dpi: 72,
+    },
+  }).png().toBuffer({ resolveWithObject: true });
+  const maxWidth = Math.round(spec.maxWidth * scale);
+  if (info.width > maxWidth) {
+    ({ data, info } = await sharp(data)
+      .resize({ width: maxWidth })
+      .png()
+      .toBuffer({ resolveWithObject: true }));
+  }
+  const anchorX = Math.round(spec.x * scale);
+  const left = spec.anchor === 'end' ? anchorX - info.width : anchorX - Math.round(info.width / 2);
+  // The rendered line box sits roughly 78% above the baseline.
+  const top = Math.round(spec.baseline * scale) - Math.round(info.height * 0.78);
+  return { input: data, left: Math.max(0, left), top: Math.max(0, top) };
+}
+
+async function textLayers(specs: CardText[], scale: number): Promise<OverlayOptions[]> {
+  const layers = await Promise.all(specs.map((spec) => textLayer(spec, scale)));
+  return layers.filter((layer): layer is OverlayOptions => layer !== null);
 }
 
 async function safeImageBuffer(
@@ -143,6 +211,29 @@ async function loadEntity(
   return {};
 }
 
+// 9:16 frame for WhatsApp Status and stories: the square card sits in the
+// middle so the QR code stays clear of the viewer's top and bottom chrome.
+async function storyCard(square: Buffer, width: number, scale: number): Promise<Buffer> {
+  const height = Math.round(1920 * scale);
+  const frame = Buffer.from(`
+    <svg width="${width}" height="${height}" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+      <rect width="1080" height="1920" fill="#09090b"/>
+      <rect x="0" y="0" width="1080" height="14" fill="#ff7a1a"/>
+    </svg>
+  `);
+  const centered = { x: 540, anchor: 'middle', maxWidth: 960, weight: 700 } as const;
+  const text = await textLayers([
+    { ...centered, text: 'ديرتك', size: 64, color: '#ffffff', baseline: 250 },
+    { ...centered, text: 'كل ما تحتاجه في مكان واحد', size: 34, color: '#a1a1aa', baseline: 330 },
+    { ...centered, text: 'امسح الكود أو افتح الرابط', size: 44, color: '#ffffff', baseline: 1640 },
+    { ...centered, text: 'محلات منطقتك كلها في جيبك', size: 34, color: '#ff7a1a', baseline: 1710 },
+  ], scale);
+  return sharp(frame)
+    .composite([{ input: square, left: 0, top: Math.round(420 * scale) }, ...text])
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer();
+}
+
 export async function GET(request: Request) {
   if (!allowRender(request)) {
     return Response.json(
@@ -156,7 +247,7 @@ export async function GET(request: Request) {
     return Response.json({ message: 'Invalid card request' }, { status: 400 });
   }
 
-  const { type, id, template, ref, preview } = parsed.data;
+  const { type, id, template, ref, preview, theme, format } = parsed.data;
   if ((type === 'place' || type === 'driver') && !id) {
     return Response.json({ message: 'Missing entity' }, { status: 400 });
   }
@@ -173,10 +264,10 @@ export async function GET(request: Request) {
     driver: entity.driver,
   });
   const subtitle = entity.place
-    ? 'مكان جديد داخل دليل ديرتك'
+    ? (theme && placeThemeSubtitles[theme]) || 'مكان جديد داخل دليل ديرتك'
     : entity.driver
       ? `${entity.driver.vehicle_type || 'كابتن توصيل'} — متابعة عبر ديرتك`
-      : marketingTemplateLabels[templateKey];
+      : 'دليل ومتجر منطقتك';
   const ideaPath = marketingIdeas.find((idea) => idea.key === templateKey)?.path || '/';
   const targetUrl = type === 'feature'
     ? (() => {
@@ -223,17 +314,18 @@ export async function GET(request: Request) {
       <rect x="80" y="92" width="920" height="470" rx="42" fill="none" stroke="#e4e4e7" stroke-width="3"/>
       <rect x="112" y="116" width="320" height="98" rx="28" fill="#ffffff"/>
       ${photo ? '<rect x="80" y="92" width="920" height="470" rx="42" fill="url(#shade)" opacity="0"/>' : ''}
-      <g text-anchor="end" font-family="Arial, sans-serif">
-        <text x="650" y="655" fill="#71717a" font-size="28" font-weight="700">${escapeXml(subtitle)}</text>
-        <text x="650" y="718" fill="#09090b" font-size="47" font-weight="800">${escapeXml(titleLineOne)}</text>
-        ${titleLineTwo ? `<text x="650" y="775" fill="#09090b" font-size="42" font-weight="800">${escapeXml(titleLineTwo)}</text>` : ''}
-        <text x="650" y="850" fill="#3f3f46" font-size="29" font-weight="700">طلب ومتابعة من داخل الموقع</text>
-        <text x="650" y="906" fill="#71717a" font-size="24">امسح الكود لفتح ديرتك ومتابعة التفاصيل</text>
-      </g>
       <rect x="710" y="660" width="290" height="290" rx="36" fill="#ffffff" stroke="#e4e4e7" stroke-width="3"/>
-      <text x="540" y="994" text-anchor="middle" fill="#71717a" font-family="Arial, sans-serif" font-size="22">كل ما تحتاجه في مكان واحد</text>
     </svg>
   `);
+  const column = { x: 650, anchor: 'end', maxWidth: 560 } as const;
+  const text = await textLayers([
+    { ...column, text: subtitle, size: 28, weight: 700, color: '#71717a', baseline: 655 },
+    { ...column, text: titleLineOne, size: 47, weight: 700, color: '#09090b', baseline: 718 },
+    { ...column, text: titleLineTwo ?? '', size: 42, weight: 700, color: '#09090b', baseline: 775 },
+    { ...column, text: 'طلب ومتابعة من داخل الموقع', size: 29, weight: 700, color: '#3f3f46', baseline: 850 },
+    { ...column, text: 'امسح الكود لفتح ديرتك ومتابعة التفاصيل', size: 24, weight: 400, color: '#71717a', baseline: 906 },
+    { x: 540, anchor: 'middle', maxWidth: 900, text: 'كل ما تحتاجه في مكان واحد', size: 22, weight: 400, color: '#71717a', baseline: 994 },
+  ], renderScale);
 
   let card = sharp(svg);
   const composites: OverlayOptions[] = [];
@@ -271,11 +363,16 @@ export async function GET(request: Request) {
       top: Math.round(675 * renderScale),
     },
   );
+  composites.push(...text);
   card = card.composite(composites);
-  const png = await card
+  const square = await card
     .png({ compressionLevel: 9, adaptiveFiltering: true })
     .toBuffer();
-  const safeName = `${type}-${id || template}`.replace(/[^a-z0-9-]/gi, '');
+  const png = format === 'story'
+    ? await storyCard(square, renderSize, renderScale)
+    : square;
+  const safeName = `${type}-${id || template}${format === 'story' ? '-story' : ''}`
+    .replace(/[^a-z0-9-]/gi, '');
 
   return new Response(new Uint8Array(png), {
     headers: {

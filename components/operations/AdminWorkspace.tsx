@@ -175,6 +175,7 @@ type AdminWorkspaceProps = {
   marketingChannels: MarketingChannel[];
   marketingCampaigns: MarketingCampaign[];
   marketingDrivers: Driver[];
+  marketingToday: string;
 };
 
 export function AdminWorkspace(props: AdminWorkspaceProps) {
@@ -618,6 +619,10 @@ export function AdminWorkspace(props: AdminWorkspaceProps) {
             drivers={props.marketingDrivers}
             channels={props.marketingChannels}
             campaigns={props.marketingCampaigns}
+            today={props.marketingToday}
+            claimedPlaceIds={props.branches.flatMap((branch) => (branch.place_id ? [branch.place_id] : []))}
+            placeEngagement={props.behaviorAnalytics.placeEngagement}
+            campaignEvents={props.behaviorAnalytics.campaignEvents}
           />
         </Tab>
         <Tab

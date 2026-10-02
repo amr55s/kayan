@@ -29,6 +29,9 @@ import {
   marketingTemplateLabels,
 } from '@/lib/marketing/content';
 import { formatCairoDate } from '@/lib/format-date';
+import type { BehaviorAnalyticsSummary } from '@/lib/analytics/admin';
+import { DailyMarketingPlan } from '@/components/admin/marketing/DailyMarketingPlan';
+import { MerchantOutreach } from '@/components/admin/marketing/MerchantOutreach';
 import {
   prepareMarketingCampaign,
   recordMarketingPublication,
@@ -165,11 +168,19 @@ export function MarketingCenter({
   drivers,
   channels,
   campaigns,
+  today,
+  claimedPlaceIds,
+  placeEngagement,
+  campaignEvents,
 }: {
   places: Place[];
   drivers: Driver[];
   channels: MarketingChannel[];
   campaigns: MarketingCampaign[];
+  today: string;
+  claimedPlaceIds: string[];
+  placeEngagement: BehaviorAnalyticsSummary['placeEngagement'];
+  campaignEvents: BehaviorAnalyticsSummary['campaignEvents'];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -274,6 +285,25 @@ export function MarketingCenter({
   return (
     <div className="space-y-5">
       {message && <p role="status" className="rounded-xl border border-zinc-200 bg-zinc-100 p-3 text-sm font-bold">{message}</p>}
+
+      <DailyMarketingPlan
+        today={today}
+        places={places}
+        engagement={placeEngagement}
+        campaignEvents={campaignEvents}
+        onMessage={setMessage}
+      />
+
+      <MerchantOutreach
+        today={today}
+        places={places}
+        claimedPlaceIds={claimedPlaceIds}
+        engagement={placeEngagement}
+        campaigns={campaigns}
+        campaignEvents={campaignEvents}
+        channelId={selectedChannelId}
+        onMessage={setMessage}
+      />
 
       <Card className="border border-zinc-200">
         <Card.Header className="flex-col items-stretch gap-3 sm:flex-row sm:items-end sm:justify-between">
