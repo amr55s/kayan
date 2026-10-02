@@ -61,8 +61,13 @@ export const Header: React.FC<HeaderProps> = ({
     void loadDashboardPath().catch((error) => {
       console.warn('Dashboard link could not be loaded:', error);
     });
+    // Signing in or out elsewhere on the page must update the account links at once.
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted) setDashboardPath(session?.user ? '/workspaces' : null);
+    });
     return () => {
       mounted = false;
+      listener.subscription.unsubscribe();
     };
   }, []);
 
