@@ -50,6 +50,12 @@ export async function submitOnboardingDraftAction(input: { draftId: string; expe
         ? 'المسودة تغيرت في تبويب آخر. افتح أحدث نسخة قبل الإرسال.'
         : error.message.includes('onboarding_incomplete')
           ? 'راجع البيانات المطلوبة والصور قبل الإرسال.'
+          : error.message.includes('phone_already_has_account')
+            ? 'رقم الموبايل ده مسجّل على حساب آخر في ديرتك (غالبًا حساب قديم برقم الهاتف). ارجع لخطوة «البيانات الأساسية» واكتب رقمًا آخر، أو ادخل بالحساب القديم من «الحسابات القديمة والإدارة».'
+          : error.message.includes('activity_request_exists')
+            ? 'عندك طلب لهذا النشاط بالفعل. تابع حالته من «مساحات عملي».'
+          : error.message.includes('google_identity_required')
+            ? 'الانضمام يتم بحساب Google. سجّل الدخول بجوجل ثم أعد الإرسال.'
           : isMissingDatabaseRoutine(error)
             ? 'إرسال الطلب غير متاح على قاعدة البيانات الحالية. تقدر تتصفح الدليل لحين تطبيق ترحيلات الأنشطة.'
           : 'تعذر إرسال الطلب الآن. مسودتك محفوظة ويمكنك المحاولة مرة أخرى.';

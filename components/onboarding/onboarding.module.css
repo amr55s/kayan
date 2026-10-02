@@ -46,3 +46,7 @@
   .fields { gap: 1rem; }
 }
 @media (prefers-reduced-motion: reduce) { .choice { transition: none; } }
+
+.identitySignOut { display: inline-flex; min-height: 44px; align-items: center; gap: .4rem; margin-inline-start: auto; border: 1px solid #d4d4d8; border-radius: .6rem; background: #fff; padding-inline: .85rem; color: #3f3f46; font-size: .82rem; font-weight: 800; cursor: pointer; }
+.identitySignOut:hover { border-color: #71717a; color: var(--kayan-black); }
+.identitySignOut[disabled] { cursor: wait; opacity: .6; }

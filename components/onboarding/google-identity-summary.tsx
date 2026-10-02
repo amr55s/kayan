@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { Avatar } from '@heroui/react/avatar';
 import { googleAvatarForPresentation, profileInitials } from '@/lib/onboarding/google-profile-presentation';
+import { SignOutButton } from '@/components/auth/SignOutButton';
 import styles from './onboarding.module.css';
 
 export function GoogleIdentitySummary({ displayName, email, avatarUrl }: {
@@ -22,6 +23,7 @@ export function GoogleIdentitySummary({ displayName, email, avatarUrl }: {
         <strong>{displayName || 'حسابك في ديرتك'}</strong>
         <bdi dir="ltr">{email}</bdi>
       </div>
+      <SignOutButton className={styles.identitySignOut} label="خروج" />
     </section>
   );
 }
